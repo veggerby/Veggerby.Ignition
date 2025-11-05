@@ -36,13 +36,23 @@ builder.Services.AddIgnition(options =>
 builder.Services.AddIgnitionSignal(new CustomConnectionSignal());
 
 // Wrap an existing task
-builder.Services.AddIgnitionTask("cache-warm", cacheWarmTask, timeout: TimeSpan.FromSeconds(5));
+builder.Services.AddIgnitionFromTask("cache-warm", cacheWarmTask, timeout: TimeSpan.FromSeconds(5));
 
 // Wrap a cancellable task factory (invoked lazily once)
-builder.Services.AddIgnitionTask(
+builder.Services.AddIgnitionFromTask(
     name: "search-index",
     readyTaskFactory: ct => indexBuilder.BuildAsync(ct),
     timeout: TimeSpan.FromSeconds(30));
+
+// Adapt a single service exposing a readiness Task
+builder.Services.AddIgnitionFor<MyBackgroundWorker>(w => w.ReadyTask);
+
+// Composite: await all instances of a service type
+builder.Services.AddIgnitionForAll<ShardProcessor>(p => p.ReadyTask);
+
+// TaskCompletionSource helpers
+_startupReady.Ignited();
+_startupReady.IgnitionFailed(ex);
 
 var app = builder.Build();
 
@@ -135,6 +145,27 @@ dotnet nuget add package Veggerby.Ignition
 
 MIT
 
+## Additional Adapters
+
+```csharp
+// Single instance
+services.AddIgnitionFor<CachePrimer>(c => c.ReadyTask);
+
+// Composite group
+services.AddIgnitionForAll<Consumer>(c => c.ReadyTask, groupName: "Consumer[*]");
+
+// Arbitrary provider-based readiness
+services.AddIgnitionFromFactory(
+    taskFactory: sp => Task.WhenAll(
+        sp.GetRequiredService<PrimaryConnection>().OpenAsync(),
+        sp.GetRequiredService<ReplicaConnection>().WarmAsync()),
+    name: "datastore-connections");
+
+// TCS helpers
+_readyTcs.Ignited();
+_readyTcs.IgnitionFailed(new Exception("boom"));
+```
+
 ## Global Timeout Semantics
 
 Ignition exposes two timeout layers:
@@ -185,7 +216,7 @@ services.AddIgnition(o =>
 });
 
 // Defining a per-signal timeout (hard for that signal only):
-services.AddIgnitionTask(
+services.AddIgnitionFromTask(
     name: "search-index",
     readyTaskFactory: ct => indexBuilder.BuildAsync(ct),
     timeout: TimeSpan.FromSeconds(30) // this signal will be marked TimedOut if exceeded
