@@ -1,4 +1,9 @@
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -74,7 +79,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         // Cancel timeout delay if completed
         globalCts.Cancel();
 
-    // Build results snapshot. Unfinished tasks appear as placeholder results when a hard global cancellation occurred.
+        // Build results snapshot. Unfinished tasks appear as placeholder results when a hard global cancellation occurred.
         List<IgnitionSignalResult> results;
         if (globalTimedOut && _options.CancelOnGlobalTimeout)
         {
@@ -99,7 +104,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         {
             results = signalTasks.Select(t => t.IsCompletedSuccessfully ? t.Result : new IgnitionSignalResult("unknown", t.IsCanceled ? IgnitionSignalStatus.TimedOut : IgnitionSignalStatus.Failed, TimeSpan.Zero, t.Exception)).ToList();
         }
-    // Option B semantics: a pure global timeout does not mark TimedOut unless any individual handle timed out (i.e. hard cancellation or per-signal timeout).
+        // Option B semantics: a pure global timeout does not mark TimedOut unless any individual handle timed out (i.e. hard cancellation or per-signal timeout).
         if (globalTimedOut)
         {
             if (_options.CancelOnGlobalTimeout)

@@ -1,8 +1,3 @@
-using System.Threading;
-using System.Threading.Tasks;
-
-using Veggerby.Ignition;
-
 namespace Veggerby.Ignition.Tests;
 
 internal sealed class FakeSignal : IIgnitionSignal

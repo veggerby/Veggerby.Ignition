@@ -1,6 +1,3 @@
-using AwesomeAssertions;
-using Veggerby.Ignition;
-
 namespace Veggerby.Ignition.Tests;
 
 public class IgnitionSignalFactoryTests
