@@ -19,10 +19,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <AdditionalFiles Include="$(BuildFolder)\BannedSymbols.txt" />
-    </ItemGroup>
-
-    <ItemGroup>
         <Using Include="System" />
     </ItemGroup>
 
