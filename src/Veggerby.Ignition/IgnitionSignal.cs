@@ -49,7 +49,6 @@ public static class IgnitionSignal
 
         public Task WaitAsync(CancellationToken cancellationToken = default)
         {
-            // Ensure single invocation of factory (unless previous task faulted and caller wants to observe that again).
             if (_createdTask is null)
             {
                 lock (_sync)
@@ -58,8 +57,7 @@ public static class IgnitionSignal
                 }
             }
 
-            // If caller supplies a cancellation token, we still need to honor it for awaiting.
-            return cancellationToken.CanBeCanceled ? _createdTask.WaitAsync(cancellationToken) : _createdTask;
+            return cancellationToken.CanBeCanceled && !_createdTask.IsCompleted ? _createdTask.WaitAsync(cancellationToken) : _createdTask;
         }
     }
 }

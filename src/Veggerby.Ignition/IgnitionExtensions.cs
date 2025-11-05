@@ -132,7 +132,7 @@ public static class IgnitionExtensions
     /// </summary>
     /// <param name="services">Target DI service collection.</param>
     /// <param name="name">Logical signal name used for diagnostics and result reporting.</param>
-    /// <param name="readyTaskFactory">Factory producing the readiness task (receives a cancellation token which is currently not coordinator-linked).</param>
+    /// <param name="readyTaskFactory">Factory producing the readiness task. Receives the cancellation token from the FIRST wait invocation; subsequent waits reuse the previously created task and cannot alter the token.</param>
     /// <param name="timeout">Optional per-signal timeout limit applied by the coordinator.</param>
     /// <returns>The same service collection for chaining.</returns>
     public static IServiceCollection AddIgnitionFromTask(
@@ -179,7 +179,7 @@ public static class IgnitionExtensions
         services.AddSingleton<IIgnitionSignal>(sp => new ServiceReadySignal<TService>(
             sp,
             name ?? typeof(TService).Name,
-            taskSelector,
+            (svc, _) => taskSelector(svc),
             timeout));
         return services;
     }
@@ -189,14 +189,14 @@ public static class IgnitionExtensions
     /// </summary>
     /// <typeparam name="TService">Service type that exposes a readiness task (for example a hosted background service).</typeparam>
     /// <param name="services">Target DI service collection.</param>
-    /// <param name="taskSelector">Selector returning the readiness task for the resolved service instance; receives a user-supplied <see cref="CancellationToken"/> (not currently coordinator propagated).</param>
+    /// <param name="taskSelector">Selector returning the readiness task for the resolved service instance; receives the cancellation token captured from the FIRST wait invocation (linked to coordinator cancellations).</param>
     /// <param name="name">Optional explicit signal name (defaults to the simple type name of <typeparamref name="TService"/>).</param>
     /// <param name="timeout">Optional per-signal timeout overriding the global option.</param>
     /// <returns>The same service collection for chaining.</returns>
     /// <remarks>
     /// Semantics:
     /// 1. Service resolution and selector invocation occur once (first wait) and the resulting task is cached.
-    /// 2. The passed <see cref="CancellationToken"/> is currently a placeholder for user composition; coordinator cancellation is enforced externally via timeout classification and not injected here.
+    /// 2. The passed <see cref="CancellationToken"/> is captured from the first wait invocation and linked to coordinator driven cancellations (global timeout cancellation or per‑signal timeout when configured). Subsequent waits do not create a new task and therefore cannot change the token.
     /// 3. Name validation and multi-instance behavior mirror the non-cancellable overload.
     /// </remarks>
     public static IServiceCollection AddIgnitionFor<TService>(
@@ -214,7 +214,7 @@ public static class IgnitionExtensions
         services.AddSingleton<IIgnitionSignal>(sp => new ServiceReadySignal<TService>(
             sp,
             name ?? typeof(TService).Name,
-            svc => taskSelector(svc, CancellationToken.None),
+            (svc, ct) => taskSelector(svc, ct),
             timeout));
         return services;
     }
@@ -277,7 +277,7 @@ public static class IgnitionExtensions
         services.AddSingleton<IIgnitionSignal>(sp => new ServiceEnumerableReadySignal<TService>(
             sp,
             groupName ?? $"{typeof(TService).Name}[*]",
-            taskSelector,
+            (svc, _) => taskSelector(svc),
             timeout));
         return services;
     }
@@ -287,12 +287,12 @@ public static class IgnitionExtensions
     /// </summary>
     /// <typeparam name="TService">Service type exposing a readiness task.</typeparam>
     /// <param name="services">Target DI service collection.</param>
-    /// <param name="taskSelector">Cancellable selector producing the readiness task for each instance. (Current implementation does not propagate the coordinator token; the selector is invoked with <see cref="CancellationToken.None"/>.)</param>
+    /// <param name="taskSelector">Cancellable selector producing the readiness task for each instance. The token from the FIRST wait invocation (linked to coordinator cancellations) is propagated to all instance invocations; subsequent waits do not recreate tasks.</param>
     /// <param name="groupName">Optional explicit group name; defaults to <c>TypeName[*]</c>.</param>
     /// <param name="timeout">Optional per-signal timeout for the composite wait.</param>
     /// <returns>The same service collection for chaining.</returns>
     /// <remarks>
-    /// Behavior mirrors the non‑cancellable overload (snapshot at first wait, cached aggregate task). The cancellation token argument is reserved for future coordinator propagation.
+    /// Behavior mirrors the non‑cancellable overload (snapshot at first wait, cached aggregate task) with added cancellation propagation: the token from the initial wait is passed to every instance selector enabling cooperative cancellation on global or per‑signal timeout when configured.
     /// </remarks>
     public static IServiceCollection AddIgnitionForAll<TService>(
         this IServiceCollection services,
@@ -309,7 +309,7 @@ public static class IgnitionExtensions
         services.AddSingleton<IIgnitionSignal>(sp => new ServiceEnumerableReadySignal<TService>(
             sp,
             groupName ?? $"{typeof(TService).Name}[*]",
-            svc => taskSelector(svc, CancellationToken.None),
+            (svc, ct) => taskSelector(svc, ct),
             timeout));
         return services;
     }
@@ -346,7 +346,7 @@ public static class IgnitionExtensions
         services.AddSingleton<IIgnitionSignal>(sp => new ScopedServiceEnumerableReadySignal<TService>(
             sp.GetRequiredService<IServiceScopeFactory>(),
             groupName ?? $"{typeof(TService).Name}[*]",
-            taskSelector,
+            (svc, _) => taskSelector(svc),
             timeout));
         return services;
     }
@@ -356,12 +356,12 @@ public static class IgnitionExtensions
     /// </summary>
     /// <typeparam name="TService">Scoped service type exposing a readiness task.</typeparam>
     /// <param name="services">Target DI service collection.</param>
-    /// <param name="taskSelector">Cancellable selector producing the readiness task for each scoped instance (currently invoked with <see cref="CancellationToken.None"/> until coordinator token propagation is introduced).</param>
+    /// <param name="taskSelector">Cancellable selector producing the readiness task for each scoped instance. The token from the FIRST wait invocation is propagated to all instance invocations within the scope.</param>
     /// <param name="groupName">Optional explicit group name; defaults to <c>TypeName[*]</c>.</param>
     /// <param name="timeout">Optional per-signal timeout applied to the composite.</param>
     /// <returns>The same service collection for chaining.</returns>
     /// <remarks>
-    /// Semantics mirror the non‑cancellable scoped overload. The cancellation token parameter is a forward‑compatibility placeholder.
+    /// Semantics mirror the non‑cancellable scoped overload with added cancellation propagation: the token from the initial wait is passed to every scoped instance selector enabling cooperative cancellation when global or per‑signal timeouts trigger cancellation.
     /// </remarks>
     public static IServiceCollection AddIgnitionForAllScoped<TService>(
         this IServiceCollection services,
@@ -378,43 +378,42 @@ public static class IgnitionExtensions
         services.AddSingleton<IIgnitionSignal>(sp => new ScopedServiceEnumerableReadySignal<TService>(
             sp.GetRequiredService<IServiceScopeFactory>(),
             groupName ?? $"{typeof(TService).Name}[*]",
-            svc => taskSelector(svc, CancellationToken.None),
+            (svc, ct) => taskSelector(svc, ct),
             timeout));
         return services;
     }
 
-    private sealed class ServiceReadySignal<TService>(IServiceProvider provider, string name, Func<TService, Task> selector, TimeSpan? timeout) : IIgnitionSignal where TService : class
+    private sealed class ServiceReadySignal<TService>(IServiceProvider provider, string name, Func<TService, CancellationToken, Task> selector, TimeSpan? timeout) : IIgnitionSignal where TService : class
     {
         private readonly IServiceProvider _provider = provider ?? throw new ArgumentNullException(nameof(provider));
-        private readonly Func<TService, Task> _selector = selector ?? throw new ArgumentNullException(nameof(selector));
+        private readonly Func<TService, CancellationToken, Task> _selector = selector ?? throw new ArgumentNullException(nameof(selector));
         private readonly object _sync = new();
         private Task? _cachedTask;
+        private bool _created;
 
         public string Name { get; } = name ?? throw new ArgumentNullException(nameof(name));
         public TimeSpan? Timeout { get; } = timeout;
 
         public Task WaitAsync(CancellationToken cancellationToken = default)
         {
-            if (_cachedTask is null)
+            if (!_created)
             {
                 lock (_sync)
                 {
-                    _cachedTask ??= _selector(_provider.GetRequiredService<TService>());
+                    if (!_created)
+                    {
+                        _cachedTask = _selector(_provider.GetRequiredService<TService>(), cancellationToken);
+                        _created = true;
+                    }
                 }
             }
 
-            // Fast-path: already completed (success/fault/cancelled) => return directly regardless of cancellation token.
-            if (_cachedTask.IsCompleted)
+            if (_cachedTask!.IsCompleted || !cancellationToken.CanBeCanceled)
             {
-                return _cachedTask; // classification handled by coordinator later.
+                return _cachedTask;
             }
 
-            if (cancellationToken.CanBeCanceled)
-            {
-                // If the task supports cooperative cancellation already (e.g., wired to the token), WaitAsync will propagate quickly.
-                return _cachedTask.WaitAsync(cancellationToken);
-            }
-            return _cachedTask;
+            return _cachedTask.WaitAsync(cancellationToken);
         }
     }
 
@@ -424,21 +423,26 @@ public static class IgnitionExtensions
         private readonly Func<IServiceProvider, Task> _factory = factory;
         private readonly object _sync = new();
         private Task? _task;
+        private bool _created;
 
         public string Name { get; } = name;
         public TimeSpan? Timeout { get; } = timeout;
 
         public Task WaitAsync(CancellationToken cancellationToken = default)
         {
-            if (_task is null)
+            if (!_created)
             {
                 lock (_sync)
                 {
-                    _task ??= _factory(_provider);
+                    if (!_created)
+                    {
+                        _task = _factory(_provider); // factory currently non-cancellable; capture semantics only
+                        _created = true;
+                    }
                 }
             }
 
-            if (_task.IsCompleted || !cancellationToken.CanBeCanceled)
+            if (_task!.IsCompleted || !cancellationToken.CanBeCanceled)
             {
                 return _task;
             }
@@ -447,21 +451,22 @@ public static class IgnitionExtensions
         }
     }
 
-    private sealed class ServiceEnumerableReadySignal<TService>(IServiceProvider provider, string name, Func<TService, Task> taskSelector, TimeSpan? timeout) : IIgnitionSignal where TService : class
+    private sealed class ServiceEnumerableReadySignal<TService>(IServiceProvider provider, string name, Func<TService, CancellationToken, Task> taskSelector, TimeSpan? timeout) : IIgnitionSignal where TService : class
     {
         private readonly object _sync = new();
         private Task? _cached;
+        private bool _created;
 
         public string Name { get; } = name;
         public TimeSpan? Timeout { get; } = timeout;
 
         public Task WaitAsync(CancellationToken cancellationToken = default)
         {
-            if (_cached is null)
+            if (!_created)
             {
                 lock (_sync)
                 {
-                    if (_cached is null)
+                    if (!_created)
                     {
                         var instances = provider.GetServices<TService>().ToList();
                         if (instances.Count == 0)
@@ -473,38 +478,40 @@ public static class IgnitionExtensions
                             var tasks = new Task[instances.Count];
                             for (int i = 0; i < instances.Count; i++)
                             {
-                                tasks[i] = taskSelector(instances[i]);
+                                tasks[i] = taskSelector(instances[i], cancellationToken);
                             }
                             _cached = Task.WhenAll(tasks);
                         }
+                        _created = true;
                     }
                 }
             }
 
-            if (cancellationToken.CanBeCanceled && !_cached.IsCompleted)
+            if (cancellationToken.CanBeCanceled && !_cached!.IsCompleted)
             {
-                return _cached.WaitAsync(cancellationToken);
+                return _cached!.WaitAsync(cancellationToken);
             }
 
-            return _cached;
+            return _cached!;
         }
     }
 
-    private sealed class ScopedServiceEnumerableReadySignal<TService>(IServiceScopeFactory scopeFactory, string name, Func<TService, Task> taskSelector, TimeSpan? timeout) : IIgnitionSignal where TService : class
+    private sealed class ScopedServiceEnumerableReadySignal<TService>(IServiceScopeFactory scopeFactory, string name, Func<TService, CancellationToken, Task> taskSelector, TimeSpan? timeout) : IIgnitionSignal where TService : class
     {
         private readonly object _sync = new();
         private Task? _cached;
+        private bool _created;
 
         public string Name { get; } = name;
         public TimeSpan? Timeout { get; } = timeout;
 
         public Task WaitAsync(CancellationToken cancellationToken = default)
         {
-            if (_cached is null)
+            if (!_created)
             {
                 lock (_sync)
                 {
-                    if (_cached is null)
+                    if (!_created)
                     {
                         var scope = scopeFactory.CreateScope();
                         var provider = scope.ServiceProvider;
@@ -519,25 +526,26 @@ public static class IgnitionExtensions
                             var tasks = new Task[instances.Count];
                             for (int i = 0; i < instances.Count; i++)
                             {
-                                tasks[i] = taskSelector(instances[i]);
+                                tasks[i] = taskSelector(instances[i], cancellationToken);
                             }
 
                             _cached = Task.WhenAll(tasks).ContinueWith(t =>
                             {
                                 scope.Dispose();
-                                return t; // unwrap via Unwrap below
+                                return t;
                             }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Unwrap();
                         }
+                        _created = true;
                     }
                 }
             }
 
-            if (cancellationToken.CanBeCanceled && !_cached.IsCompleted)
+            if (cancellationToken.CanBeCanceled && !_cached!.IsCompleted)
             {
-                return _cached.WaitAsync(cancellationToken);
+                return _cached!.WaitAsync(cancellationToken);
             }
 
-            return _cached;
+            return _cached!;
         }
     }
 }
