@@ -6,13 +6,18 @@
   </PropertyGroup>
 
   <ItemGroup>
+
     <!-- Core runtime deps -->
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="9.0.10" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.8" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="9.0.8" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="9.0.8" />
     <PackageVersion Include="Microsoft.Extensions.Options" Version="9.0.8" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.8" />
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="9.0.8" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="9.0.8" />
+    <PackageVersion Include="Microsoft.AspNetCore.Diagnostics.HealthChecks" Version="2.2.0" />
+    <PackageVersion Include="Swashbuckle.AspNetCore" Version="7.2.0" />
 
     <!-- Tooling / infra -->
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
@@ -25,6 +30,7 @@
     <PackageVersion Include="AwesomeAssertions" Version="9.2.1" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="coverlet.msbuild" Version="6.0.4" />
+
   </ItemGroup>
 
 </Project>
