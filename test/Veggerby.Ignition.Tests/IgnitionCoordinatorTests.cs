@@ -1,10 +1,7 @@
-using AwesomeAssertions;
+using System.Collections.Concurrent;
+
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using NSubstitute;
-using System.Collections.Concurrent;
-using System.Linq;
-using Veggerby.Ignition;
 
 namespace Veggerby.Ignition.Tests;
 
