@@ -5,8 +5,6 @@
     <PackageId>Veggerby.Ignition</PackageId>
     <Description>Lightweight startup readiness (ignition) coordination library for .NET with timeouts, policies, tracing, health checks, and rich diagnostics.</Description>
     <PackageTags>startup readiness ignition healthcheck diagnostics tracing</PackageTags>
-    <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
   <ItemGroup>
