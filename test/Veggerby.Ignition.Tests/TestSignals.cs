@@ -1,5 +1,3 @@
-using System.Threading;
-
 namespace Veggerby.Ignition.Tests;
 
 internal sealed class FakeSignal(string name, Func<CancellationToken, Task> action, TimeSpan? timeout = null) : IIgnitionSignal

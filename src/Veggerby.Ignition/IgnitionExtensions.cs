@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -45,7 +44,7 @@ public static class IgnitionExtensions
 
         if (addHealthCheck)
         {
-            services.AddHealthChecks().AddCheck<IgnitionHealthCheck>(healthCheckName, tags: healthCheckTags?.ToArray() ?? Array.Empty<string>());
+            services.AddHealthChecks().AddCheck<IgnitionHealthCheck>(healthCheckName, tags: healthCheckTags?.ToArray() ?? []);
         }
 
         return services;

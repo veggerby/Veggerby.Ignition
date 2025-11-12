@@ -31,6 +31,10 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
     /// <param name="logger">Logger used for diagnostic output.</param>
     public IgnitionCoordinator(IEnumerable<IIgnitionSignal> handles, IOptions<IgnitionOptions> options, ILogger<IgnitionCoordinator> logger)
     {
+        ArgumentNullException.ThrowIfNull(handles);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(logger);
+
         _handles = handles.ToList();
         _options = options.Value;
         _logger = logger;
@@ -102,7 +106,21 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         }
         else
         {
-            results = signalTasks.Select(t => t.IsCompletedSuccessfully ? t.Result : new IgnitionSignalResult("unknown", t.IsCanceled ? IgnitionSignalStatus.TimedOut : IgnitionSignalStatus.Failed, TimeSpan.Zero, t.Exception)).ToList();
+            // Build results from non-hard-timeout scenario
+            results = new List<IgnitionSignalResult>(signalTasks.Count);
+            for (int i = 0; i < signalTasks.Count; i++)
+            {
+                var task = signalTasks[i];
+                if (task.IsCompletedSuccessfully)
+                {
+                    results.Add(task.Result);
+                }
+                else
+                {
+                    var status = task.IsCanceled ? IgnitionSignalStatus.TimedOut : IgnitionSignalStatus.Failed;
+                    results.Add(new IgnitionSignalResult("unknown", status, TimeSpan.Zero, task.Exception));
+                }
+            }
         }
         // Option B semantics: a pure global timeout does not mark TimedOut unless any individual handle timed out (i.e. hard cancellation or per-signal timeout).
         if (globalTimedOut)
@@ -113,14 +131,33 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                 return IgnitionResult.FromTimeout(results, swGlobal.Elapsed);
             }
             // Soft timeout: only classify if any per-signal timed out.
-            if (results.Any(r => r.Status == IgnitionSignalStatus.TimedOut))
+            bool hasTimedOut = false;
+            foreach (var r in results)
+            {
+                if (r.Status == IgnitionSignalStatus.TimedOut)
+                {
+                    hasTimedOut = true;
+                    break;
+                }
+            }
+
+            if (hasTimedOut)
             {
                 return IgnitionResult.FromTimeout(results, swGlobal.Elapsed);
             }
             _logger.LogWarning("Global timeout elapsed (soft) with no per-signal timeouts; treating as success per Option B semantics.");
             return IgnitionResult.FromResults(results, swGlobal.Elapsed);
         }
-        var failed = results.Where(r => r.Status == IgnitionSignalStatus.Failed).ToList();
+
+        // Collect failed results with explicit loop
+        var failed = new List<IgnitionSignalResult>();
+        foreach (var r in results)
+        {
+            if (r.Status == IgnitionSignalStatus.Failed)
+            {
+                failed.Add(r);
+            }
+        }
 
         if (failed.Count > 0)
         {
@@ -132,7 +169,15 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
             if (_options.Policy == IgnitionPolicy.FailFast && _options.ExecutionMode == IgnitionExecutionMode.Parallel)
             {
                 // In parallel mode we aggregate and throw.
-                throw new AggregateException(failed.Select(f => f.Exception!).Where(e => e is not null));
+                var exceptions = new List<Exception>();
+                foreach (var f in failed)
+                {
+                    if (f.Exception is not null)
+                    {
+                        exceptions.Add(f.Exception);
+                    }
+                }
+                throw new AggregateException(exceptions);
             }
         }
 

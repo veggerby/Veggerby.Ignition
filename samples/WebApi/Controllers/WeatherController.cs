@@ -28,7 +28,7 @@ public class WeatherController : ControllerBase
     public IEnumerable<WeatherForecast> GetForecast()
     {
         _logger.LogInformation("Weather forecast requested");
-        
+
         return Enumerable.Range(1, 5).Select(index => new WeatherForecast(
             DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
             Random.Shared.Next(-20, 55),
@@ -44,7 +44,7 @@ public class WeatherController : ControllerBase
     public ActionResult<WeatherInfo> GetCurrent()
     {
         _logger.LogInformation("Current weather requested");
-        
+
         var weather = new WeatherInfo
         {
             Location = "Sample City",

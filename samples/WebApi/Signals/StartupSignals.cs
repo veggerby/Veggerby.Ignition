@@ -1,7 +1,3 @@
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using System.Threading;
-using System.Threading.Tasks;
 using Veggerby.Ignition;
 
 namespace WebApi.Signals;
@@ -24,10 +20,10 @@ public class DatabaseConnectionPoolSignal : IIgnitionSignal
     public async Task WaitAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Initializing database connection pool...");
-        
+
         // Simulate connection pool initialization
         await Task.Delay(2000, cancellationToken);
-        
+
         _logger.LogInformation("Database connection pool initialized with 10 connections");
     }
 }
@@ -44,7 +40,7 @@ public class ConfigurationValidationSignal : IIgnitionSignal
     public TimeSpan? Timeout => TimeSpan.FromSeconds(5);
 
     public ConfigurationValidationSignal(
-        ILogger<ConfigurationValidationSignal> logger, 
+        ILogger<ConfigurationValidationSignal> logger,
         IConfiguration configuration)
     {
         _logger = logger;
@@ -54,23 +50,23 @@ public class ConfigurationValidationSignal : IIgnitionSignal
     public async Task WaitAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Validating application configuration...");
-        
+
         // Simulate configuration validation
         await Task.Delay(800, cancellationToken);
-        
+
         // Example validation logic
         var connectionString = _configuration.GetConnectionString("DefaultConnection");
         if (string.IsNullOrEmpty(connectionString))
         {
             throw new InvalidOperationException("DefaultConnection connection string is required");
         }
-        
+
         var apiKey = _configuration["ApiSettings:ApiKey"];
         if (string.IsNullOrEmpty(apiKey))
         {
             _logger.LogWarning("ApiKey is not configured - some features may be limited");
         }
-        
+
         _logger.LogInformation("Configuration validation completed successfully");
     }
 }
@@ -97,7 +93,7 @@ public class ExternalDependencyCheckSignal : IIgnitionSignal
     public async Task WaitAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Checking external dependencies...");
-        
+
         var dependencies = new[]
         {
             "https://api.github.com",
@@ -107,11 +103,11 @@ public class ExternalDependencyCheckSignal : IIgnitionSignal
         foreach (var dependency in dependencies)
         {
             _logger.LogInformation("Checking connectivity to {Dependency}...", dependency);
-            
+
             try
             {
                 using var response = await _httpClient.GetAsync(dependency, cancellationToken);
-                
+
                 if (response.IsSuccessStatusCode)
                 {
                     _logger.LogInformation("✓ {Dependency} is accessible", dependency);
@@ -125,11 +121,11 @@ public class ExternalDependencyCheckSignal : IIgnitionSignal
             {
                 _logger.LogWarning("⚠ Failed to connect to {Dependency}: {Error}", dependency, ex.Message);
             }
-            
+
             // Small delay between checks
             await Task.Delay(200, cancellationToken);
         }
-        
+
         _logger.LogInformation("External dependency checks completed");
     }
 }
@@ -152,7 +148,7 @@ public class BackgroundServicesSignal : IIgnitionSignal
     public async Task WaitAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Starting background services...");
-        
+
         var services = new[]
         {
             "Message Queue Consumer",
@@ -167,7 +163,7 @@ public class BackgroundServicesSignal : IIgnitionSignal
             await Task.Delay(400, cancellationToken);
             _logger.LogInformation("✓ {Service} started", service);
         }
-        
+
         _logger.LogInformation("All background services started successfully");
     }
 }

@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
-using System.Threading.Tasks;
+
 using Veggerby.Ignition;
 
 namespace WebApi.Controllers;
@@ -33,7 +32,7 @@ public class HealthController : ControllerBase
         {
             await _ignitionCoordinator.WaitAllAsync();
             var result = await _ignitionCoordinator.GetResultAsync();
-            
+
             var response = new
             {
                 ready = result.Results.All(r => r.Status == IgnitionSignalStatus.Succeeded),
@@ -50,14 +49,14 @@ public class HealthController : ControllerBase
             };
 
             var overallSuccess = result.Results.All(r => r.Status == IgnitionSignalStatus.Succeeded);
-            return overallSuccess 
-                ? Ok(response) 
+            return overallSuccess
+                ? Ok(response)
                 : StatusCode(503, response); // Service Unavailable
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to check readiness status");
-            
+
             return StatusCode(500, new
             {
                 ready = false,
@@ -77,7 +76,7 @@ public class HealthController : ControllerBase
         {
             await _ignitionCoordinator.WaitAllAsync();
             var result = await _ignitionCoordinator.GetResultAsync();
-            
+
             var response = new
             {
                 overallSuccess = result.Results.All(r => r.Status == IgnitionSignalStatus.Succeeded),
@@ -105,7 +104,7 @@ public class HealthController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to get startup information");
-            
+
             return StatusCode(500, new
             {
                 error = "Failed to get startup information",
@@ -122,7 +121,7 @@ public class HealthController : ControllerBase
     public async Task<IActionResult> RefreshReadiness()
     {
         _logger.LogInformation("Readiness refresh requested (returns cached results due to idempotency)");
-        
+
         // This will return the cached result due to Ignition's idempotent behavior
         return await GetReadiness();
     }

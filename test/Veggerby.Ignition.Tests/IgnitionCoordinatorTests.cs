@@ -4,10 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-using NSubstitute;
-
-using Xunit;
-
 namespace Veggerby.Ignition.Tests;
 
 public class IgnitionCoordinatorTests
@@ -21,6 +17,25 @@ public class IgnitionCoordinatorTests
         return new IgnitionCoordinator(signals, optionsWrapper, logger);
     }
 
+    [Fact]
+    public async Task ZeroSignals_ReturnsEmptySuccess()
+    {
+        // arrange
+        var coord = CreateCoordinator([], o =>
+        {
+            o.GlobalTimeout = TimeSpan.FromSeconds(1);
+            o.ExecutionMode = IgnitionExecutionMode.Parallel;
+        });
+
+        // act
+        await coord.WaitAllAsync();
+        var result = await coord.GetResultAsync();
+
+        // assert
+        result.TimedOut.Should().BeFalse();
+        result.Results.Should().BeEmpty();
+        result.TotalDuration.Should().BeGreaterThanOrEqualTo(TimeSpan.Zero);
+    }
 
     [Fact]
     public async Task Parallel_AllSignalsSucceed_ReturnsSucceededResults()
@@ -393,5 +408,32 @@ public class IgnitionCoordinatorTests
 
         // assert
         result.Results.Should().Contain(r => r.Name == "tracking-scoped[*]" && (r.Status == IgnitionSignalStatus.TimedOut || r.Status == IgnitionSignalStatus.Failed));
+    }
+
+    [Fact]
+    public async Task MixedStatuses_BestEffort_ReturnsAllResults()
+    {
+        // arrange
+        var succeeded = new FakeSignal("success", _ => Task.CompletedTask);
+        var failed = new FaultingSignal("failed", new InvalidOperationException("boom"));
+        var timedOut = new FakeSignal("timeout", async ct => await Task.Delay(100, ct), timeout: TimeSpan.FromMilliseconds(50));
+        var coord = CreateCoordinator(new IIgnitionSignal[] { succeeded, failed, timedOut }, o =>
+        {
+            o.ExecutionMode = IgnitionExecutionMode.Parallel;
+            o.Policy = IgnitionPolicy.BestEffort;
+            o.GlobalTimeout = TimeSpan.FromSeconds(2);
+            o.CancelIndividualOnTimeout = true;
+        });
+
+        // act
+        await coord.WaitAllAsync();
+        var result = await coord.GetResultAsync();
+
+        // assert
+        result.TimedOut.Should().BeFalse(); // No global timeout, just individual timeouts
+        result.Results.Should().HaveCount(3);
+        result.Results.Should().Contain(r => r.Name == "success" && r.Status == IgnitionSignalStatus.Succeeded);
+        result.Results.Should().Contain(r => r.Name == "failed" && r.Status == IgnitionSignalStatus.Failed);
+        result.Results.Should().Contain(r => r.Name == "timeout" && r.Status == IgnitionSignalStatus.TimedOut);
     }
 }

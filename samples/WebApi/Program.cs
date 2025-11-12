@@ -1,7 +1,9 @@
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using System.Text.Json;
+
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+
 using Veggerby.Ignition;
+
 using WebApi.Signals;
 
 var builder = WebApplication.CreateBuilder(args);
