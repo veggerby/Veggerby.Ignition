@@ -23,10 +23,10 @@ public class IgnitionSignalFactoryTests
     {
         // arrange
         int calls = 0;
-        var signal = IgnitionSignal.FromTaskFactory("factory", _ =>
+        var signal = IgnitionSignal.FromTaskFactory("factory", ct =>
         {
             Interlocked.Increment(ref calls);
-            return Task.Delay(10);
+            return Task.Delay(10, ct);
         });
 
         // act
