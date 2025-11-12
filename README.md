@@ -41,13 +41,24 @@ builder.Services.AddIgnition(options =>
 builder.Services.AddIgnitionSignal(new CustomConnectionSignal());
 
 // Wrap an existing task
-builder.Services.AddIgnitionTask("cache-warm", cacheWarmTask, timeout: TimeSpan.FromSeconds(5));
+builder.Services.AddIgnitionFromTask("cache-warm", cacheWarmTask, timeout: TimeSpan.FromSeconds(5));
 
 // Wrap a cancellable task factory (invoked lazily once)
-builder.Services.AddIgnitionTask(
+builder.Services.AddIgnitionFromTask(
     name: "search-index",
     readyTaskFactory: ct => indexBuilder.BuildAsync(ct),
     timeout: TimeSpan.FromSeconds(30));
+
+// Adapt a service instance exposing a readiness Task (e.g. BackgroundService with ReadyTask)
+builder.Services.AddIgnitionFor<MyBackgroundWorker>(w => w.ReadyTask);
+
+// Adapt many instances as one composite signal (e.g. multiple Kafka consumers)
+builder.Services.AddIgnitionForAll<KafkaConsumer>(c => c.ReadyTask, groupName: "KafkaConsumer[*]");
+
+// TaskCompletionSource helpers (semantic sugar)
+_workerReady.Ignited();            // success
+// or on failure
+_workerReady.IgnitionFailed(ex);
 
 var app = builder.Build();
 
@@ -145,3 +156,28 @@ dotnet add package Veggerby.Ignition
 ## License
 
 MIT License. See [LICENSE](LICENSE).
+
+## Additional Adapters
+
+Alongside `AddIgnitionFromTask` you can map existing service readiness without custom wrappers:
+
+```csharp
+// Single service
+services.AddIgnitionFor<CachePrimer>(c => c.ReadyTask, name: "cache-primer");
+
+// Composite for many instances (all must complete)
+services.AddIgnitionForAll<ShardIndexer>(i => i.ReadyTask, groupName: "ShardIndexer[*]");
+
+// Arbitrary composition across multiple services
+services.AddIgnitionFromFactory(
+    taskFactory: sp => Task.WhenAll(
+        sp.GetRequiredService<PrimaryConnection>().OpenAsync(),
+        sp.GetRequiredService<ReplicaConnection>().WarmAsync()),
+    name: "datastore-connections");
+
+// TaskCompletionSource helpers
+_readyTcs.Ignited();
+_readyTcs.IgnitionFailed(new InvalidOperationException("startup failed"));
+```
+
+These helpers are lazy and idempotent: service instances are resolved on the first wait and the readiness task(s) are cached.

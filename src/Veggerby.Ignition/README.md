@@ -36,13 +36,23 @@ builder.Services.AddIgnition(options =>
 builder.Services.AddIgnitionSignal(new CustomConnectionSignal());
 
 // Wrap an existing task
-builder.Services.AddIgnitionTask("cache-warm", cacheWarmTask, timeout: TimeSpan.FromSeconds(5));
+builder.Services.AddIgnitionFromTask("cache-warm", cacheWarmTask, timeout: TimeSpan.FromSeconds(5));
 
 // Wrap a cancellable task factory (invoked lazily once)
-builder.Services.AddIgnitionTask(
+builder.Services.AddIgnitionFromTask(
     name: "search-index",
     readyTaskFactory: ct => indexBuilder.BuildAsync(ct),
     timeout: TimeSpan.FromSeconds(30));
+
+// Adapt a single service exposing a readiness Task
+builder.Services.AddIgnitionFor<MyBackgroundWorker>(w => w.ReadyTask);
+
+// Composite: await all instances of a service type
+builder.Services.AddIgnitionForAll<ShardProcessor>(p => p.ReadyTask);
+
+// TaskCompletionSource helpers
+_startupReady.Ignited();
+_startupReady.IgnitionFailed(ex);
 
 var app = builder.Build();
 
@@ -117,6 +127,21 @@ Set `EnableTracing = true` to emit an `Activity` named `Ignition.WaitAll`. Attac
 - Sequential mode enables early fail-fast behavior and reduces resource contention.
 - Per-signal cancellation requires signal implementations to observe passed CancellationToken.
 
+### Cancellation Token Semantics for Selectors
+
+The cancellable selector overloads (`AddIgnitionFor<TService>(Func<TService, CancellationToken, Task>)`, `AddIgnitionForAll<TService>(Func<TService, CancellationToken, Task>)`, and scoped variants) receive the **cancellation token from the FIRST wait invocation**. That token is linked to coordinator-driven cancellations:
+
+- Hard global timeout (`CancelOnGlobalTimeout = true`)
+- Per-signal timeout cancellation (`CancelIndividualOnTimeout = true`)
+
+Because ignition evaluation is idempotent, subsequent calls to `IIgnitionCoordinator.WaitAllAsync()` reuse already created tasks; the token cannot be changed after the first invocation. Selector implementations should:
+
+- Avoid capturing ambient tokens elsewhere (use only the provided one)
+- Return promptly or cooperatively observe cancellation (e.g. `await Task.Delay(timeout, token)`)
+- Not block synchronously; always async-await
+
+If you require a fresh cancellation token per consumer, expose a custom `IIgnitionSignal` instead of using the built-in selector adapters.
+
 ## Installation
 
 Add a package reference (after publishing):
@@ -134,6 +159,27 @@ dotnet nuget add package Veggerby.Ignition
 ## License
 
 MIT
+
+## Additional Adapters
+
+```csharp
+// Single instance
+services.AddIgnitionFor<CachePrimer>(c => c.ReadyTask);
+
+// Composite group
+services.AddIgnitionForAll<Consumer>(c => c.ReadyTask, groupName: "Consumer[*]");
+
+// Arbitrary provider-based readiness
+services.AddIgnitionFromFactory(
+    taskFactory: sp => Task.WhenAll(
+        sp.GetRequiredService<PrimaryConnection>().OpenAsync(),
+        sp.GetRequiredService<ReplicaConnection>().WarmAsync()),
+    name: "datastore-connections");
+
+// TCS helpers
+_readyTcs.Ignited();
+_readyTcs.IgnitionFailed(new Exception("boom"));
+```
 
 ## Global Timeout Semantics
 
@@ -185,7 +231,7 @@ services.AddIgnition(o =>
 });
 
 // Defining a per-signal timeout (hard for that signal only):
-services.AddIgnitionTask(
+services.AddIgnitionFromTask(
     name: "search-index",
     readyTaskFactory: ct => indexBuilder.BuildAsync(ct),
     timeout: TimeSpan.FromSeconds(30) // this signal will be marked TimedOut if exceeded

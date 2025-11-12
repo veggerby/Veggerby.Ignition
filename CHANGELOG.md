@@ -6,30 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
-### Added (0.1.0)
+### Added (Unreleased)
 
-- (Placeholder) Additional ignition policies or execution strategies under consideration.
-- (Placeholder) Potential signal adapters (e.g., async enumerable, channel drain) not yet implemented.
+- Fluent readiness adapters: `AddIgnitionFor<T>(Func<T, Task>)`, cancellable variant, and `AddIgnitionForAll<T>` / `AddIgnitionForAllScoped<T>` composite variants (replace earlier verbosely named service adapters before first release).
+- Provider composition: `AddIgnitionFromFactory(Func<IServiceProvider, Task>, name)`.
+- Task adaptation: `AddIgnitionFromTask(name, Task)` plus cancellable factory overload.
+- TaskCompletionSource helpers: `Ignited()`, `IgnitionFailed(Exception)`, generic variants and `IgnitionCanceled<T>()`.
 
-### Changed (0.1.0)
+### Changed (Unreleased)
 
-- None.
+- Multi-instance readiness simplified to a composite pattern (`AddIgnitionForAll`) and scoped composite (`AddIgnitionForAllScoped`); removed pre-release per-index strategy.
+- Renamed pre-release APIs (`AddIgnitionServiceReadyTask*`, `AddIgnitionServicesReadyTasks`) to concise fluent forms prior to first stable tag.
 
-### Deprecated (0.1.0)
+### Removed (Unreleased)
 
-- None.
+- Pre-release indexed multi-instance adapter (superseded by composite variant). No public package release contained the removed API.
 
-### Removed (0.1.0)
+### Fixed (Unreleased)
 
-- None.
+- Eliminated duplicate extension class ambiguity (`TaskExtensions` vs `TaskCompletionSourceExtensions`).
 
-### Fixed (0.1.0)
+### Security (Unreleased)
 
-- None.
-
-### Security (0.1.0)
-
-- None.
+- No changes.
 
 ## [0.1.0] - 2025-11-05
 

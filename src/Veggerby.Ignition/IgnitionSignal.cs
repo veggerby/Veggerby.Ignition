@@ -39,24 +39,16 @@ public static class IgnitionSignal
             => _task.WaitAsync(cancellationToken);
     }
 
-    private sealed class TaskFactoryHandle : IIgnitionSignal
+    private sealed class TaskFactoryHandle(string name, Func<CancellationToken, Task> factory, TimeSpan? timeout) : IIgnitionSignal
     {
-        public string Name { get; }
-        public TimeSpan? Timeout { get; }
-        private readonly Func<CancellationToken, Task> _factory;
+        public string Name { get; } = name;
+        public TimeSpan? Timeout { get; } = timeout;
+        private readonly Func<CancellationToken, Task> _factory = factory ?? throw new ArgumentNullException(nameof(factory));
         private readonly object _sync = new();
         private Task? _createdTask;
 
-        public TaskFactoryHandle(string name, Func<CancellationToken, Task> factory, TimeSpan? timeout)
-        {
-            Name = name;
-            Timeout = timeout;
-            _factory = factory ?? throw new ArgumentNullException(nameof(factory));
-        }
-
         public Task WaitAsync(CancellationToken cancellationToken = default)
         {
-            // Ensure single invocation of factory (unless previous task faulted and caller wants to observe that again).
             if (_createdTask is null)
             {
                 lock (_sync)
@@ -65,8 +57,7 @@ public static class IgnitionSignal
                 }
             }
 
-            // If caller supplies a cancellation token, we still need to honor it for awaiting.
-            return cancellationToken.CanBeCanceled ? _createdTask.WaitAsync(cancellationToken) : _createdTask;
+            return cancellationToken.CanBeCanceled && !_createdTask.IsCompleted ? _createdTask.WaitAsync(cancellationToken) : _createdTask;
         }
     }
 }
