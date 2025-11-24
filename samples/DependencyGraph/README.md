@@ -24,7 +24,7 @@ This sample demonstrates how to use Veggerby.Ignition's dependency-aware executi
 
 The sample implements a realistic startup scenario with the following dependency graph:
 
-```
+```txt
        Database          Configuration
           |               /     \
         Cache            /       \
@@ -33,6 +33,7 @@ The sample implements a realistic startup scenario with the following dependency
 ```
 
 **Execution Flow**:
+
 1. Database and Configuration start in parallel (no dependencies)
 2. Cache starts after Database completes
 3. API starts after Configuration completes (runs parallel with Cache)
@@ -50,9 +51,11 @@ dotnet run
 You'll see two examples running:
 
 ### Example 1: Attribute-Based Dependencies
+
 Uses `[SignalDependency]` attributes on signal classes for declarative dependency declaration.
 
 ### Example 2: Fluent API Dependencies
+
 Uses `builder.DependsOn()` method calls to define dependencies programmatically.
 
 Both examples produce the same execution order but demonstrate different API styles.
@@ -62,6 +65,7 @@ Both examples produce the same execution order but demonstrate different API sty
 ### 1. Dependency Declaration
 
 **Attribute-based** (declarative):
+
 ```csharp
 [SignalDependency("database")]
 public class CacheSignal : IIgnitionSignal
@@ -72,6 +76,7 @@ public class CacheSignal : IIgnitionSignal
 ```
 
 **Fluent API** (programmatic):
+
 ```csharp
 services.AddIgnitionGraph((builder, sp) =>
 {
@@ -86,6 +91,7 @@ services.AddIgnitionGraph((builder, sp) =>
 ### 2. Execution Mode
 
 To enable dependency-aware execution:
+
 ```csharp
 services.AddIgnition(options =>
 {
@@ -96,6 +102,7 @@ services.AddIgnition(options =>
 ### 3. Graph Building
 
 The graph must be explicitly built and registered:
+
 ```csharp
 services.AddIgnitionGraph((builder, sp) =>
 {
@@ -108,6 +115,7 @@ services.AddIgnitionGraph((builder, sp) =>
 ### 4. Result Inspection
 
 Check if signals were skipped due to failed dependencies:
+
 ```csharp
 var result = await coordinator.GetResultAsync();
 foreach (var r in result.Results)
@@ -148,7 +156,8 @@ foreach (var r in result.Results)
 ### Cycle Detection Error
 
 If you see an error like:
-```
+
+```txt
 Ignition graph contains a cycle: s1 -> s2 -> s3 -> s1
 ```
 
@@ -157,6 +166,7 @@ This means you've created a circular dependency. Review your dependency declarat
 ### Signal Never Starts
 
 If a signal never executes, check:
+
 1. Are all its dependencies registered?
 2. Did any dependency fail or timeout?
 3. Check the `FailedDependencies` property in the result
