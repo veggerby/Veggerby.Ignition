@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -57,7 +58,7 @@ public class IgnitionGraphTests
         var s1 = new FakeSignal("s1", _ => Task.CompletedTask);
         var s2 = new FakeSignal("s2", _ => Task.CompletedTask);
         var s3 = new FakeSignal("s3", _ => Task.CompletedTask);
-        
+
         var builder = new IgnitionGraphBuilder();
         builder.AddSignal(s3);
         builder.AddSignal(s1);
@@ -73,10 +74,10 @@ public class IgnitionGraphTests
         graph.Signals[0].Should().Be(s1);
         graph.Signals[1].Should().Be(s2);
         graph.Signals[2].Should().Be(s3);
-        
+
         graph.GetRootSignals().Should().ContainSingle().Which.Should().Be(s1);
         graph.GetLeafSignals().Should().ContainSingle().Which.Should().Be(s3);
-        
+
         graph.GetDependencies(s1).Should().BeEmpty();
         graph.GetDependencies(s2).Should().ContainSingle().Which.Should().Be(s1);
         graph.GetDependencies(s3).Should().ContainSingle().Which.Should().Be(s2);
@@ -95,7 +96,7 @@ public class IgnitionGraphTests
         var s2 = new FakeSignal("s2", _ => Task.CompletedTask);
         var s3 = new FakeSignal("s3", _ => Task.CompletedTask);
         var s4 = new FakeSignal("s4", _ => Task.CompletedTask);
-        
+
         var builder = new IgnitionGraphBuilder();
         builder.DependsOn(s2, s1);
         builder.DependsOn(s3, s1);
@@ -108,10 +109,10 @@ public class IgnitionGraphTests
         graph.Signals.Should().HaveCount(4);
         graph.Signals[0].Should().Be(s1);
         graph.Signals[3].Should().Be(s4); // s4 must come last
-        
+
         graph.GetRootSignals().Should().ContainSingle().Which.Should().Be(s1);
         graph.GetLeafSignals().Should().ContainSingle().Which.Should().Be(s4);
-        
+
         graph.GetDependencies(s4).Should().HaveCount(2);
         graph.GetDependencies(s4).Should().Contain(s2);
         graph.GetDependencies(s4).Should().Contain(s3);
@@ -124,7 +125,7 @@ public class IgnitionGraphTests
         var s1 = new FakeSignal("s1", _ => Task.CompletedTask);
         var s2 = new FakeSignal("s2", _ => Task.CompletedTask);
         var s3 = new FakeSignal("s3", _ => Task.CompletedTask);
-        
+
         var builder = new IgnitionGraphBuilder();
         builder.DependsOn(s2, s1);
         builder.DependsOn(s3, s2);
@@ -141,7 +142,7 @@ public class IgnitionGraphTests
     {
         // arrange
         var s1 = new FakeSignal("s1", _ => Task.CompletedTask);
-        
+
         var builder = new IgnitionGraphBuilder();
         builder.DependsOn(s1, s1); // Self-loop
 
@@ -158,12 +159,12 @@ public class IgnitionGraphTests
         var s1 = new FakeSignal("s1", async _ => { executionOrder.Add("s1"); await Task.Delay(10); });
         var s2 = new FakeSignal("s2", async _ => { executionOrder.Add("s2"); await Task.Delay(10); });
         var s3 = new FakeSignal("s3", async _ => { executionOrder.Add("s3"); await Task.Delay(10); });
-        
+
         var builder = new IgnitionGraphBuilder();
         builder.DependsOn(s2, s1);
         builder.DependsOn(s3, s2);
         var graph = builder.Build();
-        
+
         var coord = CreateCoordinator(new[] { s1, s2, s3 }, graph, o =>
         {
             o.ExecutionMode = IgnitionExecutionMode.DependencyAware;
@@ -178,7 +179,7 @@ public class IgnitionGraphTests
         result.TimedOut.Should().BeFalse();
         result.Results.Should().HaveCount(3);
         result.Results.Should().OnlyContain(r => r.Status == IgnitionSignalStatus.Succeeded);
-        
+
         executionOrder.Should().HaveCount(3);
         executionOrder[0].Should().Be("s1");
         executionOrder[1].Should().Be("s2");
@@ -193,27 +194,27 @@ public class IgnitionGraphTests
         //    /  \
         //   s2  s3
         var executionStart = new Dictionary<string, DateTime>();
-        var s1 = new FakeSignal("s1", async _ => 
-        { 
+        var s1 = new FakeSignal("s1", async _ =>
+        {
             executionStart["s1"] = DateTime.UtcNow;
-            await Task.Delay(10); 
+            await Task.Delay(10);
         });
-        var s2 = new FakeSignal("s2", async _ => 
-        { 
+        var s2 = new FakeSignal("s2", async _ =>
+        {
             executionStart["s2"] = DateTime.UtcNow;
-            await Task.Delay(50); 
+            await Task.Delay(50);
         });
-        var s3 = new FakeSignal("s3", async _ => 
-        { 
+        var s3 = new FakeSignal("s3", async _ =>
+        {
             executionStart["s3"] = DateTime.UtcNow;
-            await Task.Delay(50); 
+            await Task.Delay(50);
         });
-        
+
         var builder = new IgnitionGraphBuilder();
         builder.DependsOn(s2, s1);
         builder.DependsOn(s3, s1);
         var graph = builder.Build();
-        
+
         var coord = CreateCoordinator(new[] { s1, s2, s3 }, graph, o =>
         {
             o.ExecutionMode = IgnitionExecutionMode.DependencyAware;
@@ -228,7 +229,7 @@ public class IgnitionGraphTests
         result.TimedOut.Should().BeFalse();
         result.Results.Should().HaveCount(3);
         result.Results.Should().OnlyContain(r => r.Status == IgnitionSignalStatus.Succeeded);
-        
+
         // s2 and s3 should start around the same time (after s1 completes)
         var s2Start = executionStart["s2"];
         var s3Start = executionStart["s3"];
@@ -243,12 +244,12 @@ public class IgnitionGraphTests
         var s1 = new FakeSignal("s1", _ => Task.CompletedTask);
         var s2 = new FaultingSignal("s2", new InvalidOperationException("s2 failed"));
         var s3 = new CountingSignal("s3"); // Should be skipped
-        
+
         var builder = new IgnitionGraphBuilder();
         builder.DependsOn(s2, s1);
         builder.DependsOn(s3, s2);
         var graph = builder.Build();
-        
+
         var coord = CreateCoordinator(new IIgnitionSignal[] { s1, s2, s3 }, graph, o =>
         {
             o.ExecutionMode = IgnitionExecutionMode.DependencyAware;
@@ -263,18 +264,18 @@ public class IgnitionGraphTests
         // assert
         result.TimedOut.Should().BeFalse();
         result.Results.Should().HaveCount(3);
-        
+
         result.Results[0].Name.Should().Be("s1");
         result.Results[0].Status.Should().Be(IgnitionSignalStatus.Succeeded);
-        
+
         result.Results[1].Name.Should().Be("s2");
         result.Results[1].Status.Should().Be(IgnitionSignalStatus.Failed);
-        
+
         result.Results[2].Name.Should().Be("s3");
         result.Results[2].Status.Should().Be(IgnitionSignalStatus.Skipped);
         result.Results[2].SkippedDueToDependencies.Should().BeTrue();
         result.Results[2].FailedDependencies.Should().ContainSingle().Which.Should().Be("s2");
-        
+
         s3.InvocationCount.Should().Be(0); // Never executed
     }
 
@@ -284,11 +285,11 @@ public class IgnitionGraphTests
         // arrange
         var s1 = new FaultingSignal("s1", new InvalidOperationException("s1 failed"));
         var s2 = new CountingSignal("s2"); // Should be skipped
-        
+
         var builder = new IgnitionGraphBuilder();
         builder.DependsOn(s2, s1);
         var graph = builder.Build();
-        
+
         var coord = CreateCoordinator(new IIgnitionSignal[] { s1, s2 }, graph, o =>
         {
             o.ExecutionMode = IgnitionExecutionMode.DependencyAware;
@@ -301,7 +302,7 @@ public class IgnitionGraphTests
         // but doesn't throw immediately - dependent signals are marked as Skipped
         await coord.WaitAllAsync();
         var result = await coord.GetResultAsync();
-        
+
         result.Results[0].Status.Should().Be(IgnitionSignalStatus.Failed);
         result.Results[1].Status.Should().Be(IgnitionSignalStatus.Skipped);
     }
@@ -316,11 +317,11 @@ public class IgnitionGraphTests
         var s1 = new FaultingSignal("s1", new InvalidOperationException("s1 failed"));
         var s2 = new FaultingSignal("s2", new InvalidOperationException("s2 failed"));
         var s3 = new CountingSignal("s3");
-        
+
         var builder = new IgnitionGraphBuilder();
         builder.DependsOn(s3, s1, s2);
         var graph = builder.Build();
-        
+
         var coord = CreateCoordinator(new IIgnitionSignal[] { s1, s2, s3 }, graph, o =>
         {
             o.ExecutionMode = IgnitionExecutionMode.DependencyAware;
@@ -345,7 +346,7 @@ public class IgnitionGraphTests
     {
         // arrange
         var s1 = new FakeSignal("s1", _ => Task.CompletedTask);
-        
+
         var coord = CreateCoordinator(new[] { s1 }, graph: null, o =>
         {
             o.ExecutionMode = IgnitionExecutionMode.DependencyAware;
@@ -368,14 +369,14 @@ public class IgnitionGraphTests
         //      s4  s5
         //       \ /
         //        s6
-        var executionOrder = new List<string>();
-        var s1 = new FakeSignal("s1", async _ => { executionOrder.Add("s1"); await Task.Delay(10); });
-        var s2 = new FakeSignal("s2", async _ => { executionOrder.Add("s2"); await Task.Delay(10); });
-        var s3 = new FakeSignal("s3", async _ => { executionOrder.Add("s3"); await Task.Delay(10); });
-        var s4 = new FakeSignal("s4", async _ => { executionOrder.Add("s4"); await Task.Delay(10); });
-        var s5 = new FakeSignal("s5", async _ => { executionOrder.Add("s5"); await Task.Delay(10); });
-        var s6 = new FakeSignal("s6", async _ => { executionOrder.Add("s6"); await Task.Delay(10); });
-        
+        var executionStart = new ConcurrentDictionary<string, DateTime>();
+        var s1 = new FakeSignal("s1", async _ => { executionStart["s1"] = DateTime.UtcNow; await Task.Delay(10); });
+        var s2 = new FakeSignal("s2", async _ => { executionStart["s2"] = DateTime.UtcNow; await Task.Delay(10); });
+        var s3 = new FakeSignal("s3", async _ => { executionStart["s3"] = DateTime.UtcNow; await Task.Delay(10); });
+        var s4 = new FakeSignal("s4", async _ => { executionStart["s4"] = DateTime.UtcNow; await Task.Delay(10); });
+        var s5 = new FakeSignal("s5", async _ => { executionStart["s5"] = DateTime.UtcNow; await Task.Delay(10); });
+        var s6 = new FakeSignal("s6", async _ => { executionStart["s6"] = DateTime.UtcNow; await Task.Delay(10); });
+
         var builder = new IgnitionGraphBuilder();
         builder.DependsOn(s2, s1);
         builder.DependsOn(s3, s1);
@@ -383,7 +384,7 @@ public class IgnitionGraphTests
         builder.DependsOn(s5, s3);
         builder.DependsOn(s6, s4, s5);
         var graph = builder.Build();
-        
+
         var coord = CreateCoordinator(new[] { s1, s2, s3, s4, s5, s6 }, graph, o =>
         {
             o.ExecutionMode = IgnitionExecutionMode.DependencyAware;
@@ -398,15 +399,22 @@ public class IgnitionGraphTests
         result.TimedOut.Should().BeFalse();
         result.Results.Should().HaveCount(6);
         result.Results.Should().OnlyContain(r => r.Status == IgnitionSignalStatus.Succeeded);
-        
-        // Verify execution order constraints
-        executionOrder.IndexOf("s1").Should().BeLessThan(executionOrder.IndexOf("s2"));
-        executionOrder.IndexOf("s1").Should().BeLessThan(executionOrder.IndexOf("s3"));
-        executionOrder.IndexOf("s2").Should().BeLessThan(executionOrder.IndexOf("s4"));
-        executionOrder.IndexOf("s3").Should().BeLessThan(executionOrder.IndexOf("s4"));
-        executionOrder.IndexOf("s3").Should().BeLessThan(executionOrder.IndexOf("s5"));
-        executionOrder.IndexOf("s4").Should().BeLessThan(executionOrder.IndexOf("s6"));
-        executionOrder.IndexOf("s5").Should().BeLessThan(executionOrder.IndexOf("s6"));
+
+        // Verify execution order constraints using timestamps
+        // s1 must start before s2 and s3
+        executionStart["s1"].Should().BeBefore(executionStart["s2"]);
+        executionStart["s1"].Should().BeBefore(executionStart["s3"]);
+
+        // s2 and s3 must both complete before s4 starts
+        executionStart["s2"].Should().BeBefore(executionStart["s4"]);
+        executionStart["s3"].Should().BeBefore(executionStart["s4"]);
+
+        // s3 must start before s5
+        executionStart["s3"].Should().BeBefore(executionStart["s5"]);
+
+        // s4 and s5 must both complete before s6 starts
+        executionStart["s4"].Should().BeBefore(executionStart["s6"]);
+        executionStart["s5"].Should().BeBefore(executionStart["s6"]);
     }
 
     [Fact]
@@ -453,7 +461,7 @@ public class IgnitionGraphTests
         // arrange
         var baseSignal = new FakeSignal("base-signal", _ => Task.CompletedTask);
         var decorated = new AttributeDecoratedSignal();
-        
+
         var builder = new IgnitionGraphBuilder();
         builder.AddSignal(baseSignal);
         builder.AddSignal(decorated);
@@ -471,7 +479,7 @@ public class IgnitionGraphTests
     {
         // arrange
         var decorated = new AttributeDecoratedSignal();
-        
+
         var builder = new IgnitionGraphBuilder();
         builder.AddSignal(decorated);
 
@@ -510,14 +518,14 @@ public class IgnitionGraphTests
         var s3 = new FakeSignal("s3", _ => TrackConcurrency());
         var s4 = new FakeSignal("s4", _ => TrackConcurrency());
         var s5 = new FakeSignal("s5", _ => TrackConcurrency());
-        
+
         var builder = new IgnitionGraphBuilder();
         builder.DependsOn(s2, s1);
         builder.DependsOn(s3, s1);
         builder.DependsOn(s4, s1);
         builder.DependsOn(s5, s1);
         var graph = builder.Build();
-        
+
         var coord = CreateCoordinator(new[] { s1, s2, s3, s4, s5 }, graph, o =>
         {
             o.ExecutionMode = IgnitionExecutionMode.DependencyAware;
