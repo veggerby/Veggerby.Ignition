@@ -366,83 +366,47 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
 
             if (signalToStart is not null)
             {
-                if (gate is not null)
+                bool gateAcquired = false;
+                try
                 {
-                    await gate.WaitAsync(globalCts.Token);
-                }
-
-                var signal = signalToStart;
-
-                // Check if any dependencies failed
-                var deps = _graph.GetDependencies(signal);
-                var failedDeps = new List<string>();
-                lock (syncLock)
-                {
-                    foreach (var dep in deps)
+                    if (gate is not null)
                     {
-                        if (failed.Contains(dep))
-                        {
-                            failedDeps.Add(dep.Name);
-                        }
+                        await gate.WaitAsync(globalCts.Token);
+                        gateAcquired = true;
                     }
-                }
 
-                if (failedDeps.Count > 0)
-                {
-                    // Skip this signal due to failed dependencies
-                    var skipResult = new IgnitionSignalResult(
-                        signal.Name,
-                        IgnitionSignalStatus.Skipped,
-                        TimeSpan.Zero,
-                        Exception: null,
-                        FailedDependencies: failedDeps);
-                    
+                    var signal = signalToStart;
+
+                    // Check if any dependencies failed
+                    var deps = _graph.GetDependencies(signal);
+                    var failedDeps = new List<string>();
                     lock (syncLock)
                     {
-                        completed[signal] = skipResult;
-                        skipped.Add(signal);
-                        
-                        // Mark dependents as ready if all their other dependencies are done
-                        foreach (var dependent in _graph.GetDependents(signal))
+                        foreach (var dep in deps)
                         {
-                            pendingDependencies[dependent]--;
-                            if (pendingDependencies[dependent] == 0)
+                            if (failed.Contains(dep))
                             {
-                                readyQueue.Enqueue(dependent);
+                                failedDeps.Add(dep.Name);
                             }
                         }
                     }
-                    
-                    gate?.Release();
 
-                    _logger.LogWarning(
-                        "Skipping signal '{Name}' due to failed dependencies: {Dependencies}",
-                        signal.Name,
-                        string.Join(", ", failedDeps));
-                    continue;
-                }
-
-                // Start the signal
-                var task = Task.Run(async () =>
-                {
-                    try
+                    if (failedDeps.Count > 0)
                     {
-                        var result = await WaitOneAsync(signal, globalCts.Token);
+                        // Skip this signal due to failed dependencies
+                        var skipResult = new IgnitionSignalResult(
+                            signal.Name,
+                            IgnitionSignalStatus.Skipped,
+                            TimeSpan.Zero,
+                            Exception: null,
+                            FailedDependencies: failedDeps);
+                        
                         lock (syncLock)
                         {
-                            completed[signal] = result;
-                            if (result.Status == IgnitionSignalStatus.Failed || result.Status == IgnitionSignalStatus.TimedOut)
-                            {
-                                failed.Add(signal);
-
-                                if (_options.Policy == IgnitionPolicy.FailFast)
-                                {
-                                    _logger.LogError(result.Exception, "Signal '{Name}' failed in dependency-aware mode; aborting per FailFast policy.", signal.Name);
-                                    globalCts.Cancel();
-                                }
-                            }
-
-                            // Notify dependents
+                            completed[signal] = skipResult;
+                            skipped.Add(signal);
+                            
+                            // Mark dependents as ready if all their other dependencies are done
                             foreach (var dependent in _graph.GetDependents(signal))
                             {
                                 pendingDependencies[dependent]--;
@@ -452,18 +416,67 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                                 }
                             }
                         }
-                        return result;
+
+                        _logger.LogWarning(
+                            "Skipping signal '{Name}' due to failed dependencies: {Dependencies}",
+                            signal.Name,
+                            string.Join(", ", failedDeps));
+                        continue;
                     }
-                    finally
+
+                    // Start the signal - gate released in task's finally block
+                    gateAcquired = false; // Transfer ownership to task
+                    var task = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var result = await WaitOneAsync(signal, globalCts.Token);
+                            lock (syncLock)
+                            {
+                                completed[signal] = result;
+                                if (result.Status == IgnitionSignalStatus.Failed || result.Status == IgnitionSignalStatus.TimedOut)
+                                {
+                                    failed.Add(signal);
+
+                                    if (_options.Policy == IgnitionPolicy.FailFast)
+                                    {
+                                        _logger.LogError(result.Exception, "Signal '{Name}' failed in dependency-aware mode; aborting per FailFast policy.", signal.Name);
+                                        globalCts.Cancel();
+                                    }
+                                }
+
+                                // Notify dependents
+                                foreach (var dependent in _graph.GetDependents(signal))
+                                {
+                                    pendingDependencies[dependent]--;
+                                    if (pendingDependencies[dependent] == 0)
+                                    {
+                                        readyQueue.Enqueue(dependent);
+                                    }
+                                }
+                            }
+                            return result;
+                        }
+                        finally
+                        {
+                            gate?.Release();
+                        }
+                    }, globalCts.Token);
+
+                    lock (syncLock)
+                    {
+                        results[signal] = task;
+                        activeTasks.Add(task);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    // Global cancellation occurred while waiting for gate
+                    if (gateAcquired)
                     {
                         gate?.Release();
                     }
-                }, globalCts.Token);
-
-                lock (syncLock)
-                {
-                    results[signal] = task;
-                    activeTasks.Add(task);
+                    throw;
                 }
             }
             else if (activeTasks.Count > 0)

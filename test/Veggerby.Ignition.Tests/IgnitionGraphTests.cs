@@ -297,7 +297,9 @@ public class IgnitionGraphTests
         });
 
         // act & assert
-        await coord.WaitAllAsync(); // FailFast with DAG doesn't throw in parallel branches
+        // Note: FailFast in dependency-aware mode cancels execution via global cancellation
+        // but doesn't throw immediately - dependent signals are marked as Skipped
+        await coord.WaitAllAsync();
         var result = await coord.GetResultAsync();
         
         result.Results[0].Status.Should().Be(IgnitionSignalStatus.Failed);
