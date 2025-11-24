@@ -90,7 +90,7 @@ public class IgnitionBundleTests
     }
 
     [Fact]
-    public async Task HttpDependencyBundle_SingleEndpoint_RegistersSignal()
+    public void HttpDependencyBundle_SingleEndpoint_RegistersSignal()
     {
         // arrange
         var services = new ServiceCollection();
@@ -141,7 +141,7 @@ public class IgnitionBundleTests
     }
 
     [Fact]
-    public async Task DatabaseTrioBundle_AllPhases_RegistersThreeSignals()
+    public void DatabaseTrioBundle_AllPhases_RegistersThreeSignals()
     {
         // arrange
         var services = new ServiceCollection();
@@ -271,7 +271,7 @@ public class IgnitionBundleTests
     }
 
     [Fact]
-    public async Task BundleOptions_OverrideTimeout_AppliedToSignals()
+    public void BundleOptions_OverrideTimeout_AppliedToSignals()
     {
         // arrange
         var services = new ServiceCollection();
