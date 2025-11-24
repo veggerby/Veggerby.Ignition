@@ -124,7 +124,7 @@ public sealed class IgnitionGraphBuilder
     {
         if (_signals.Count == 0)
         {
-            return new IgnitionGraph([], new Dictionary<IIgnitionSignal, HashSet<IIgnitionSignal>>());
+            return new IgnitionGraph(Array.Empty<IIgnitionSignal>(), new Dictionary<IIgnitionSignal, HashSet<IIgnitionSignal>>());
         }
 
         // Perform topological sort using Kahn's algorithm
@@ -253,6 +253,8 @@ public sealed class IgnitionGraphBuilder
 
     private sealed class IgnitionGraph : IIgnitionGraph
     {
+        private static readonly IReadOnlySet<IIgnitionSignal> EmptySet = new HashSet<IIgnitionSignal>();
+        
         private readonly IReadOnlyList<IIgnitionSignal> _sortedSignals;
         private readonly Dictionary<IIgnitionSignal, HashSet<IIgnitionSignal>> _dependencies;
         private readonly Dictionary<IIgnitionSignal, HashSet<IIgnitionSignal>> _dependents;
@@ -283,13 +285,13 @@ public sealed class IgnitionGraphBuilder
         public IReadOnlySet<IIgnitionSignal> GetDependencies(IIgnitionSignal signal)
         {
             ArgumentNullException.ThrowIfNull(signal);
-            return _dependencies.TryGetValue(signal, out var deps) ? deps : new HashSet<IIgnitionSignal>();
+            return _dependencies.TryGetValue(signal, out var deps) ? deps : EmptySet;
         }
 
         public IReadOnlySet<IIgnitionSignal> GetDependents(IIgnitionSignal signal)
         {
             ArgumentNullException.ThrowIfNull(signal);
-            return _dependents.TryGetValue(signal, out var deps) ? deps : new HashSet<IIgnitionSignal>();
+            return _dependents.TryGetValue(signal, out var deps) ? deps : EmptySet;
         }
 
         public IReadOnlyList<IIgnitionSignal> GetRootSignals()

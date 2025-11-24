@@ -315,6 +315,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
 
         _logger.LogDebug("Starting dependency-aware execution for {Count} signal(s).", _graph.Signals.Count);
 
+        var syncLock = new object();
         var results = new Dictionary<IIgnitionSignal, Task<IgnitionSignalResult>>();
         var completed = new Dictionary<IIgnitionSignal, IgnitionSignalResult>();
         var failed = new HashSet<IIgnitionSignal>();
@@ -346,26 +347,43 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
             gate = new SemaphoreSlim(_options.MaxDegreeOfParallelism.Value);
         }
 
-        while (readyQueue.Count > 0 || activeTasks.Count > 0)
+        while (true)
         {
-            // Start ready signals up to concurrency limit
-            while (readyQueue.Count > 0)
+            IIgnitionSignal? signalToStart = null;
+            
+            lock (syncLock)
+            {
+                if (readyQueue.Count == 0 && activeTasks.Count == 0)
+                {
+                    break; // All done
+                }
+
+                if (readyQueue.Count > 0)
+                {
+                    signalToStart = readyQueue.Dequeue();
+                }
+            }
+
+            if (signalToStart is not null)
             {
                 if (gate is not null)
                 {
                     await gate.WaitAsync(globalCts.Token);
                 }
 
-                var signal = readyQueue.Dequeue();
+                var signal = signalToStart;
 
                 // Check if any dependencies failed
                 var deps = _graph.GetDependencies(signal);
                 var failedDeps = new List<string>();
-                foreach (var dep in deps)
+                lock (syncLock)
                 {
-                    if (failed.Contains(dep))
+                    foreach (var dep in deps)
                     {
-                        failedDeps.Add(dep.Name);
+                        if (failed.Contains(dep))
+                        {
+                            failedDeps.Add(dep.Name);
+                        }
                     }
                 }
 
@@ -378,24 +396,29 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                         TimeSpan.Zero,
                         Exception: null,
                         FailedDependencies: failedDeps);
-                    completed[signal] = skipResult;
-                    skipped.Add(signal);
+                    
+                    lock (syncLock)
+                    {
+                        completed[signal] = skipResult;
+                        skipped.Add(signal);
+                        
+                        // Mark dependents as ready if all their other dependencies are done
+                        foreach (var dependent in _graph.GetDependents(signal))
+                        {
+                            pendingDependencies[dependent]--;
+                            if (pendingDependencies[dependent] == 0)
+                            {
+                                readyQueue.Enqueue(dependent);
+                            }
+                        }
+                    }
+                    
                     gate?.Release();
 
                     _logger.LogWarning(
                         "Skipping signal '{Name}' due to failed dependencies: {Dependencies}",
                         signal.Name,
                         string.Join(", ", failedDeps));
-
-                    // Mark dependents as ready if all their other dependencies are done
-                    foreach (var dependent in _graph.GetDependents(signal))
-                    {
-                        pendingDependencies[dependent]--;
-                        if (pendingDependencies[dependent] == 0)
-                        {
-                            readyQueue.Enqueue(dependent);
-                        }
-                    }
                     continue;
                 }
 
@@ -405,7 +428,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                     try
                     {
                         var result = await WaitOneAsync(signal, globalCts.Token);
-                        lock (results)
+                        lock (syncLock)
                         {
                             completed[signal] = result;
                             if (result.Status == IgnitionSignalStatus.Failed || result.Status == IgnitionSignalStatus.TimedOut)
@@ -437,14 +460,21 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                     }
                 }, globalCts.Token);
 
-                results[signal] = task;
-                activeTasks.Add(task);
+                lock (syncLock)
+                {
+                    results[signal] = task;
+                    activeTasks.Add(task);
+                }
             }
-
-            // Wait for at least one task to complete or global timeout
-            if (activeTasks.Count > 0)
+            else if (activeTasks.Count > 0)
             {
-                var anyTask = Task.WhenAny(activeTasks);
+                // Wait for at least one task to complete or global timeout
+                Task<Task> anyTask;
+                lock (syncLock)
+                {
+                    anyTask = Task.WhenAny(activeTasks);
+                }
+                
                 var completedTask = await Task.WhenAny(anyTask, globalTimeoutTask);
 
                 if (completedTask == globalTimeoutTask)
@@ -455,9 +485,15 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                         globalCts.Cancel();
 
                         // Wait for all active tasks to finish
+                        Task[] tasksSnapshot;
+                        lock (syncLock)
+                        {
+                            tasksSnapshot = activeTasks.ToArray();
+                        }
+                        
                         try
                         {
-                            await Task.WhenAll(activeTasks);
+                            await Task.WhenAll(tasksSnapshot);
                         }
                         catch
                         {
@@ -492,7 +528,10 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                 {
                     // Remove completed task from active list
                     var finished = await anyTask;
-                    activeTasks.Remove(finished);
+                    lock (syncLock)
+                    {
+                        activeTasks.Remove(finished);
+                    }
                 }
             }
         }
