@@ -18,9 +18,12 @@ Veggerby.Ignition is a lightweight, extensible startup readiness ("ignition") co
 - Slow handle logging (top N longest signals)
 - Task and cancellable Task factory adapters (`IgnitionSignal.FromTask`, `FromTaskFactory`)
 - Idempotent execution (signals evaluated once, result cached)
-- Execution modes: Parallel (default) or Sequential
+- Execution modes: Parallel (default), Sequential, or **Dependency-Aware (DAG)**
 - Optional parallelism limiting via MaxDegreeOfParallelism
 - Cooperative cancellation on global or per-signal timeout
+- **Dependency-aware execution graph (DAG)** with topological sort and cycle detection
+- **Declarative dependency declaration** via `[SignalDependency]` attribute
+- **Automatic parallel execution** of independent branches in dependency graphs
 
 ## Quick Start
 
@@ -31,8 +34,8 @@ builder.Services.AddIgnition(options =>
     options.GlobalTimeout = TimeSpan.FromSeconds(10);
     options.Policy = IgnitionPolicy.BestEffort; // or FailFast / ContinueOnTimeout
     options.EnableTracing = true; // emits Activity if diagnostics consumed
-    options.ExecutionMode = IgnitionExecutionMode.Parallel; // or Sequential
-    options.MaxDegreeOfParallelism = 4; // limit concurrency (Parallel mode only)
+    options.ExecutionMode = IgnitionExecutionMode.Parallel; // or Sequential / DependencyAware
+    options.MaxDegreeOfParallelism = 4; // limit concurrency (Parallel/DependencyAware modes)
     options.CancelOnGlobalTimeout = true; // attempt to cancel still-running signals if global timeout hits
     options.CancelIndividualOnTimeout = true; // cancel a signal if its own timeout elapses
 });
@@ -144,6 +147,114 @@ Classification summary:
 | Per-signal timeout only | True | TimedOut + Succeeded |
 
 This model avoids penalizing slow but successful initialization while still enabling an upper bound via opt-in cancellation.
+
+## Dependency-Aware Execution (DAG)
+
+Veggerby.Ignition supports dependency-aware execution where signals can declare prerequisites. The coordinator automatically:
+
+- Performs topological sort to determine execution order
+- Detects cycles with clear diagnostics (cycle path shown in error message)
+- Executes independent branches in parallel automatically
+- Skips dependent signals when prerequisites fail
+
+### Defining Dependencies
+
+Use the fluent builder API to define a dependency graph:
+
+```csharp
+builder.Services.AddIgnition(options =>
+{
+    options.ExecutionMode = IgnitionExecutionMode.DependencyAware;
+    options.GlobalTimeout = TimeSpan.FromSeconds(30);
+});
+
+// Register signals
+builder.Services.AddIgnitionSignal<DatabaseSignal>();
+builder.Services.AddIgnitionSignal<CacheSignal>();
+builder.Services.AddIgnitionSignal<WorkerSignal>();
+
+// Define dependency graph
+builder.Services.AddIgnitionGraph((graphBuilder, sp) =>
+{
+    var db = sp.GetServices<IIgnitionSignal>().First(s => s.Name == "database");
+    var cache = sp.GetServices<IIgnitionSignal>().First(s => s.Name == "cache");
+    var worker = sp.GetServices<IIgnitionSignal>().First(s => s.Name == "worker");
+    
+    graphBuilder.AddSignals(new[] { db, cache, worker });
+    graphBuilder.DependsOn(cache, db);      // Cache depends on Database
+    graphBuilder.DependsOn(worker, cache);  // Worker depends on Cache
+});
+```
+
+### Declarative Dependencies with Attributes
+
+Use `[SignalDependency]` for declarative dependency declaration:
+
+```csharp
+public class DatabaseSignal : IIgnitionSignal
+{
+    public string Name => "database";
+    public TimeSpan? Timeout => TimeSpan.FromSeconds(10);
+    public Task WaitAsync(CancellationToken ct) => /* connect to DB */;
+}
+
+[SignalDependency("database")]
+public class CacheSignal : IIgnitionSignal
+{
+    public string Name => "cache";
+    public TimeSpan? Timeout => TimeSpan.FromSeconds(5);
+    public Task WaitAsync(CancellationToken ct) => /* warm cache */;
+}
+
+[SignalDependency("cache")]
+public class WorkerSignal : IIgnitionSignal
+{
+    public string Name => "worker";
+    public TimeSpan? Timeout => null;
+    public Task WaitAsync(CancellationToken ct) => /* start worker */;
+}
+
+// Register and apply attribute-based dependencies
+builder.Services.AddIgnitionSignal<DatabaseSignal>();
+builder.Services.AddIgnitionSignal<CacheSignal>();
+builder.Services.AddIgnitionSignal<WorkerSignal>();
+
+builder.Services.AddIgnitionGraph((graphBuilder, sp) =>
+{
+    var signals = sp.GetServices<IIgnitionSignal>();
+    graphBuilder.AddSignals(signals);
+    graphBuilder.ApplyAttributeDependencies(); // Automatically wire dependencies from attributes
+});
+```
+
+### Dependency Execution Behavior
+
+1. **Parallel Independent Branches**: Signals with no dependency relationship execute concurrently
+2. **Sequential Chains**: Dependent signals wait for all prerequisites to complete
+3. **Failure Propagation**: If a signal fails, all its dependents are automatically skipped
+4. **Structured Diagnostics**: Results include `FailedDependencies` showing which prerequisites failed
+
+Example result inspection:
+
+```csharp
+var result = await coordinator.GetResultAsync();
+foreach (var r in result.Results)
+{
+    if (r.Status == IgnitionSignalStatus.Skipped)
+    {
+        Console.WriteLine($"{r.Name} skipped due to failed dependencies: {string.Join(", ", r.FailedDependencies)}");
+    }
+}
+```
+
+### Cycle Detection
+
+The graph builder validates acyclicity during construction. If a cycle is detected, an `InvalidOperationException` is thrown with the exact cycle path:
+
+```
+Ignition graph contains a cycle: s1 -> s2 -> s3 -> s1. 
+Dependency-aware execution requires an acyclic graph.
+```
 
 ## Installation
 
