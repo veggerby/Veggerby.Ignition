@@ -449,6 +449,84 @@ public static class IgnitionExtensions
         return services;
     }
 
+    /// <summary>
+    /// Registers an ignition bundle, invoking its <see cref="IIgnitionBundle.ConfigureBundle"/> method to register signals and dependencies.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="bundle">The bundle to register.</param>
+    /// <param name="configure">Optional configuration delegate for per-bundle options.</param>
+    /// <returns>The same service collection for chaining.</returns>
+    /// <remarks>
+    /// Bundles provide a convenient way to register grouped sets of signals with optional shared configuration.
+    /// The bundle's <see cref="IIgnitionBundle.ConfigureBundle"/> method is invoked immediately to register signals and configure dependencies.
+    /// Per-bundle options (e.g., <see cref="IgnitionBundleOptions.DefaultTimeout"/>) are applied to signals registered by the bundle.
+    /// </remarks>
+    public static IServiceCollection AddIgnitionBundle(
+        this IServiceCollection services,
+        IIgnitionBundle bundle,
+        Action<IgnitionBundleOptions>? configure = null)
+    {
+        ArgumentNullException.ThrowIfNull(bundle);
+
+        bundle.ConfigureBundle(services, configure);
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers an ignition bundle by type, constructing it with the default constructor and invoking its <see cref="IIgnitionBundle.ConfigureBundle"/> method.
+    /// </summary>
+    /// <typeparam name="TBundle">Concrete implementation of <see cref="IIgnitionBundle"/> with a parameterless constructor.</typeparam>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="configure">Optional configuration delegate for per-bundle options.</param>
+    /// <returns>The same service collection for chaining.</returns>
+    /// <remarks>
+    /// This overload requires the bundle type to have a public parameterless constructor.
+    /// If the bundle requires constructor dependencies, use the instance-based overload instead.
+    /// </remarks>
+    public static IServiceCollection AddIgnitionBundle<TBundle>(
+        this IServiceCollection services,
+        Action<IgnitionBundleOptions>? configure = null) where TBundle : class, IIgnitionBundle, new()
+    {
+        var bundle = new TBundle();
+        bundle.ConfigureBundle(services, configure);
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers multiple ignition bundles from an enumerable.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="bundles">Enumerable sequence of bundle instances to register.</param>
+    /// <param name="configure">Optional configuration delegate applied to all bundles.</param>
+    /// <returns>The same service collection for chaining.</returns>
+    public static IServiceCollection AddIgnitionBundles(
+        this IServiceCollection services,
+        IEnumerable<IIgnitionBundle> bundles,
+        Action<IgnitionBundleOptions>? configure = null)
+    {
+        ArgumentNullException.ThrowIfNull(bundles);
+
+        foreach (var bundle in bundles)
+        {
+            services.AddIgnitionBundle(bundle, configure);
+        }
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers multiple ignition bundles using a params array convenience overload.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="bundles">Bundle instances to register.</param>
+    /// <returns>The same service collection for chaining.</returns>
+    public static IServiceCollection AddIgnitionBundles(
+        this IServiceCollection services,
+        params IIgnitionBundle[] bundles)
+        => services.AddIgnitionBundles((IEnumerable<IIgnitionBundle>)bundles);
+
     private sealed class ServiceReadySignal<TService>(IServiceProvider provider, string name, Func<TService, CancellationToken, Task> selector, TimeSpan? timeout) : IIgnitionSignal where TService : class
     {
         private readonly IServiceProvider _provider = provider ?? throw new ArgumentNullException(nameof(provider));
