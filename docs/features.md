@@ -613,3 +613,18 @@ Veggerby.Ignition provides:
 ✅ **Zero Dependencies**: Minimal surface using only BCL + Microsoft.Extensions.*
 
 Perfect for coordinating startup readiness in modern .NET applications with minimal overhead and maximum flexibility.
+
+## Detailed Guides
+
+For in-depth coverage of specific topics, see:
+
+- **[Getting Started Guide](getting-started.md)** - Installation, first steps, common patterns
+- **[Dependency-Aware Execution](dependency-aware-execution.md)** - Complete DAG mode guide
+- **[Timeout Management](timeout-management.md)** - Deep dive into timeout system
+- **[Bundles Guide](bundles.md)** - Creating and using signal bundles
+- **[Policies and Failure Handling](policies.md)** - Choosing and using policies
+- **[Observability and Diagnostics](observability.md)** - Monitoring and troubleshooting
+- **[Advanced Patterns](advanced-patterns.md)** - Testing, integration, complex scenarios
+- **[Performance Guide](performance.md)** - Optimization and tuning
+- **[Migration Guide](migration.md)** - Upgrading between versions
+- **[API Reference](api-reference.md)** - Complete API documentation

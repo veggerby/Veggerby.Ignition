@@ -25,6 +25,8 @@ Veggerby.Ignition is a lightweight, extensible startup readiness ("ignition") co
 - **Declarative dependency declaration** via `[SignalDependency]` attribute
 - **Automatic parallel execution** of independent branches in dependency graphs
 
+📚 **[Full Documentation](docs/README.md)** | 🚀 **[Getting Started Guide](docs/getting-started.md)** | 📖 **[Features Overview](docs/features.md)**
+
 ## Quick Start
 
 ```csharp
@@ -403,6 +405,33 @@ services.AddIgnitionBundle(new MyBundle(), opts =>
 ```
 
 Individual signal timeouts (via `IIgnitionSignal.Timeout`) override bundle defaults.
+
+## Documentation
+
+### Core Guides
+
+- 📖 **[Getting Started](docs/getting-started.md)** - Installation, first signal, common patterns, ASP.NET Core integration
+- 🔀 **[Dependency-Aware Execution](docs/dependency-aware-execution.md)** - DAG mode, topological sort, cycle detection
+- ⏱ **[Timeout Management](docs/timeout-management.md)** - Two-layer timeouts, soft vs hard semantics, classification matrix
+- 📦 **[Bundles](docs/bundles.md)** - Reusable signal packages, built-in bundles, custom bundle creation
+- 🛡️ **[Policies](docs/policies.md)** - FailFast, BestEffort, ContinueOnTimeout failure handling
+- 📊 **[Observability](docs/observability.md)** - Logging, tracing, health checks, metrics
+
+### Advanced Topics
+
+- 🎯 **[Advanced Patterns](docs/advanced-patterns.md)** - Composite signals, testing strategies, integration patterns
+- ⚡ **[Performance Guide](docs/performance.md)** - Execution modes, concurrency tuning, benchmarks
+- 🔄 **[Migration Guide](docs/migration.md)** - Version upgrades, breaking changes
+- 📚 **[API Reference](docs/api-reference.md)** - Complete API surface documentation
+- ✨ **[Features Overview](docs/features.md)** - Comprehensive feature reference
+
+### Sample Projects
+
+- [Simple](samples/Simple/README.md) - Basic usage
+- [Advanced](samples/Advanced/README.md) - Complex scenarios
+- [DependencyGraph](samples/DependencyGraph/README.md) - DAG execution
+- [Bundles](samples/Bundles/README.md) - Bundle usage
+- [WebApi](samples/WebApi/README.md) - ASP.NET Core integration
 
 ## License
 
