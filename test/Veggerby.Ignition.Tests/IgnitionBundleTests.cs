@@ -361,9 +361,10 @@ public class IgnitionBundleTests
             for (int i = 0; i < 3; i++)
             {
                 var signalName = $"{_prefix}-{i}";
+                var capturedName = signalName; // Capture in local scope to avoid closure bug
                 services.AddIgnitionFromTask(signalName, ct =>
                 {
-                    _executed.Add(signalName);
+                    _executed.Add(capturedName);
                     return Task.CompletedTask;
                 });
             }
