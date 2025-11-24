@@ -59,46 +59,41 @@ public sealed class DatabaseTrioBundle : IIgnitionBundle
         var connectSignal = new DatabasePhaseSignal($"{_databaseName}:connect", _connectFactory, options.DefaultTimeout);
         services.AddIgnitionSignal(connectSignal);
 
+        DatabasePhaseSignal? validateSignal = null;
         if (_validateSchemaFactory is not null)
         {
-            var validateSignal = new DatabasePhaseSignal($"{_databaseName}:validate-schema", _validateSchemaFactory, options.DefaultTimeout);
+            validateSignal = new DatabasePhaseSignal($"{_databaseName}:validate-schema", _validateSchemaFactory, options.DefaultTimeout);
             services.AddIgnitionSignal(validateSignal);
+        }
 
-            // Register dependency graph if not already configured
+        DatabasePhaseSignal? warmupSignal = null;
+        if (_warmupFactory is not null)
+        {
+            warmupSignal = new DatabasePhaseSignal($"{_databaseName}:warmup", _warmupFactory, options.DefaultTimeout);
+            services.AddIgnitionSignal(warmupSignal);
+        }
+
+        // Register dependency graph if any dependencies exist
+        if (validateSignal is not null || warmupSignal is not null)
+        {
             services.AddIgnitionGraph((builder, sp) =>
             {
                 var signals = sp.GetServices<IIgnitionSignal>();
                 builder.AddSignals(signals);
-                builder.DependsOn(validateSignal, connectSignal);
 
-                if (_warmupFactory is not null)
+                // Schema validation depends on connection
+                if (validateSignal is not null)
                 {
-                    var warmupSignal = sp.GetServices<IIgnitionSignal>()
-                        .FirstOrDefault(s => s.Name == $"{_databaseName}:warmup");
-                    
-                    if (warmupSignal is not null)
-                    {
-                        builder.DependsOn(warmupSignal, validateSignal);
-                    }
+                    builder.DependsOn(validateSignal, connectSignal);
+                }
+
+                // Warmup depends on schema validation if present, otherwise on connection
+                if (warmupSignal is not null)
+                {
+                    var dependency = validateSignal ?? connectSignal;
+                    builder.DependsOn(warmupSignal, dependency);
                 }
             });
-        }
-
-        if (_warmupFactory is not null)
-        {
-            var warmupSignal = new DatabasePhaseSignal($"{_databaseName}:warmup", _warmupFactory, options.DefaultTimeout);
-            services.AddIgnitionSignal(warmupSignal);
-
-            if (_validateSchemaFactory is null)
-            {
-                // Warmup depends directly on connect if no schema validation
-                services.AddIgnitionGraph((builder, sp) =>
-                {
-                    var signals = sp.GetServices<IIgnitionSignal>();
-                    builder.AddSignals(signals);
-                    builder.DependsOn(warmupSignal, connectSignal);
-                });
-            }
         }
     }
 

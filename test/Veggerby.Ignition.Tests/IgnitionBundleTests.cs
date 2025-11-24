@@ -361,7 +361,7 @@ public class IgnitionBundleTests
             for (int i = 0; i < 3; i++)
             {
                 var signalName = $"{_prefix}-{i}";
-                var capturedName = signalName; // Capture in local scope to avoid closure bug
+                var capturedName = signalName; // Capture loop variable to avoid closure over modified variable
                 services.AddIgnitionFromTask(signalName, ct =>
                 {
                     _executed.Add(capturedName);
