@@ -1,3 +1,5 @@
+using System;
+
 namespace Veggerby.Ignition;
 
 /// <summary>
