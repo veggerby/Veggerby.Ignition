@@ -5,10 +5,6 @@ namespace Veggerby.Ignition;
 /// </summary>
 public sealed class IgnitionOptions
 {
-    private TimeSpan _globalTimeout = TimeSpan.FromSeconds(5);
-    private int _slowHandleLogCount = 3;
-    private int? _maxDegreeOfParallelism;
-
     /// <summary>
     /// Maximum total duration allowed for all ignition signals before the global timeout deadline elapses.
     /// By default this is a soft deadline: execution continues unless <see cref="CancelOnGlobalTimeout"/> is true.
@@ -16,7 +12,7 @@ public sealed class IgnitionOptions
     /// <exception cref="ArgumentOutOfRangeException">Thrown when set to a negative value.</exception>
     public TimeSpan GlobalTimeout
     {
-        get => _globalTimeout;
+        get;
         set
         {
             if (value < TimeSpan.Zero)
@@ -24,9 +20,9 @@ public sealed class IgnitionOptions
                 throw new ArgumentOutOfRangeException(nameof(value), "Global timeout cannot be negative.");
             }
 
-            _globalTimeout = value;
+            field = value;
         }
-    }
+    } = TimeSpan.FromSeconds(5);
 
     /// <summary>
     /// Policy determining how failures or timeouts influence startup continuation.
@@ -49,7 +45,7 @@ public sealed class IgnitionOptions
     /// <exception cref="ArgumentOutOfRangeException">Thrown when set to a negative value.</exception>
     public int SlowHandleLogCount
     {
-        get => _slowHandleLogCount;
+        get;
         set
         {
             if (value < 0)
@@ -57,9 +53,9 @@ public sealed class IgnitionOptions
                 throw new ArgumentOutOfRangeException(nameof(value), "Slow handle log count cannot be negative.");
             }
 
-            _slowHandleLogCount = value;
+            field = value;
         }
-    }
+    } = 3;
 
     /// <summary>
     /// Execution mode controlling scheduling strategy (parallel or sequential).
@@ -73,7 +69,7 @@ public sealed class IgnitionOptions
     /// <exception cref="ArgumentOutOfRangeException">Thrown when set to zero or negative value.</exception>
     public int? MaxDegreeOfParallelism
     {
-        get => _maxDegreeOfParallelism;
+        get;
         set
         {
             if (value.HasValue && value.Value <= 0)
@@ -81,7 +77,7 @@ public sealed class IgnitionOptions
                 throw new ArgumentOutOfRangeException(nameof(value), "Max degree of parallelism must be greater than zero when specified.");
             }
 
-            _maxDegreeOfParallelism = value;
+            field = value;
         }
     }
 

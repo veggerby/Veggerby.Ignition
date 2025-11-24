@@ -179,6 +179,7 @@ public static class IgnitionExtensions
         TimeSpan? timeout = null) where TService : class
     {
         ArgumentNullException.ThrowIfNull(taskSelector, nameof(taskSelector));
+
         if (name is not null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
@@ -189,6 +190,7 @@ public static class IgnitionExtensions
             name ?? typeof(TService).Name,
             (svc, _) => taskSelector(svc),
             timeout));
+
         return services;
     }
 
@@ -214,6 +216,7 @@ public static class IgnitionExtensions
         TimeSpan? timeout = null) where TService : class
     {
         ArgumentNullException.ThrowIfNull(taskSelector, nameof(taskSelector));
+
         if (name is not null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
@@ -224,6 +227,7 @@ public static class IgnitionExtensions
             name ?? typeof(TService).Name,
             (svc, ct) => taskSelector(svc, ct),
             timeout));
+
         return services;
     }
 
@@ -244,6 +248,7 @@ public static class IgnitionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
 
         services.AddSingleton<IIgnitionSignal>(sp => new ServiceCompositeReadySignal(sp, name, taskFactory, timeout));
+
         return services;
     }
 
@@ -277,6 +282,7 @@ public static class IgnitionExtensions
         TimeSpan? timeout = null) where TService : class
     {
         ArgumentNullException.ThrowIfNull(taskSelector, nameof(taskSelector));
+
         if (groupName is not null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(groupName, nameof(groupName));
@@ -287,6 +293,7 @@ public static class IgnitionExtensions
             groupName ?? $"{typeof(TService).Name}[*]",
             (svc, _) => taskSelector(svc),
             timeout));
+
         return services;
     }
 
@@ -309,6 +316,7 @@ public static class IgnitionExtensions
         TimeSpan? timeout = null) where TService : class
     {
         ArgumentNullException.ThrowIfNull(taskSelector, nameof(taskSelector));
+
         if (groupName is not null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(groupName, nameof(groupName));
@@ -319,6 +327,7 @@ public static class IgnitionExtensions
             groupName ?? $"{typeof(TService).Name}[*]",
             (svc, ct) => taskSelector(svc, ct),
             timeout));
+
         return services;
     }
 
@@ -346,6 +355,7 @@ public static class IgnitionExtensions
         TimeSpan? timeout = null) where TService : class
     {
         ArgumentNullException.ThrowIfNull(taskSelector, nameof(taskSelector));
+
         if (groupName is not null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(groupName, nameof(groupName));
@@ -356,6 +366,7 @@ public static class IgnitionExtensions
             groupName ?? $"{typeof(TService).Name}[*]",
             (svc, _) => taskSelector(svc),
             timeout));
+
         return services;
     }
 
@@ -378,6 +389,7 @@ public static class IgnitionExtensions
         TimeSpan? timeout = null) where TService : class
     {
         ArgumentNullException.ThrowIfNull(taskSelector, nameof(taskSelector));
+
         if (groupName is not null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(groupName, nameof(groupName));
@@ -388,6 +400,7 @@ public static class IgnitionExtensions
             groupName ?? $"{typeof(TService).Name}[*]",
             (svc, ct) => taskSelector(svc, ct),
             timeout));
+
         return services;
     }
 
@@ -425,12 +438,14 @@ public static class IgnitionExtensions
         Action<IgnitionGraphBuilder, IServiceProvider> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
+
         services.AddSingleton<IIgnitionGraph>(sp =>
         {
             var builder = new IgnitionGraphBuilder();
             configure(builder, sp);
             return builder.Build();
         });
+
         return services;
     }
 
@@ -520,6 +535,7 @@ public static class IgnitionExtensions
                     if (!_created)
                     {
                         var instances = provider.GetServices<TService>().ToList();
+
                         if (instances.Count == 0)
                         {
                             _cached = Task.CompletedTask;
@@ -533,6 +549,7 @@ public static class IgnitionExtensions
                             }
                             _cached = Task.WhenAll(tasks);
                         }
+
                         _created = true;
                     }
                 }
@@ -567,6 +584,7 @@ public static class IgnitionExtensions
                         var scope = scopeFactory.CreateScope();
                         var provider = scope.ServiceProvider;
                         var instances = provider.GetServices<TService>().ToList();
+
                         if (instances.Count == 0)
                         {
                             scope.Dispose();
@@ -586,6 +604,7 @@ public static class IgnitionExtensions
                                 return t;
                             }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Unwrap();
                         }
+                        
                         _created = true;
                     }
                 }

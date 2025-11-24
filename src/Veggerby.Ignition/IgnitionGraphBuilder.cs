@@ -10,8 +10,8 @@ namespace Veggerby.Ignition;
 /// </summary>
 public sealed class IgnitionGraphBuilder
 {
-    private readonly List<IIgnitionSignal> _signals = new();
-    private readonly Dictionary<IIgnitionSignal, HashSet<IIgnitionSignal>> _dependencies = new();
+    private readonly List<IIgnitionSignal> _signals = [];
+    private readonly Dictionary<IIgnitionSignal, HashSet<IIgnitionSignal>> _dependencies = [];
 
     /// <summary>
     /// Adds a signal to the graph with no explicit dependencies.
@@ -25,7 +25,7 @@ public sealed class IgnitionGraphBuilder
         if (!_signals.Contains(signal))
         {
             _signals.Add(signal);
-            _dependencies[signal] = new HashSet<IIgnitionSignal>();
+            _dependencies[signal] = [];
         }
 
         return this;
@@ -124,7 +124,7 @@ public sealed class IgnitionGraphBuilder
     {
         if (_signals.Count == 0)
         {
-            return new IgnitionGraph(Array.Empty<IIgnitionSignal>(), new Dictionary<IIgnitionSignal, HashSet<IIgnitionSignal>>());
+            return new IgnitionGraph(Array.Empty<IIgnitionSignal>(), []);
         }
 
         // Perform topological sort using Kahn's algorithm
@@ -146,7 +146,7 @@ public sealed class IgnitionGraphBuilder
         var dependents = new Dictionary<IIgnitionSignal, HashSet<IIgnitionSignal>>();
         foreach (var signal in _signals)
         {
-            dependents[signal] = new HashSet<IIgnitionSignal>();
+            dependents[signal] = [];
         }
 
         foreach (var kvp in _dependencies)
@@ -254,21 +254,19 @@ public sealed class IgnitionGraphBuilder
     private sealed class IgnitionGraph : IIgnitionGraph
     {
         private static readonly IReadOnlySet<IIgnitionSignal> EmptySet = new HashSet<IIgnitionSignal>();
-        
-        private readonly IReadOnlyList<IIgnitionSignal> _sortedSignals;
         private readonly Dictionary<IIgnitionSignal, HashSet<IIgnitionSignal>> _dependencies;
         private readonly Dictionary<IIgnitionSignal, HashSet<IIgnitionSignal>> _dependents;
 
         public IgnitionGraph(IReadOnlyList<IIgnitionSignal> sortedSignals, Dictionary<IIgnitionSignal, HashSet<IIgnitionSignal>> dependencies)
         {
-            _sortedSignals = sortedSignals;
+            Signals = sortedSignals;
             _dependencies = new Dictionary<IIgnitionSignal, HashSet<IIgnitionSignal>>(dependencies);
             
             // Build reverse mapping
-            _dependents = new Dictionary<IIgnitionSignal, HashSet<IIgnitionSignal>>();
-            foreach (var signal in _sortedSignals)
+            _dependents = [];
+            foreach (var signal in Signals)
             {
-                _dependents[signal] = new HashSet<IIgnitionSignal>();
+                _dependents[signal] = [];
             }
 
             foreach (var kvp in _dependencies)
@@ -280,7 +278,7 @@ public sealed class IgnitionGraphBuilder
             }
         }
 
-        public IReadOnlyList<IIgnitionSignal> Signals => _sortedSignals;
+        public IReadOnlyList<IIgnitionSignal> Signals { get; }
 
         public IReadOnlySet<IIgnitionSignal> GetDependencies(IIgnitionSignal signal)
         {
@@ -297,7 +295,7 @@ public sealed class IgnitionGraphBuilder
         public IReadOnlyList<IIgnitionSignal> GetRootSignals()
         {
             var roots = new List<IIgnitionSignal>();
-            foreach (var signal in _sortedSignals)
+            foreach (var signal in Signals)
             {
                 if (_dependencies[signal].Count == 0)
                 {
@@ -311,7 +309,7 @@ public sealed class IgnitionGraphBuilder
         public IReadOnlyList<IIgnitionSignal> GetLeafSignals()
         {
             var leaves = new List<IIgnitionSignal>();
-            foreach (var signal in _sortedSignals)
+            foreach (var signal in Signals)
             {
                 if (_dependents[signal].Count == 0)
                 {

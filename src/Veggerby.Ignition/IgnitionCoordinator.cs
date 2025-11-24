@@ -139,6 +139,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                 }
             }
         }
+
         // Option B semantics: a pure global timeout does not mark TimedOut unless any individual handle timed out (i.e. hard cancellation or per-signal timeout).
         if (globalTimedOut)
         {
@@ -147,6 +148,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                 // Hard global timeout => always classify as timed out.
                 return IgnitionResult.FromTimeout(results, swGlobal.Elapsed);
             }
+
             // Soft timeout: only classify if any per-signal timed out.
             bool hasTimedOut = false;
             foreach (var r in results)
@@ -301,6 +303,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         {
             // swallow: results gathered later
         }
+        
         return (list, false);
     }
 
