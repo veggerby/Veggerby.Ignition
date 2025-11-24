@@ -19,6 +19,23 @@ Demonstrates:
 
 Perfect for getting started with Ignition and understanding core concepts.
 
+### [Bundles Console Application](./Bundles/)
+
+**Complexity**: Intermediate
+**Type**: Console Application
+**Focus**: Composable bundle patterns
+
+Demonstrates:
+
+- Using built-in bundles (DatabaseTrioBundle)
+- Creating custom reusable bundles
+- Bundle configuration with timeout overrides
+- Packaging related signals into modules
+- Combining multiple bundles
+- Dependency graph setup within bundles
+
+Ideal for understanding how to create reusable signal packages for common patterns like Redis startup, message queue initialization, or database trios.
+
 ### [Advanced Console Application](./Advanced/)
 
 **Complexity**: Intermediate
@@ -86,15 +103,17 @@ dotnet run
 We recommend exploring the samples in this order:
 
 1. **Start with Simple** - Learn the basic concepts and API
-2. **Move to Advanced** - Understand configuration options and policies
-3. **Explore DependencyGraph** - Master dependency-aware execution (DAG mode)
-4. **Study WebApi** - See real-world integration patterns
+2. **Explore Bundles** - Understand composable signal packages
+3. **Move to Advanced** - Deep dive into configuration options and policies
+4. **Study DependencyGraph** - Master dependency-aware execution (DAG mode)
+5. **Review WebApi** - See real-world integration patterns
 
 ## Key Concepts Demonstrated
 
 ### Signal Implementation
 
 - Custom `IIgnitionSignal` implementations
+- Custom `IIgnitionBundle` implementations for reusable packages
 - Per-signal timeout configuration
 - Error handling and logging patterns
 
