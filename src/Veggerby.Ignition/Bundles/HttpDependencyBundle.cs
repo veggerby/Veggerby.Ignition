@@ -71,6 +71,7 @@ public sealed class HttpDependencyBundle : IIgnitionBundle
     private sealed class HttpEndpointSignal : IIgnitionSignal
     {
         private readonly string _endpoint;
+        private static readonly HttpClient _sharedClient = new();
 
         public HttpEndpointSignal(string endpoint, TimeSpan? timeout)
         {
@@ -83,8 +84,7 @@ public sealed class HttpDependencyBundle : IIgnitionBundle
 
         public async Task WaitAsync(CancellationToken cancellationToken = default)
         {
-            using var client = new HttpClient();
-            var response = await client.GetAsync(_endpoint, cancellationToken).ConfigureAwait(false);
+            var response = await _sharedClient.GetAsync(_endpoint, cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
         }
     }

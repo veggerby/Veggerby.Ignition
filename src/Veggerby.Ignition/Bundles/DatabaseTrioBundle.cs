@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -78,8 +79,18 @@ public sealed class DatabaseTrioBundle : IIgnitionBundle
         {
             services.AddIgnitionGraph((builder, sp) =>
             {
-                var signals = sp.GetServices<IIgnitionSignal>();
-                builder.AddSignals(signals);
+                // Only add signals from this bundle to avoid unnecessary dependencies with other bundles
+                var bundleSignals = new List<IIgnitionSignal> { connectSignal };
+                if (validateSignal is not null)
+                {
+                    bundleSignals.Add(validateSignal);
+                }
+                if (warmupSignal is not null)
+                {
+                    bundleSignals.Add(warmupSignal);
+                }
+
+                builder.AddSignals(bundleSignals);
 
                 // Schema validation depends on connection
                 if (validateSignal is not null)
