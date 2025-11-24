@@ -18,7 +18,11 @@ public enum IgnitionSignalStatus
     /// <summary>
     /// The signal exceeded its timeout before completion.
     /// </summary>
-    TimedOut
+    TimedOut,
+    /// <summary>
+    /// The signal was not executed because one or more of its dependencies failed (dependency-aware mode only).
+    /// </summary>
+    Skipped
 }
 
 /// <summary>
@@ -28,7 +32,19 @@ public enum IgnitionSignalStatus
 /// <param name="Status">Completion status.</param>
 /// <param name="Duration">Elapsed time waiting for the signal.</param>
 /// <param name="Exception">Captured exception if <see cref="IgnitionSignalStatus.Failed"/>.</param>
-public sealed record IgnitionSignalResult(string Name, IgnitionSignalStatus Status, TimeSpan Duration, Exception? Exception = null);
+/// <param name="FailedDependencies">Names of dependency signals that failed, preventing this signal from executing (dependency-aware mode only).</param>
+public sealed record IgnitionSignalResult(
+    string Name,
+    IgnitionSignalStatus Status,
+    TimeSpan Duration,
+    Exception? Exception = null,
+    IReadOnlyList<string>? FailedDependencies = null)
+{
+    /// <summary>
+    /// Gets whether this signal was skipped due to failed dependencies.
+    /// </summary>
+    public bool SkippedDueToDependencies => FailedDependencies is not null && FailedDependencies.Count > 0;
+}
 
 /// <summary>
 /// Aggregated result representing all ignition signals and overall timing info.

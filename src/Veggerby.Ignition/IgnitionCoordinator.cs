@@ -19,6 +19,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
 
     private static readonly ActivitySource ActivitySource = new(ActivitySourceName);
     private readonly IReadOnlyList<IIgnitionSignal> _handles;
+    private readonly IIgnitionGraph? _graph;
     private readonly IgnitionOptions _options;
     private readonly ILogger<IgnitionCoordinator> _logger;
     private readonly Lazy<Task<IgnitionResult>> _lazyRun;
@@ -30,12 +31,25 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
     /// <param name="options">Configured ignition options.</param>
     /// <param name="logger">Logger used for diagnostic output.</param>
     public IgnitionCoordinator(IEnumerable<IIgnitionSignal> handles, IOptions<IgnitionOptions> options, ILogger<IgnitionCoordinator> logger)
+        : this(handles, graph: null, options, logger)
+    {
+    }
+
+    /// <summary>
+    /// Creates a new coordinator instance with optional dependency graph.
+    /// </summary>
+    /// <param name="handles">The collection of ignition signals to evaluate.</param>
+    /// <param name="graph">Optional dependency graph for dependency-aware execution.</param>
+    /// <param name="options">Configured ignition options.</param>
+    /// <param name="logger">Logger used for diagnostic output.</param>
+    public IgnitionCoordinator(IEnumerable<IIgnitionSignal> handles, IIgnitionGraph? graph, IOptions<IgnitionOptions> options, ILogger<IgnitionCoordinator> logger)
     {
         ArgumentNullException.ThrowIfNull(handles);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(logger);
 
         _handles = handles.ToList();
+        _graph = graph;
         _options = options.Value;
         _logger = logger;
         _lazyRun = new Lazy<Task<IgnitionResult>>(ExecuteAsync, isThreadSafe: true);
@@ -76,9 +90,12 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         // Do not attach cancellation token; we want pure elapsed-time behavior independent of later cancellation.
         var globalTimeoutTask = Task.Delay(_options.GlobalTimeout);
 
-        var (signalTasks, globalTimedOut) = _options.ExecutionMode == IgnitionExecutionMode.Sequential
-            ? await RunSequentialAsync(globalCts, globalTimeoutTask)
-            : await RunParallelAsync(globalCts, globalTimeoutTask);
+        var (signalTasks, globalTimedOut) = _options.ExecutionMode switch
+        {
+            IgnitionExecutionMode.Sequential => await RunSequentialAsync(globalCts, globalTimeoutTask),
+            IgnitionExecutionMode.DependencyAware => await RunDependencyAwareAsync(globalCts, globalTimeoutTask),
+            _ => await RunParallelAsync(globalCts, globalTimeoutTask)
+        };
 
         // Cancel timeout delay if completed
         globalCts.Cancel();
@@ -122,6 +139,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                 }
             }
         }
+
         // Option B semantics: a pure global timeout does not mark TimedOut unless any individual handle timed out (i.e. hard cancellation or per-signal timeout).
         if (globalTimedOut)
         {
@@ -130,6 +148,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                 // Hard global timeout => always classify as timed out.
                 return IgnitionResult.FromTimeout(results, swGlobal.Elapsed);
             }
+
             // Soft timeout: only classify if any per-signal timed out.
             bool hasTimedOut = false;
             foreach (var r in results)
@@ -284,7 +303,277 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         {
             // swallow: results gathered later
         }
+        
         return (list, false);
+    }
+
+    private async Task<(List<Task<IgnitionSignalResult>> Tasks, bool TimedOut)> RunDependencyAwareAsync(CancellationTokenSource globalCts, Task globalTimeoutTask)
+    {
+        if (_graph is null)
+        {
+            throw new InvalidOperationException(
+                "Dependency-aware execution mode requires an IIgnitionGraph to be registered. " +
+                "Use IgnitionGraphBuilder to create a graph and register it in the DI container.");
+        }
+
+        _logger.LogDebug("Starting dependency-aware execution for {Count} signal(s).", _graph.Signals.Count);
+
+        var syncLock = new object();
+        var results = new Dictionary<IIgnitionSignal, Task<IgnitionSignalResult>>();
+        var completed = new Dictionary<IIgnitionSignal, IgnitionSignalResult>();
+        var failed = new HashSet<IIgnitionSignal>();
+        var skipped = new HashSet<IIgnitionSignal>();
+
+        // Track signals by their dependency count
+        var pendingDependencies = new Dictionary<IIgnitionSignal, int>();
+        foreach (var signal in _graph.Signals)
+        {
+            var deps = _graph.GetDependencies(signal);
+            pendingDependencies[signal] = deps.Count;
+        }
+
+        // Queue for signals ready to execute
+        var readyQueue = new Queue<IIgnitionSignal>();
+        foreach (var signal in _graph.Signals)
+        {
+            if (pendingDependencies[signal] == 0)
+            {
+                readyQueue.Enqueue(signal);
+            }
+        }
+
+        // Execute signals as their dependencies complete
+        var activeTasks = new List<Task>();
+        SemaphoreSlim? gate = null;
+        if (_options.MaxDegreeOfParallelism.HasValue && _options.MaxDegreeOfParallelism > 0)
+        {
+            gate = new SemaphoreSlim(_options.MaxDegreeOfParallelism.Value);
+        }
+
+        while (true)
+        {
+            IIgnitionSignal? signalToStart = null;
+            
+            lock (syncLock)
+            {
+                if (readyQueue.Count == 0 && activeTasks.Count == 0)
+                {
+                    break; // All done
+                }
+
+                if (readyQueue.Count > 0)
+                {
+                    signalToStart = readyQueue.Dequeue();
+                }
+            }
+
+            if (signalToStart is not null)
+            {
+                bool gateAcquired = false;
+                try
+                {
+                    if (gate is not null)
+                    {
+                        await gate.WaitAsync(globalCts.Token);
+                        gateAcquired = true;
+                    }
+
+                    var signal = signalToStart;
+
+                    // Check if any dependencies failed
+                    var deps = _graph.GetDependencies(signal);
+                    var failedDeps = new List<string>();
+                    lock (syncLock)
+                    {
+                        foreach (var dep in deps)
+                        {
+                            if (failed.Contains(dep))
+                            {
+                                failedDeps.Add(dep.Name);
+                            }
+                        }
+                    }
+
+                    if (failedDeps.Count > 0)
+                    {
+                        // Skip this signal due to failed dependencies
+                        var skipResult = new IgnitionSignalResult(
+                            signal.Name,
+                            IgnitionSignalStatus.Skipped,
+                            TimeSpan.Zero,
+                            Exception: null,
+                            FailedDependencies: failedDeps);
+                        
+                        lock (syncLock)
+                        {
+                            completed[signal] = skipResult;
+                            skipped.Add(signal);
+                            
+                            // Mark dependents as ready if all their other dependencies are done
+                            foreach (var dependent in _graph.GetDependents(signal))
+                            {
+                                pendingDependencies[dependent]--;
+                                if (pendingDependencies[dependent] == 0)
+                                {
+                                    readyQueue.Enqueue(dependent);
+                                }
+                            }
+                        }
+
+                        _logger.LogWarning(
+                            "Skipping signal '{Name}' due to failed dependencies: {Dependencies}",
+                            signal.Name,
+                            string.Join(", ", failedDeps));
+                        continue;
+                    }
+
+                    // Start the signal - gate released in task's finally block
+                    gateAcquired = false; // Transfer ownership to task
+                    var task = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var result = await WaitOneAsync(signal, globalCts.Token);
+                            lock (syncLock)
+                            {
+                                completed[signal] = result;
+                                if (result.Status == IgnitionSignalStatus.Failed || result.Status == IgnitionSignalStatus.TimedOut)
+                                {
+                                    failed.Add(signal);
+
+                                    if (_options.Policy == IgnitionPolicy.FailFast)
+                                    {
+                                        _logger.LogError(result.Exception, "Signal '{Name}' failed in dependency-aware mode; aborting per FailFast policy.", signal.Name);
+                                        globalCts.Cancel();
+                                    }
+                                }
+
+                                // Notify dependents
+                                foreach (var dependent in _graph.GetDependents(signal))
+                                {
+                                    pendingDependencies[dependent]--;
+                                    if (pendingDependencies[dependent] == 0)
+                                    {
+                                        readyQueue.Enqueue(dependent);
+                                    }
+                                }
+                            }
+                            return result;
+                        }
+                        finally
+                        {
+                            gate?.Release();
+                        }
+                    }, globalCts.Token);
+
+                    lock (syncLock)
+                    {
+                        results[signal] = task;
+                        activeTasks.Add(task);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    // Global cancellation occurred while waiting for gate
+                    if (gateAcquired)
+                    {
+                        gate?.Release();
+                    }
+                    throw;
+                }
+            }
+            else if (activeTasks.Count > 0)
+            {
+                // Wait for at least one task to complete or global timeout
+                Task<Task> anyTask;
+                lock (syncLock)
+                {
+                    anyTask = Task.WhenAny(activeTasks);
+                }
+                
+                var completedTask = await Task.WhenAny(anyTask, globalTimeoutTask);
+
+                if (completedTask == globalTimeoutTask)
+                {
+                    if (_options.CancelOnGlobalTimeout)
+                    {
+                        _logger.LogWarning("Global timeout in dependency-aware execution (cancelling).");
+                        globalCts.Cancel();
+
+                        // Wait for all active tasks to finish
+                        Task[] tasksSnapshot;
+                        lock (syncLock)
+                        {
+                            tasksSnapshot = activeTasks.ToArray();
+                        }
+                        
+                        try
+                        {
+                            await Task.WhenAll(tasksSnapshot);
+                        }
+                        catch
+                        {
+                            // Exceptions handled in results
+                        }
+
+                        // Build final results list
+                        var taskList = new List<Task<IgnitionSignalResult>>();
+                        foreach (var signal in _graph.Signals)
+                        {
+                            if (results.TryGetValue(signal, out var t))
+                            {
+                                taskList.Add(t);
+                            }
+                            else
+                            {
+                                // Signal never started
+                                var timedOutResult = Task.FromResult(
+                                    new IgnitionSignalResult(signal.Name, IgnitionSignalStatus.TimedOut, TimeSpan.Zero));
+                                taskList.Add(timedOutResult);
+                            }
+                        }
+
+                        return (taskList, true);
+                    }
+                    else
+                    {
+                        _logger.LogDebug("Global timeout in dependency-aware mode but CancelOnGlobalTimeout=false; continuing.");
+                    }
+                }
+                else
+                {
+                    // Remove completed task from active list
+                    var finished = await anyTask;
+                    lock (syncLock)
+                    {
+                        activeTasks.Remove(finished);
+                    }
+                }
+            }
+        }
+
+        // Build final results in original graph order
+        var finalResults = new List<Task<IgnitionSignalResult>>();
+        foreach (var signal in _graph.Signals)
+        {
+            if (results.TryGetValue(signal, out var task))
+            {
+                finalResults.Add(task);
+            }
+            else if (completed.TryGetValue(signal, out var result))
+            {
+                finalResults.Add(Task.FromResult(result));
+            }
+            else
+            {
+                // Should not happen, but handle defensively
+                finalResults.Add(Task.FromResult(
+                    new IgnitionSignalResult(signal.Name, IgnitionSignalStatus.Failed, TimeSpan.Zero,
+                        new InvalidOperationException("Signal was not executed"))));
+            }
+        }
+
+        return (finalResults, false);
     }
 
     private async Task<IgnitionSignalResult> WaitOneAsync(IIgnitionSignal h, CancellationToken globalToken)

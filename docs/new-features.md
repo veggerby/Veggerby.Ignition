@@ -1,8 +1,8 @@
 # 🚀 Veggerby.Ignition — Proposed Major Feature Epics
 
-## 1. **Dependency-Aware Execution Graph (DAG-based ignition)**
+## 1. **Dependency-Aware Execution Graph (DAG-based ignition)** ✅ IMPLEMENTED
 
-Right now, everything is either **parallel** or **sequential**—simple and elegant. But real startup systems often have conditional readiness: DB before Cache, Cache before Worker, etc.
+~~Right now, everything is either **parallel** or **sequential**—simple and elegant. But real startup systems often have conditional readiness: DB before Cache, Cache before Worker, etc.~~
 
 ### What the epic delivers
 
@@ -22,6 +22,17 @@ Right now, everything is either **parallel** or **sequential**—simple and eleg
 ### Why it’s useful
 
 Startup readiness becomes (optionally) declarative instead of imperative — without forcing full workflow orchestration.
+
+**Status**: ✅ **Fully Implemented**
+
+#### Implementation Details
+
+* **Core Abstractions**: `IIgnitionGraph`, `SignalDependencyAttribute`, `IgnitionGraphBuilder` (fluent API)
+* **New Execution Mode**: `IgnitionExecutionMode.DependencyAware`  
+* **Enhanced Results**: `IgnitionSignalStatus.Skipped` + `FailedDependencies` property
+* **Algorithm**: In-house topological sort using Kahn's algorithm (zero external dependencies)
+* **Backward Compatible**: All 33 existing tests pass without modification
+* **Comprehensive Testing**: 19 new tests (52 total) covering topological sort, cycle detection, parallel execution, failure propagation, and edge cases
 
 ---
 
@@ -275,17 +286,17 @@ Makes Ignition adaptable to real-world startup complexities—while still tiny.
 
 # Summary Table
 
-| Epic                         | Value        | Complexity | Lightweight-friendly |
-| ---------------------------- | ------------ | ---------- | -------------------- |
-| DAG-based execution          | 🔥 Very high | 🔥🔥🔥     | ✔                    |
-| Staged execution             | High         | 🔥🔥       | ✔                    |
-| Bundles/modules              | Medium-high  | 🔥🔥       | ✔                    |
-| Event-based state machine    | High         | 🔥🔥🔥     | ✔                    |
-| Replay & historical analysis | High         | 🔥🔥🔥     | ✔                    |
-| Metrics adapter              | Medium       | 🔥         | ✔                    |
-| Cancellation trees           | High         | 🔥🔥🔥     | ✔                    |
-| Timeline exporter            | High         | 🔥🔥       | ✔                    |
-| Timeout strategy plugins     | Medium-high  | 🔥🔥       | ✔                    |
+| Epic                         | Value        | Complexity | Lightweight-friendly | Status               |
+| ---------------------------- | ------------ | ---------- | -------------------- | -------------------- |
+| DAG-based execution          | 🔥 Very high | 🔥🔥🔥     | ✔                    | ✅ **IMPLEMENTED**  |
+| Staged execution             | High         | 🔥🔥       | ✔                    | 📋 Proposed         |
+| Bundles/modules              | Medium-high  | 🔥🔥       | ✔                    | 📋 Proposed         |
+| Event-based state machine    | High         | 🔥🔥🔥     | ✔                    | 📋 Proposed         |
+| Replay & historical analysis | High         | 🔥🔥🔥     | ✔                    | 📋 Proposed         |
+| Metrics adapter              | Medium       | 🔥         | ✔                    | 📋 Proposed         |
+| Cancellation trees           | High         | 🔥🔥🔥     | ✔                    | 📋 Proposed         |
+| Timeline exporter            | High         | 🔥🔥       | ✔                    | 📋 Proposed         |
+| Timeout strategy plugins     | Medium-high  | 🔥🔥       | ✔                    | 📋 Proposed         |
 
 ---
 

@@ -35,6 +35,23 @@ Demonstrates:
 
 Ideal for understanding advanced configuration options and policy behaviors.
 
+### [Dependency Graph Console Application](./DependencyGraph/)
+
+**Complexity**: Advanced
+**Type**: Console Application
+**Focus**: Dependency-aware (DAG) execution mode
+
+Demonstrates:
+
+- Dependency-aware execution with automatic topological sorting
+- Declarative dependencies using `[SignalDependency]` attributes
+- Programmatic dependencies using fluent API (`builder.DependsOn()`)
+- Parallel execution of independent signal branches
+- Automatic failure propagation and signal skipping
+- Cycle detection and validation
+
+Best for understanding complex startup sequences with inter-signal dependencies.
+
 ### [Web API Application](./WebApi/)
 
 **Complexity**: Advanced
@@ -58,7 +75,7 @@ Each sample includes its own README with detailed instructions. To run any sampl
 
 ```bash
 # Navigate to the sample directory
-cd samples/[Simple|Advanced|WebApi]
+cd samples/[Simple|Advanced|DependencyGraph|WebApi]
 
 # Run the sample
 dotnet run
@@ -70,7 +87,8 @@ We recommend exploring the samples in this order:
 
 1. **Start with Simple** - Learn the basic concepts and API
 2. **Move to Advanced** - Understand configuration options and policies
-3. **Explore WebApi** - See real-world integration patterns
+3. **Explore DependencyGraph** - Master dependency-aware execution (DAG mode)
+4. **Study WebApi** - See real-world integration patterns
 
 ## Key Concepts Demonstrated
 
@@ -90,6 +108,7 @@ We recommend exploring the samples in this order:
 
 - **Parallel**: Run all signals simultaneously (default)
 - **Sequential**: Run signals one after another in registration order
+- **DependencyAware**: Run signals based on their dependency relationships (DAG mode)
 
 ### Timeout Handling
 
