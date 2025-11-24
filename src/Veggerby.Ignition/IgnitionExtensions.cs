@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Veggerby.Ignition;
 
@@ -40,7 +42,14 @@ public static class IgnitionExtensions
             services.Configure(configure);
         }
 
-        services.TryAddSingleton<IIgnitionCoordinator, IgnitionCoordinator>();
+        services.TryAddSingleton<IIgnitionCoordinator>(sp =>
+        {
+            var signals = sp.GetServices<IIgnitionSignal>();
+            var graph = sp.GetService<IIgnitionGraph>();
+            var options = sp.GetRequiredService<IOptions<IgnitionOptions>>();
+            var logger = sp.GetRequiredService<ILogger<IgnitionCoordinator>>();
+            return new IgnitionCoordinator(signals, graph, options, logger);
+        });
 
         if (addHealthCheck)
         {
@@ -379,6 +388,49 @@ public static class IgnitionExtensions
             groupName ?? $"{typeof(TService).Name}[*]",
             (svc, ct) => taskSelector(svc, ct),
             timeout));
+        return services;
+    }
+
+    /// <summary>
+    /// Registers an <see cref="IIgnitionGraph"/> for dependency-aware execution.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="graph">The ignition graph defining signal dependencies.</param>
+    /// <returns>The same service collection for chaining.</returns>
+    /// <remarks>
+    /// When using dependency-aware execution mode (<see cref="IgnitionExecutionMode.DependencyAware"/>),
+    /// an <see cref="IIgnitionGraph"/> must be registered. Use <see cref="IgnitionGraphBuilder"/> to construct the graph.
+    /// </remarks>
+    public static IServiceCollection AddIgnitionGraph(
+        this IServiceCollection services,
+        IIgnitionGraph graph)
+    {
+        ArgumentNullException.ThrowIfNull(graph);
+        services.AddSingleton(graph);
+        return services;
+    }
+
+    /// <summary>
+    /// Registers an <see cref="IIgnitionGraph"/> built from a configuration delegate.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="configure">Delegate to configure the graph builder.</param>
+    /// <returns>The same service collection for chaining.</returns>
+    /// <remarks>
+    /// The builder is invoked once when the service provider is created.
+    /// All signals must already be registered before building the graph.
+    /// </remarks>
+    public static IServiceCollection AddIgnitionGraph(
+        this IServiceCollection services,
+        Action<IgnitionGraphBuilder, IServiceProvider> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+        services.AddSingleton<IIgnitionGraph>(sp =>
+        {
+            var builder = new IgnitionGraphBuilder();
+            configure(builder, sp);
+            return builder.Build();
+        });
         return services;
     }
 
