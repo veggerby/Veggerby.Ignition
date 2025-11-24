@@ -1,10 +1,13 @@
 # Dependency-Aware Execution Guide
 
-This guide covers Veggerby.Ignition's dependency-aware execution mode, which automatically orders signal execution based on declared dependencies using a directed acyclic graph (DAG).
+This guide covers Veggerby.Ignition's dependency-aware execution mode, which automatically orders signal
+execution based on declared dependencies using a directed acyclic graph (DAG).
 
 ## Overview
 
-Dependency-aware execution mode solves the problem of coordinating startup tasks that have prerequisite relationships. Instead of manually sequencing signals or running everything in parallel, you declare dependencies and let Ignition determine the optimal execution order.
+Dependency-aware execution mode solves the problem of coordinating startup tasks that have prerequisite
+relationships. Instead of manually sequencing signals or running everything in parallel, you declare
+dependencies and let Ignition determine the optimal execution order.
 
 ### When to Use DAG Mode
 

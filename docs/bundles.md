@@ -1,10 +1,13 @@
 # Ignition Bundles Guide
 
-This guide covers Veggerby.Ignition's bundle system, which enables reusable, composable signal packages that can be registered as a unit.
+This guide covers Veggerby.Ignition's bundle system, which enables reusable, composable signal packages
+that can be registered as a unit.
 
 ## What are Bundles?
 
-Bundles are packaged sets of related ignition signals with pre-configured dependencies and options. They eliminate the need to manually register multiple signals individually and enable ecosystem modules for common initialization patterns.
+Bundles are packaged sets of related ignition signals with pre-configured dependencies and options.
+They eliminate the need to manually register multiple signals individually and enable ecosystem modules
+for common initialization patterns.
 
 ### Benefits of Bundles
 
@@ -647,6 +650,7 @@ builder.Services.AddIgnitionBundle(
 
 - `connectionString`: Redis connection string (required)
 - `DefaultTimeout`: Timeout for all signals (default: 10s)
+
 ```
 
 ## Real-World Bundle Examples

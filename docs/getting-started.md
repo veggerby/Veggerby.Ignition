@@ -1,10 +1,12 @@
 # Getting Started with Veggerby.Ignition
 
-This guide will help you get up and running with Veggerby.Ignition, a lightweight startup readiness coordination library for .NET applications.
+This guide will help you get up and running with Veggerby.Ignition, a lightweight startup readiness
+coordination library for .NET applications.
 
 ## What is Veggerby.Ignition?
 
-Veggerby.Ignition coordinates asynchronous startup tasks (called "signals") in your application. It ensures all critical components are ready before your application begins serving requests, with support for:
+Veggerby.Ignition coordinates asynchronous startup tasks (called "signals") in your application. It ensures
+all critical components are ready before your application begins serving requests, with support for:
 
 - Timeouts and deadline management
 - Failure handling policies
