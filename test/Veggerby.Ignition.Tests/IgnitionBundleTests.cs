@@ -361,9 +361,10 @@ public class IgnitionBundleTests
             for (int i = 0; i < 3; i++)
             {
                 var signalName = $"{_prefix}-{i}";
+                var name = signalName; // Explicit local capture for clarity
                 services.AddIgnitionFromTask(signalName, ct =>
                 {
-                    _executed.Add(signalName);
+                    _executed.Add(name);
                     return Task.CompletedTask;
                 });
             }
