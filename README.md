@@ -264,6 +264,146 @@ Package reference (after publishing to NuGet):
 dotnet add package Veggerby.Ignition
 ```
 
+## Ignition Bundles (Composable Signal Modules)
+
+Ignition bundles enable reusable, packaged sets of signals that can be registered as a unit. This eliminates the need to manually add 10+ related signals individually and enables ecosystem modules like `RedisStarterBundle`, `KafkaConsumerBundle`, or custom infrastructure warmup bundles.
+
+### Built-in Bundles
+
+#### HttpDependencyBundle
+
+Verifies HTTP endpoint readiness by performing GET requests to specified URLs:
+
+```csharp
+// Single endpoint
+services.AddIgnitionBundle(
+    new HttpDependencyBundle("https://api.example.com/health", TimeSpan.FromSeconds(10)));
+
+// Multiple endpoints
+services.AddIgnitionBundle(
+    new HttpDependencyBundle(
+        new[] { "https://api1.example.com/ready", "https://api2.example.com/ready" },
+        TimeSpan.FromSeconds(5)));
+
+// Override timeout via bundle options
+services.AddIgnitionBundle(
+    new HttpDependencyBundle("https://slow-api.example.com"),
+    opts => opts.DefaultTimeout = TimeSpan.FromSeconds(30));
+```
+
+#### DatabaseTrioBundle
+
+Represents a typical database initialization sequence (connect → validate schema → warmup data):
+
+```csharp
+services.AddIgnitionBundle(
+    new DatabaseTrioBundle(
+        databaseName: "primary-db",
+        connectFactory: ct => dbConnection.OpenAsync(ct),
+        validateSchemaFactory: ct => schemaValidator.ValidateAsync(ct),
+        warmupFactory: ct => dataCache.WarmAsync(ct),
+        defaultTimeout: TimeSpan.FromSeconds(15)));
+
+// Only connection and warmup (no schema validation)
+services.AddIgnitionBundle(
+    new DatabaseTrioBundle(
+        "replica-db",
+        ct => replicaConnection.OpenAsync(ct),
+        warmupFactory: ct => replicaCache.WarmAsync(ct)));
+```
+
+The bundle automatically configures dependencies: schema validation depends on connection, and warmup depends on schema validation (or connection if no schema validation).
+
+### Creating Custom Bundles
+
+Implement `IIgnitionBundle` to create reusable signal modules:
+
+```csharp
+public sealed class RedisStarterBundle : IIgnitionBundle
+{
+    private readonly string _connectionString;
+
+    public RedisStarterBundle(string connectionString)
+    {
+        _connectionString = connectionString;
+    }
+
+    public string Name => "RedisStarter";
+
+    public void ConfigureBundle(IServiceCollection services, Action<IgnitionBundleOptions>? configure = null)
+    {
+        var options = new IgnitionBundleOptions();
+        configure?.Invoke(options);
+
+        // Register signals for: connection, health check, and cache warmup
+        services.AddIgnitionFromTask(
+            "redis:connect",
+            ct => ConnectAsync(_connectionString, ct),
+            options.DefaultTimeout);
+
+        services.AddIgnitionFromTask(
+            "redis:health",
+            ct => HealthCheckAsync(ct),
+            options.DefaultTimeout);
+
+        services.AddIgnitionFromTask(
+            "redis:warmup",
+            ct => WarmupCacheAsync(ct),
+            options.DefaultTimeout);
+
+        // Optionally configure dependency graph
+        services.AddIgnitionGraph((builder, sp) =>
+        {
+            var signals = sp.GetServices<IIgnitionSignal>();
+            var connectSig = signals.First(s => s.Name == "redis:connect");
+            var healthSig = signals.First(s => s.Name == "redis:health");
+            var warmupSig = signals.First(s => s.Name == "redis:warmup");
+
+            builder.AddSignals(new[] { connectSig, healthSig, warmupSig });
+            builder.DependsOn(healthSig, connectSig);
+            builder.DependsOn(warmupSig, healthSig);
+        });
+    }
+
+    private Task ConnectAsync(string connStr, CancellationToken ct) { /* ... */ }
+    private Task HealthCheckAsync(CancellationToken ct) { /* ... */ }
+    private Task WarmupCacheAsync(CancellationToken ct) { /* ... */ }
+}
+
+// Register the bundle
+services.AddIgnitionBundle(new RedisStarterBundle("localhost:6379"), opts =>
+{
+    opts.DefaultTimeout = TimeSpan.FromSeconds(10);
+});
+```
+
+### Bundle Registration Methods
+
+```csharp
+// Register a bundle instance
+services.AddIgnitionBundle(new MyBundle(), opts => opts.DefaultTimeout = TimeSpan.FromSeconds(5));
+
+// Register a bundle by type (requires parameterless constructor)
+services.AddIgnitionBundle<MyBundle>();
+
+// Register multiple bundles
+services.AddIgnitionBundles(bundle1, bundle2, bundle3);
+```
+
+### Bundle Options
+
+Use `IgnitionBundleOptions` to configure per-bundle defaults:
+
+```csharp
+services.AddIgnitionBundle(new MyBundle(), opts =>
+{
+    opts.DefaultTimeout = TimeSpan.FromSeconds(20);  // Applied to all signals in bundle
+    opts.Policy = IgnitionPolicy.BestEffort;         // Reserved for future use
+});
+```
+
+Individual signal timeouts (via `IIgnitionSignal.Timeout`) override bundle defaults.
+
 ## License
 
 MIT License. See [LICENSE](LICENSE).

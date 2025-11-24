@@ -58,9 +58,9 @@ A middle ground between DAGs and pure parallel execution: staged batches.
 
 ---
 
-## 3. **Composable Ignition Bundles / Modules**
+## 3. **Composable Ignition Bundles / Modules** ✅ IMPLEMENTED
 
-Allow reusable, packaged sets of signals—without forcing users to manually add 10 related signals individually.
+~~Allow reusable, packaged sets of signals—without forcing users to manually add 10 related signals individually.~~
 
 ### What the epic delivers
 
@@ -68,9 +68,9 @@ Allow reusable, packaged sets of signals—without forcing users to manually add
 * Bundles register a graph or set of signals + default options
 * Optional per-bundle timeouts or policies
 * Ability to override bundle internals without forking
-* Built-in bundles for common patterns (e.g. “HTTP dependency”, “database trio”, etc.)
+* Built-in bundles for common patterns (e.g. "HTTP dependency", "database trio", etc.)
 
-### Why it’s big
+### Why it's big
 
 * Requires a bundle loader layer
 * New DI scanning paths
@@ -83,9 +83,21 @@ Allows users to build reusable ecosystem modules like:
 
 * RedisStarterBundle
 * KafkaConsumerBundle
-* “Search Infrastructure Warmup Bundle”
+* "Search Infrastructure Warmup Bundle"
 
 …but without making the library heavyweight.
+
+**Status**: ✅ **Fully Implemented**
+
+#### Implementation Details
+
+* **Core Abstractions**: `IIgnitionBundle`, `IgnitionBundleOptions`
+* **Extension Methods**: `AddIgnitionBundle`, `AddIgnitionBundle<T>`, `AddIgnitionBundles`
+* **Built-in Bundles**: `HttpDependencyBundle`, `DatabaseTrioBundle`
+* **Per-Bundle Configuration**: Timeout and policy overrides via `IgnitionBundleOptions`
+* **Backward Compatible**: All 52 existing tests pass without modification
+* **Comprehensive Testing**: 16 new tests (68 total) covering bundle registration, options, built-in bundles, and integration
+* **Zero Dependencies**: Maintains library's lightweight philosophy
 
 ---
 
@@ -290,7 +302,7 @@ Makes Ignition adaptable to real-world startup complexities—while still tiny.
 | ---------------------------- | ------------ | ---------- | -------------------- | -------------------- |
 | DAG-based execution          | 🔥 Very high | 🔥🔥🔥     | ✔                    | ✅ **IMPLEMENTED**  |
 | Staged execution             | High         | 🔥🔥       | ✔                    | 📋 Proposed         |
-| Bundles/modules              | Medium-high  | 🔥🔥       | ✔                    | 📋 Proposed         |
+| Bundles/modules              | Medium-high  | 🔥🔥       | ✔                    | ✅ **IMPLEMENTED**  |
 | Event-based state machine    | High         | 🔥🔥🔥     | ✔                    | 📋 Proposed         |
 | Replay & historical analysis | High         | 🔥🔥🔥     | ✔                    | 📋 Proposed         |
 | Metrics adapter              | Medium       | 🔥         | ✔                    | 📋 Proposed         |
@@ -304,8 +316,9 @@ Makes Ignition adaptable to real-world startup complexities—while still tiny.
 
 If Veggerby.Ignition were to *level up* without becoming bloated, the most impactful additions are:
 
-1. **Dependency-aware DAG execution**
-2. **Staged (multi-phase) ignition pipeline**
-3. **Ignition state machine + event hooks**
+1. **Dependency-aware DAG execution** ✅
+2. **Composable bundles/modules** ✅
+3. **Staged (multi-phase) ignition pipeline**
+4. **Ignition state machine + event hooks**
 
 These add massive expressive power while preserving your clean architectural DNA—and unlike Elon’s product launches, they’ll actually work.
