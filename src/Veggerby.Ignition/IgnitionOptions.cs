@@ -96,5 +96,30 @@ public sealed class IgnitionOptions
     /// <summary>
     /// When true, a per-signal timeout cancels that specific signal's task; otherwise the timeout is classified without forcing cancellation.
     /// </summary>
+    /// <remarks>
+    /// This property provides a global default for cancellation behavior. When a custom <see cref="TimeoutStrategy"/>
+    /// is configured, that strategy's <c>cancelImmediately</c> return value takes precedence over this setting.
+    /// </remarks>
     public bool CancelIndividualOnTimeout { get; set; } = false;
+
+    /// <summary>
+    /// Optional pluggable timeout strategy for determining per-signal timeout and cancellation behavior.
+    /// When <c>null</c>, the default behavior uses <see cref="IIgnitionSignal.Timeout"/> and <see cref="CancelIndividualOnTimeout"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Custom strategies enable advanced scenarios such as:
+    /// <list type="bullet">
+    ///   <item>Exponential scaling based on failure count</item>
+    ///   <item>Adaptive timeouts (e.g., slow I/O detection)</item>
+    ///   <item>Dynamic per-stage deadlines</item>
+    ///   <item>User-defined per-class or per-assembly defaults</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// When set, the strategy's <see cref="IIgnitionTimeoutStrategy.GetTimeout"/> method is invoked for each signal
+    /// to determine the effective timeout duration and whether to cancel on timeout.
+    /// </para>
+    /// </remarks>
+    public IIgnitionTimeoutStrategy? TimeoutStrategy { get; set; }
 }

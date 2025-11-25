@@ -584,13 +584,27 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
             using var perHandleCts = CancellationTokenSource.CreateLinkedTokenSource(globalToken);
             Task work = h.WaitAsync(perHandleCts.Token);
 
-            if (h.Timeout.HasValue)
+            // Determine timeout and cancellation behavior from strategy or defaults
+            TimeSpan? effectiveTimeout;
+            bool cancelOnTimeout;
+
+            if (_options.TimeoutStrategy is not null)
             {
-                var timeoutTask = Task.Delay(h.Timeout.Value, perHandleCts.Token);
+                (effectiveTimeout, cancelOnTimeout) = _options.TimeoutStrategy.GetTimeout(h, _options);
+            }
+            else
+            {
+                effectiveTimeout = h.Timeout;
+                cancelOnTimeout = _options.CancelIndividualOnTimeout;
+            }
+
+            if (effectiveTimeout.HasValue)
+            {
+                var timeoutTask = Task.Delay(effectiveTimeout.Value, perHandleCts.Token);
                 var completed = await Task.WhenAny(work, timeoutTask);
                 if (completed == timeoutTask)
                 {
-                    if (_options.CancelIndividualOnTimeout)
+                    if (cancelOnTimeout)
                     {
                         perHandleCts.Cancel();
                     }
