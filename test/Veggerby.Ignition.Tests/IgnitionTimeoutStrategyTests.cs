@@ -344,6 +344,7 @@ public class IgnitionTimeoutStrategyTests
         // Constructor for DI registration
         public FixedTimeoutStrategy(FixedTimeoutStrategyConfig config)
         {
+            ArgumentNullException.ThrowIfNull(config);
             _timeout = config.Timeout;
             _cancelImmediately = config.CancelImmediately;
         }
