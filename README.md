@@ -21,6 +21,7 @@ Veggerby.Ignition is a lightweight, extensible startup readiness ("ignition") co
 - Execution modes: Parallel (default), Sequential, or **Dependency-Aware (DAG)**
 - Optional parallelism limiting via MaxDegreeOfParallelism
 - Cooperative cancellation on global or per-signal timeout
+- **Pluggable timeout strategies** via `IIgnitionTimeoutStrategy` for advanced timeout behavior
 - **Dependency-aware execution graph (DAG)** with topological sort and cycle detection
 - **Declarative dependency declaration** via `[SignalDependency]` attribute
 - **Automatic parallel execution** of independent branches in dependency graphs
@@ -149,6 +150,82 @@ Classification summary:
 | Per-signal timeout only | True | TimedOut + Succeeded |
 
 This model avoids penalizing slow but successful initialization while still enabling an upper bound via opt-in cancellation.
+
+## Timeout Strategy Plugins
+
+For advanced timeout requirements, Veggerby.Ignition supports pluggable timeout strategies via `IIgnitionTimeoutStrategy`. This enables scenarios such as:
+
+- Exponential scaling based on failure count
+- Adaptive timeouts (e.g., slow I/O detection)
+- Dynamic per-stage deadlines
+- User-defined per-class or per-assembly defaults
+
+### Using a Custom Timeout Strategy
+
+Create a strategy implementing `IIgnitionTimeoutStrategy`:
+
+```csharp
+public sealed class ExponentialBackoffTimeoutStrategy : IIgnitionTimeoutStrategy
+{
+    private readonly TimeSpan _baseTimeout;
+    private readonly double _multiplier;
+
+    public ExponentialBackoffTimeoutStrategy(TimeSpan baseTimeout, double multiplier = 2.0)
+    {
+        _baseTimeout = baseTimeout;
+        _multiplier = multiplier;
+    }
+
+    public (TimeSpan? signalTimeout, bool cancelImmediately) GetTimeout(
+        IIgnitionSignal signal, 
+        IgnitionOptions options)
+    {
+        // Apply exponential scaling based on signal characteristics
+        var timeout = signal.Name.StartsWith("slow-io") 
+            ? TimeSpan.FromTicks((long)(_baseTimeout.Ticks * _multiplier))
+            : _baseTimeout;
+        
+        return (timeout, cancelImmediately: true);
+    }
+}
+```
+
+Register the strategy:
+
+```csharp
+// Option 1: Register strategy instance directly
+services.AddIgnition();
+services.AddIgnitionTimeoutStrategy(new ExponentialBackoffTimeoutStrategy(TimeSpan.FromSeconds(5)));
+
+// Option 2: Register strategy type for DI construction
+services.AddIgnition();
+services.AddIgnitionTimeoutStrategy<MyDependencyAwareTimeoutStrategy>();
+
+// Option 3: Use factory for complex construction
+services.AddIgnition();
+services.AddIgnitionTimeoutStrategy(sp => 
+{
+    var config = sp.GetRequiredService<IOptions<TimeoutConfig>>().Value;
+    return new ConfigurableTimeoutStrategy(config);
+});
+```
+
+Alternatively, configure directly via options:
+
+```csharp
+services.AddIgnition(options =>
+{
+    options.TimeoutStrategy = new ExponentialBackoffTimeoutStrategy(TimeSpan.FromSeconds(5));
+});
+```
+
+### Built-in Strategy
+
+The `DefaultIgnitionTimeoutStrategy` preserves backward-compatible behavior:
+- Returns the signal's own `Timeout` property
+- Uses the global `CancelIndividualOnTimeout` setting
+
+When no custom strategy is configured, this behavior is applied automatically.
 
 ## Dependency-Aware Execution (DAG)
 

@@ -261,7 +261,7 @@ This is amazing for startup debugging, profiling, container warmup analysis, or 
 
 ---
 
-## 9. **Timeout Strategy Plugins**
+## 9. **Timeout Strategy Plugins** ✅ IMPLEMENTED
 
 Timeout semantics today are “global” vs “per-signal”. Add pluggable strategy modules.
 
@@ -294,6 +294,16 @@ Support custom strategies:
 
 Makes Ignition adaptable to real-world startup complexities—while still tiny.
 
+**Status**: ✅ **Fully Implemented**
+
+#### Implementation Details
+
+* **Core Abstractions**: `IIgnitionTimeoutStrategy`, `DefaultIgnitionTimeoutStrategy`
+* **Options Integration**: `IgnitionOptions.TimeoutStrategy` property for custom strategy configuration
+* **DI Registration**: `AddIgnitionTimeoutStrategy`, `AddIgnitionTimeoutStrategy<T>`, and factory overloads
+* **Backward Compatible**: Default behavior preserved when no strategy is configured
+* **Comprehensive Testing**: 16 new tests covering strategy behavior, DI registration, and cancellation control
+
 ---
 
 # Summary Table
@@ -308,7 +318,7 @@ Makes Ignition adaptable to real-world startup complexities—while still tiny.
 | Metrics adapter              | Medium       | 🔥         | ✔                    | 📋 Proposed         |
 | Cancellation trees           | High         | 🔥🔥🔥     | ✔                    | 📋 Proposed         |
 | Timeline exporter            | High         | 🔥🔥       | ✔                    | 📋 Proposed         |
-| Timeout strategy plugins     | Medium-high  | 🔥🔥       | ✔                    | 📋 Proposed         |
+| Timeout strategy plugins     | Medium-high  | 🔥🔥       | ✔                    | ✅ **IMPLEMENTED**  |
 
 ---
 
@@ -318,7 +328,8 @@ If Veggerby.Ignition were to *level up* without becoming bloated, the most impac
 
 1. **Dependency-aware DAG execution** ✅
 2. **Composable bundles/modules** ✅
-3. **Staged (multi-phase) ignition pipeline**
-4. **Ignition state machine + event hooks**
+3. **Timeout strategy plugins** ✅
+4. **Staged (multi-phase) ignition pipeline**
+5. **Ignition state machine + event hooks**
 
 These add massive expressive power while preserving your clean architectural DNA—and unlike Elon’s product launches, they’ll actually work.

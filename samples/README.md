@@ -52,6 +52,22 @@ Demonstrates:
 
 Ideal for understanding advanced configuration options and policy behaviors.
 
+### [Timeout Strategies Console Application](./TimeoutStrategies/)
+
+**Complexity**: Intermediate
+**Type**: Console Application
+**Focus**: Pluggable timeout strategies
+
+Demonstrates:
+
+- Creating custom `IIgnitionTimeoutStrategy` implementations
+- Different timeout approaches (lenient, strict, adaptive, category-based)
+- How the same signals produce different outcomes with different strategies
+- Strategy registration via DI extension methods
+- Comparing strategy effects side-by-side
+
+Ideal for understanding how to customize timeout behavior for different environments or signal types.
+
 ### [Dependency Graph Console Application](./DependencyGraph/)
 
 **Complexity**: Advanced

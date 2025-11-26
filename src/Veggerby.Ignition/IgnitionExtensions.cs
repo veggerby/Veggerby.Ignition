@@ -60,6 +60,81 @@ public static class IgnitionExtensions
     }
 
     /// <summary>
+    /// Configures a custom timeout strategy for determining per-signal timeout and cancellation behavior.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="strategy">The timeout strategy instance to use.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// The timeout strategy is applied via <see cref="IgnitionOptions.TimeoutStrategy"/> configuration.
+    /// Call this method after <see cref="AddIgnition"/> to ensure the options are properly configured.
+    /// </para>
+    /// <para>
+    /// Custom strategies enable advanced scenarios such as:
+    /// <list type="bullet">
+    ///   <item>Exponential scaling based on failure count</item>
+    ///   <item>Adaptive timeouts (e.g., slow I/O detection)</item>
+    ///   <item>Dynamic per-stage deadlines</item>
+    ///   <item>User-defined per-class or per-assembly defaults</item>
+    /// </list>
+    /// </para>
+    /// </remarks>
+    public static IServiceCollection AddIgnitionTimeoutStrategy(
+        this IServiceCollection services,
+        IIgnitionTimeoutStrategy strategy)
+    {
+        ArgumentNullException.ThrowIfNull(strategy);
+
+        services.Configure<IgnitionOptions>(options => options.TimeoutStrategy = strategy);
+
+        return services;
+    }
+
+    /// <summary>
+    /// Configures a custom timeout strategy for determining per-signal timeout and cancellation behavior using a factory delegate.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="strategyFactory">Factory delegate that produces the timeout strategy using the service provider.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    /// <remarks>
+    /// Use this overload when the timeout strategy requires dependencies from the DI container.
+    /// The factory is invoked once when options are first accessed.
+    /// </remarks>
+    public static IServiceCollection AddIgnitionTimeoutStrategy(
+        this IServiceCollection services,
+        Func<IServiceProvider, IIgnitionTimeoutStrategy> strategyFactory)
+    {
+        ArgumentNullException.ThrowIfNull(strategyFactory);
+
+        services.AddSingleton<IIgnitionTimeoutStrategy>(strategyFactory);
+        services.AddOptions<IgnitionOptions>()
+            .Configure<IIgnitionTimeoutStrategy>((options, strategy) => options.TimeoutStrategy = strategy);
+
+        return services;
+    }
+
+    /// <summary>
+    /// Configures a custom timeout strategy by type, allowing DI to construct the strategy instance.
+    /// </summary>
+    /// <typeparam name="TStrategy">Concrete implementation of <see cref="IIgnitionTimeoutStrategy"/>.</typeparam>
+    /// <param name="services">Target DI service collection.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    /// <remarks>
+    /// The strategy type must have a constructor compatible with DI resolution.
+    /// Use this overload when the timeout strategy requires dependencies injected via constructor.
+    /// </remarks>
+    public static IServiceCollection AddIgnitionTimeoutStrategy<TStrategy>(
+        this IServiceCollection services) where TStrategy : class, IIgnitionTimeoutStrategy
+    {
+        services.AddSingleton<IIgnitionTimeoutStrategy, TStrategy>();
+        services.AddOptions<IgnitionOptions>()
+            .Configure<IIgnitionTimeoutStrategy>((options, strategy) => options.TimeoutStrategy = strategy);
+
+        return services;
+    }
+
+    /// <summary>
     /// Registers a concrete ignition signal instance.
     /// </summary>
     /// <param name="services">Target DI service collection.</param>
