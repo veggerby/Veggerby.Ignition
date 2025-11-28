@@ -36,9 +36,9 @@ Startup readiness becomes (optionally) declarative instead of imperative — wit
 
 ---
 
-## 2. **Ignition Warmup “Stages” (Multi-Phase Startup Pipeline)**
+## 2. **Ignition Warmup "Stages" (Multi-Phase Startup Pipeline)** ✅ IMPLEMENTED
 
-A middle ground between DAGs and pure parallel execution: staged batches.
+~~A middle ground between DAGs and pure parallel execution: staged batches.~~
 
 ### What the epic delivers
 
@@ -55,6 +55,20 @@ A middle ground between DAGs and pure parallel execution: staged batches.
 * More complex result representation
 * Configurable stage fail-fast/best-effort/passthrough behaviors
 * Needs careful determinism guarantees (your jam)
+
+**Status**: ✅ **Fully Implemented**
+
+#### Implementation Details
+
+* **Core Abstractions**: `IStagedIgnitionSignal`, `IgnitionStagePolicy`, `IgnitionStageResult`
+* **New Execution Mode**: `IgnitionExecutionMode.Staged`
+* **Stage Policies**: `AllMustSucceed`, `BestEffort`, `FailFast`, `EarlyPromotion`
+* **Options**: `IgnitionOptions.StagePolicy`, `IgnitionOptions.EarlyPromotionThreshold`
+* **Enhanced Results**: `IgnitionResult.StageResults` with per-stage timing and outcome data
+* **DI Extensions**: `AddIgnitionSignalWithStage`, `AddIgnitionFromTaskWithStage`
+* **Algorithm**: Sequential stage execution with parallel signals within each stage
+* **Backward Compatible**: All existing tests pass without modification
+* **Comprehensive Testing**: 18 new tests (153 total) covering stage execution, policies, early promotion, and edge cases
 
 ---
 
@@ -335,7 +349,7 @@ Makes Ignition adaptable to real-world startup complexities—while still tiny.
 | Epic                         | Value        | Complexity | Lightweight-friendly | Status               |
 | ---------------------------- | ------------ | ---------- | -------------------- | -------------------- |
 | DAG-based execution          | 🔥 Very high | 🔥🔥🔥     | ✔                    | ✅ **IMPLEMENTED**  |
-| Staged execution             | High         | 🔥🔥       | ✔                    | 📋 Proposed         |
+| Staged execution             | High         | 🔥🔥       | ✔                    | ✅ **IMPLEMENTED**  |
 | Bundles/modules              | Medium-high  | 🔥🔥       | ✔                    | ✅ **IMPLEMENTED**  |
 | Event-based state machine    | High         | 🔥🔥🔥     | ✔                    | ✅ **IMPLEMENTED**  |
 | Replay & historical analysis | High         | 🔥🔥🔥     | ✔                    | 📋 Proposed         |
@@ -353,7 +367,7 @@ If Veggerby.Ignition were to *level up* without becoming bloated, the most impac
 1. **Dependency-aware DAG execution** ✅
 2. **Composable bundles/modules** ✅
 3. **Timeout strategy plugins** ✅
-4. **Staged (multi-phase) ignition pipeline**
+4. **Staged (multi-phase) ignition pipeline** ✅
 5. **Ignition state machine + event hooks** ✅
 
 These add massive expressive power while preserving your clean architectural DNA—and unlike Elon’s product launches, they’ll actually work.

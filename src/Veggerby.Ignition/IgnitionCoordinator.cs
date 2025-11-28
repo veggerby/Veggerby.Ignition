@@ -116,8 +116,17 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         {
             IgnitionExecutionMode.Sequential => await RunSequentialAsync(globalCts, globalTimeoutTask, swGlobal),
             IgnitionExecutionMode.DependencyAware => await RunDependencyAwareAsync(globalCts, globalTimeoutTask, swGlobal),
+            IgnitionExecutionMode.Staged => (new List<Task<IgnitionSignalResult>>(), false), // Handled separately
             _ => await RunParallelAsync(globalCts, globalTimeoutTask, swGlobal)
         };
+
+        // Staged execution has its own result construction path
+        if (_options.ExecutionMode == IgnitionExecutionMode.Staged)
+        {
+            var stagedResult = await RunStagedAsync(globalCts, globalTimeoutTask, swGlobal);
+            TransitionToFinalState(stagedResult);
+            return stagedResult;
+        }
 
         // Cancel timeout delay if completed
         globalCts.Cancel();
@@ -668,6 +677,421 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         }
 
         return (finalResults, false);
+    }
+
+    private async Task<IgnitionResult> RunStagedAsync(CancellationTokenSource globalCts, Task globalTimeoutTask, Stopwatch swGlobal)
+    {
+        _logger.LogDebug("Starting staged execution for {Count} signal(s).", _handles.Count);
+
+        var signalsByStage = GroupSignalsByStage();
+        var sortedStages = signalsByStage.Keys.OrderBy(s => s).ToList();
+
+        var context = new StagedExecutionContext();
+
+        SemaphoreSlim? gate = null;
+        if (_options.MaxDegreeOfParallelism.HasValue && _options.MaxDegreeOfParallelism > 0)
+        {
+            gate = new SemaphoreSlim(_options.MaxDegreeOfParallelism.Value);
+        }
+
+        try
+        {
+            foreach (var stageNumber in sortedStages)
+            {
+                if (context.ShouldStop)
+                {
+                    MarkStageAsSkipped(signalsByStage[stageNumber], stageNumber, context);
+                    continue;
+                }
+
+                await ExecuteStageAsync(signalsByStage[stageNumber], stageNumber, globalCts, globalTimeoutTask, swGlobal, gate, context);
+            }
+        }
+        finally
+        {
+            gate?.Dispose();
+        }
+
+        return BuildStagedResult(context, swGlobal);
+    }
+
+    private Dictionary<int, List<IIgnitionSignal>> GroupSignalsByStage()
+    {
+        var signalsByStage = new Dictionary<int, List<IIgnitionSignal>>();
+        foreach (var signal in _handles)
+        {
+            int stage = signal is IStagedIgnitionSignal staged ? staged.Stage : 0;
+            if (!signalsByStage.TryGetValue(stage, out var list))
+            {
+                list = new List<IIgnitionSignal>();
+                signalsByStage[stage] = list;
+            }
+            list.Add(signal);
+        }
+        return signalsByStage;
+    }
+
+    private void MarkStageAsSkipped(List<IIgnitionSignal> signals, int stageNumber, StagedExecutionContext context)
+    {
+        var skippedResults = new List<IgnitionSignalResult>();
+        foreach (var signal in signals)
+        {
+            var skipResult = new IgnitionSignalResult(signal.Name, IgnitionSignalStatus.Skipped, TimeSpan.Zero);
+            skippedResults.Add(skipResult);
+            RaiseSignalCompleted(skipResult);
+        }
+        context.AllResults.AddRange(skippedResults);
+        context.StageResults.Add(new IgnitionStageResult(
+            stageNumber, TimeSpan.Zero, skippedResults,
+            SucceededCount: 0, FailedCount: 0, TimedOutCount: 0, Completed: false));
+    }
+
+    private async Task ExecuteStageAsync(
+        List<IIgnitionSignal> signalsInStage,
+        int stageNumber,
+        CancellationTokenSource globalCts,
+        Task globalTimeoutTask,
+        Stopwatch swGlobal,
+        SemaphoreSlim? gate,
+        StagedExecutionContext context)
+    {
+        _logger.LogDebug("Starting stage {Stage} with {Count} signal(s).", stageNumber, signalsInStage.Count);
+
+        var swStage = Stopwatch.StartNew();
+        var stageTasks = await StartStageSignalsAsync(signalsInStage, globalCts, gate);
+
+        var stageExecution = _options.StagePolicy == IgnitionStagePolicy.EarlyPromotion
+            ? await ExecuteStageWithEarlyPromotionAsync(stageTasks, signalsInStage, stageNumber, globalCts, globalTimeoutTask, swGlobal, context)
+            : await ExecuteStageStandardAsync(stageTasks, signalsInStage, stageNumber, globalCts, globalTimeoutTask, swGlobal, context);
+
+        swStage.Stop();
+
+        var stageResult = BuildStageResult(stageNumber, swStage.Elapsed, stageExecution, signalsInStage.Count);
+
+        if (stageResult.TimedOutCount > 0)
+        {
+            context.HasAnyTimeout = true;
+        }
+
+        context.StageResults.Add(stageResult);
+        context.AllResults.AddRange(stageExecution.Results);
+
+        _logger.LogDebug(
+            "Stage {Stage} completed in {Duration:F0} ms (succeeded: {Succeeded}, failed: {Failed}, timed out: {TimedOut}).",
+            stageNumber, swStage.Elapsed.TotalMilliseconds, stageResult.SucceededCount, stageResult.FailedCount, stageResult.TimedOutCount);
+
+        if (!context.ShouldStop)
+        {
+            context.ShouldStop = ShouldStopAfterStage(stageResult, stageExecution.Promoted, signalsInStage.Count, stageNumber);
+        }
+    }
+
+    private async Task<List<Task<IgnitionSignalResult>>> StartStageSignalsAsync(
+        List<IIgnitionSignal> signals,
+        CancellationTokenSource globalCts,
+        SemaphoreSlim? gate)
+    {
+        var stageTasks = new List<Task<IgnitionSignalResult>>();
+        foreach (var signal in signals)
+        {
+            var task = Task.Run(async () =>
+            {
+                if (gate is not null)
+                {
+                    await gate.WaitAsync(globalCts.Token);
+                }
+
+                RaiseSignalStarted(signal.Name);
+                try
+                {
+                    var result = await WaitOneAsync(signal, globalCts.Token);
+                    RaiseSignalCompleted(result);
+                    return result;
+                }
+                finally
+                {
+                    gate?.Release();
+                }
+            }, globalCts.Token);
+
+            stageTasks.Add(task);
+        }
+        return stageTasks;
+    }
+
+    private async Task<StageExecutionResult> ExecuteStageWithEarlyPromotionAsync(
+        List<Task<IgnitionSignalResult>> stageTasks,
+        List<IIgnitionSignal> signalsInStage,
+        int stageNumber,
+        CancellationTokenSource globalCts,
+        Task globalTimeoutTask,
+        Stopwatch swGlobal,
+        StagedExecutionContext context)
+    {
+        var requiredSuccesses = (int)Math.Ceiling(signalsInStage.Count * _options.EarlyPromotionThreshold);
+        var completedTasks = new HashSet<Task<IgnitionSignalResult>>();
+        var results = new List<IgnitionSignalResult>();
+        int succeededCount = 0;
+        bool promoted = false;
+
+        while (completedTasks.Count < stageTasks.Count)
+        {
+            var remainingTasks = stageTasks.Where(t => !completedTasks.Contains(t)).ToList();
+            var allStageTask = Task.WhenAny(remainingTasks);
+            var completedTask = await Task.WhenAny(allStageTask, globalTimeoutTask);
+
+            if (completedTask == globalTimeoutTask)
+            {
+                context.GlobalTimedOut = true;
+                RaiseGlobalTimeout(swGlobal.Elapsed, GetPendingSignalNamesFromTasks(remainingTasks, signalsInStage));
+
+                if (_options.CancelOnGlobalTimeout)
+                {
+                    _logger.LogWarning("Global timeout in staged execution during stage {Stage} (cancelling).", stageNumber);
+                    globalCts.Cancel();
+                    context.ShouldStop = true;
+                    try { await Task.WhenAll(stageTasks); } catch { /* swallow */ }
+                    break;
+                }
+            }
+            else
+            {
+                var finished = await allStageTask;
+                completedTasks.Add(finished);
+
+                if (finished.IsCompletedSuccessfully)
+                {
+                    var result = finished.Result;
+                    results.Add(result);
+                    if (result.Status == IgnitionSignalStatus.Succeeded)
+                    {
+                        succeededCount++;
+                    }
+                }
+
+                if (!promoted && succeededCount >= requiredSuccesses)
+                {
+                    promoted = true;
+                    _logger.LogDebug(
+                        "Stage {Stage} reached early promotion threshold ({Success}/{Required}).",
+                        stageNumber, succeededCount, requiredSuccesses);
+                }
+            }
+        }
+
+        // Collect remaining results
+        CollectRemainingResults(stageTasks, signalsInStage, results, ref succeededCount);
+
+        return new StageExecutionResult(results, succeededCount, promoted);
+    }
+
+    private async Task<StageExecutionResult> ExecuteStageStandardAsync(
+        List<Task<IgnitionSignalResult>> stageTasks,
+        List<IIgnitionSignal> signalsInStage,
+        int stageNumber,
+        CancellationTokenSource globalCts,
+        Task globalTimeoutTask,
+        Stopwatch swGlobal,
+        StagedExecutionContext context)
+    {
+        var allStageTask = Task.WhenAll(stageTasks);
+        var completedTask = await Task.WhenAny(allStageTask, globalTimeoutTask);
+
+        if (completedTask == globalTimeoutTask)
+        {
+            context.GlobalTimedOut = true;
+            RaiseGlobalTimeout(swGlobal.Elapsed, GetPendingSignalNamesFromTasks(stageTasks, signalsInStage));
+
+            if (_options.CancelOnGlobalTimeout)
+            {
+                _logger.LogWarning("Global timeout in staged execution during stage {Stage} (cancelling).", stageNumber);
+                globalCts.Cancel();
+                context.ShouldStop = true;
+                try { await allStageTask; } catch { /* swallow */ }
+            }
+            else
+            {
+                _logger.LogDebug("Global timeout in staged mode but CancelOnGlobalTimeout=false; waiting for stage {Stage}.", stageNumber);
+                try { await allStageTask; } catch { /* swallow */ }
+            }
+        }
+        else
+        {
+            try { await allStageTask; } catch { /* swallow, results gathered later */ }
+        }
+
+        var results = new List<IgnitionSignalResult>();
+        int succeededCount = 0;
+
+        for (int i = 0; i < stageTasks.Count; i++)
+        {
+            var task = stageTasks[i];
+            if (task.IsCompletedSuccessfully)
+            {
+                results.Add(task.Result);
+                if (task.Result.Status == IgnitionSignalStatus.Succeeded)
+                {
+                    succeededCount++;
+                }
+            }
+            else if (task.IsCanceled)
+            {
+                results.Add(new IgnitionSignalResult(
+                    signalsInStage[i].Name, IgnitionSignalStatus.TimedOut, TimeSpan.Zero,
+                    CancellationReason: CancellationReason.GlobalTimeout));
+            }
+            else if (task.IsFaulted)
+            {
+                results.Add(new IgnitionSignalResult(
+                    signalsInStage[i].Name, IgnitionSignalStatus.Failed, TimeSpan.Zero, task.Exception));
+            }
+        }
+
+        return new StageExecutionResult(results, succeededCount, Promoted: false);
+    }
+
+    private void CollectRemainingResults(
+        List<Task<IgnitionSignalResult>> stageTasks,
+        List<IIgnitionSignal> signalsInStage,
+        List<IgnitionSignalResult> results,
+        ref int succeededCount)
+    {
+        var processedSignalNames = new HashSet<string>(results.Select(r => r.Name));
+
+        for (int i = 0; i < stageTasks.Count; i++)
+        {
+            var task = stageTasks[i];
+            var signalName = signalsInStage[i].Name;
+
+            if (processedSignalNames.Contains(signalName))
+            {
+                continue;
+            }
+
+            if (task.IsCompletedSuccessfully)
+            {
+                results.Add(task.Result);
+                if (task.Result.Status == IgnitionSignalStatus.Succeeded)
+                {
+                    succeededCount++;
+                }
+            }
+            else if (task.IsCanceled || task.IsFaulted)
+            {
+                results.Add(new IgnitionSignalResult(
+                    signalName,
+                    task.IsCanceled ? IgnitionSignalStatus.TimedOut : IgnitionSignalStatus.Failed,
+                    TimeSpan.Zero,
+                    task.Exception,
+                    CancellationReason: task.IsCanceled ? CancellationReason.GlobalTimeout : CancellationReason.None));
+            }
+        }
+    }
+
+    private static IgnitionStageResult BuildStageResult(int stageNumber, TimeSpan duration, StageExecutionResult execution, int totalSignals)
+    {
+        int failedCount = execution.Results.Count(r => r.Status == IgnitionSignalStatus.Failed);
+        int timedOutCount = execution.Results.Count(r => r.Status == IgnitionSignalStatus.TimedOut);
+        bool stageCompleted = execution.Results.Count == totalSignals;
+
+        return new IgnitionStageResult(
+            stageNumber, duration, execution.Results,
+            execution.SucceededCount, failedCount, timedOutCount, stageCompleted, execution.Promoted);
+    }
+
+    private bool ShouldStopAfterStage(IgnitionStageResult stageResult, bool promoted, int totalSignals, int stageNumber)
+    {
+        switch (_options.StagePolicy)
+        {
+            case IgnitionStagePolicy.AllMustSucceed:
+                if (stageResult.FailedCount > 0 || stageResult.TimedOutCount > 0)
+                {
+                    _logger.LogWarning(
+                        "Stage {Stage} had failures/timeouts; stopping execution per AllMustSucceed policy.",
+                        stageNumber);
+                    return true;
+                }
+                break;
+
+            case IgnitionStagePolicy.FailFast:
+                if (stageResult.FailedCount > 0)
+                {
+                    _logger.LogWarning(
+                        "Stage {Stage} had {Count} failure(s); stopping execution per FailFast policy.",
+                        stageNumber, stageResult.FailedCount);
+                    return true;
+                }
+                break;
+
+            case IgnitionStagePolicy.BestEffort:
+                // Continue regardless of failures
+                break;
+
+            case IgnitionStagePolicy.EarlyPromotion:
+                var requiredSuccesses = (int)Math.Ceiling(totalSignals * _options.EarlyPromotionThreshold);
+                if (!promoted && stageResult.SucceededCount < requiredSuccesses)
+                {
+                    _logger.LogWarning(
+                        "Stage {Stage} did not meet promotion threshold ({Success}/{Required}); stopping execution.",
+                        stageNumber, stageResult.SucceededCount, requiredSuccesses);
+                    return true;
+                }
+                break;
+        }
+        return false;
+    }
+
+    private IgnitionResult BuildStagedResult(StagedExecutionContext context, Stopwatch swGlobal)
+    {
+        bool hasTimedOut = context.GlobalTimedOut || context.HasAnyTimeout;
+        if (_options.LogTopSlowHandles)
+        {
+            foreach (var s in context.AllResults.OrderByDescending(r => r.Duration).Take(_options.SlowHandleLogCount))
+            {
+                _logger.LogDebug("Startup handle '{Name}' took {Ms} ms.", s.Name, s.Duration.TotalMilliseconds);
+            }
+        }
+
+        _logger.LogDebug(
+            "Staged startup readiness finished in {Ms} ms across {StageCount} stage(s).",
+            swGlobal.Elapsed.TotalMilliseconds, context.StageResults.Count);
+
+        return IgnitionResult.FromStaged(context.AllResults, context.StageResults, swGlobal.Elapsed, hasTimedOut && _options.CancelOnGlobalTimeout);
+    }
+
+    /// <summary>
+    /// Context for tracking state during staged execution.
+    /// </summary>
+    private sealed class StagedExecutionContext
+    {
+        public List<IgnitionSignalResult> AllResults { get; } = new();
+        public List<IgnitionStageResult> StageResults { get; } = new();
+        public bool GlobalTimedOut { get; set; }
+        public bool HasAnyTimeout { get; set; }
+        public bool ShouldStop { get; set; }
+    }
+
+    /// <summary>
+    /// Result of executing a single stage.
+    /// </summary>
+    private sealed record StageExecutionResult(
+        List<IgnitionSignalResult> Results,
+        int SucceededCount,
+        bool Promoted);
+
+    private static IReadOnlyList<string> GetPendingSignalNamesFromTasks(
+        List<Task<IgnitionSignalResult>> tasks,
+        List<IIgnitionSignal> signals)
+    {
+        var pending = new List<string>();
+        for (int i = 0; i < signals.Count && i < tasks.Count; i++)
+        {
+            if (!tasks[i].IsCompleted)
+            {
+                pending.Add(signals[i].Name);
+            }
+        }
+        return pending;
     }
 
     private async Task<IgnitionSignalResult> WaitOneAsync(IIgnitionSignal h, CancellationToken globalToken)
