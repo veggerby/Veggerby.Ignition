@@ -694,15 +694,22 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
             gate = new SemaphoreSlim(_options.MaxDegreeOfParallelism.Value);
         }
 
-        foreach (var stageNumber in sortedStages)
+        try
         {
-            if (context.ShouldStop)
+            foreach (var stageNumber in sortedStages)
             {
-                MarkStageAsSkipped(signalsByStage[stageNumber], stageNumber, context);
-                continue;
-            }
+                if (context.ShouldStop)
+                {
+                    MarkStageAsSkipped(signalsByStage[stageNumber], stageNumber, context);
+                    continue;
+                }
 
-            await ExecuteStageAsync(signalsByStage[stageNumber], stageNumber, globalCts, globalTimeoutTask, swGlobal, gate, context);
+                await ExecuteStageAsync(signalsByStage[stageNumber], stageNumber, globalCts, globalTimeoutTask, swGlobal, gate, context);
+            }
+        }
+        finally
+        {
+            gate?.Dispose();
         }
 
         return BuildStagedResult(context, swGlobal);
@@ -787,13 +794,13 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         var stageTasks = new List<Task<IgnitionSignalResult>>();
         foreach (var signal in signals)
         {
-            if (gate is not null)
-            {
-                await gate.WaitAsync(globalCts.Token);
-            }
-
             var task = Task.Run(async () =>
             {
+                if (gate is not null)
+                {
+                    await gate.WaitAsync(globalCts.Token);
+                }
+
                 RaiseSignalStarted(signal.Name);
                 try
                 {
@@ -869,11 +876,6 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                         "Stage {Stage} reached early promotion threshold ({Success}/{Required}).",
                         stageNumber, succeededCount, requiredSuccesses);
                 }
-            }
-
-            if (promoted && completedTasks.Count == stageTasks.Count)
-            {
-                break;
             }
         }
 
