@@ -146,15 +146,15 @@ public static class IgnitionTimelineExtensions
 
         foreach (var (index, start, end) in signalWindows)
         {
-            if (start < groupEndTime)
+            if (start <= groupEndTime)
             {
-                // Overlaps with current group
+                // Overlaps or touches current group
                 groups[index] = currentGroup;
                 groupEndTime = Math.Max(groupEndTime, end);
             }
             else
             {
-                // New group starts
+                // New group starts - no overlap with previous
                 currentGroup++;
                 groups[index] = currentGroup;
                 groupEndTime = end;
@@ -276,10 +276,14 @@ public static class IgnitionTimelineExtensions
         double? averageDurationMs = total > 0 ? totalDurationMs / total : null;
 
         // Handle edge cases
-        if (total == 0 || fastestDurationMs == double.MaxValue)
+        double? actualFastestDuration = null;
+        if (total > 0 && fastestDurationMs != double.MaxValue)
+        {
+            actualFastestDuration = fastestDurationMs;
+        }
+        else
         {
             fastestSignal = null;
-            fastestDurationMs = 0;
         }
 
         return new IgnitionTimelineSummary(
@@ -293,7 +297,7 @@ public static class IgnitionTimelineExtensions
             SlowestSignal: slowestSignal,
             SlowestDurationMs: total > 0 ? slowestDurationMs : null,
             FastestSignal: fastestSignal,
-            FastestDurationMs: total > 0 && fastestSignal != null ? fastestDurationMs : null,
+            FastestDurationMs: actualFastestDuration,
             AverageDurationMs: averageDurationMs);
     }
 
@@ -313,7 +317,9 @@ public static class IgnitionTimelineExtensions
             timePoints.Add((e.EndMs, -1));   // Signal ends
         }
 
-        // Sort by time, with starts before ends at same time
+        // Sort by time, with ends before starts at same time to correctly count concurrency
+        // When a signal ends and another starts at the exact same time, we process the end first
+        // to avoid counting them as concurrent when they're actually sequential
         timePoints.Sort((a, b) =>
         {
             int cmp = a.time.CompareTo(b.time);
@@ -321,7 +327,7 @@ public static class IgnitionTimelineExtensions
             {
                 return cmp;
             }
-            // At same time, process ends (-1) before starts (+1) to avoid overcounting
+            // At same time, process ends (-1) before starts (+1): -1 < +1
             return a.delta.CompareTo(b.delta);
         });
 
