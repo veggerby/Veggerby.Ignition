@@ -78,10 +78,12 @@ public sealed record IgnitionSignalResult(
 /// <param name="TotalDuration">Total elapsed time for ignition evaluation.</param>
 /// <param name="Results">Per-signal results (may be partial if timed out).</param>
 /// <param name="TimedOut">True if a global timeout occurred before all signals completed.</param>
+/// <param name="StageResults">Per-stage results when using <see cref="IgnitionExecutionMode.Staged"/> execution mode.</param>
 public sealed record IgnitionResult(
     TimeSpan TotalDuration,
     IReadOnlyList<IgnitionSignalResult> Results,
-    bool TimedOut)
+    bool TimedOut,
+    IReadOnlyList<IgnitionStageResult>? StageResults = null)
 {
     /// <summary>
     /// Convenience result for the case where no signals were registered.
@@ -97,4 +99,15 @@ public sealed record IgnitionResult(
     /// Creates a timeout ignition result with partial signal outcomes.
     /// </summary>
     public static IgnitionResult FromTimeout(IReadOnlyList<IgnitionSignalResult> partial, TimeSpan total) => new(total, partial, TimedOut: true);
+
+    /// <summary>
+    /// Creates a staged ignition result with per-stage information.
+    /// </summary>
+    public static IgnitionResult FromStaged(IReadOnlyList<IgnitionSignalResult> results, IReadOnlyList<IgnitionStageResult> stageResults, TimeSpan total, bool timedOut = false)
+        => new(total, results, timedOut, stageResults);
+
+    /// <summary>
+    /// Gets whether this result includes stage-level information.
+    /// </summary>
+    public bool HasStageResults => StageResults is not null && StageResults.Count > 0;
 }
