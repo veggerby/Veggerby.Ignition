@@ -122,20 +122,20 @@ public class IgnitionCancellationScopeTests
         using var scope = new CancellationScope("test-scope");
         var innerSignal = new FakeSignal("inner", async ct =>
         {
-            await Task.Delay(5000, ct); // Long delay to ensure cancellation happens
+            await Task.Delay(200, ct); // Short delay - cancellation will happen before this completes
         });
 
         var scopedSignal = new ScopedFakeSignal(innerSignal, scope, cancelScopeOnFailure: false);
         var coord = CreateCoordinator(new[] { scopedSignal }, o =>
         {
-            o.GlobalTimeout = TimeSpan.FromSeconds(5);
+            o.GlobalTimeout = TimeSpan.FromSeconds(2);
         });
 
         // Start waiting in background
         var waitTask = coord.WaitAllAsync();
 
         // Give the signal time to start
-        await Task.Delay(50);
+        await Task.Delay(30);
 
         // act - cancel the scope
         scope.Cancel(CancellationReason.BundleCancelled, "external-trigger");
@@ -163,15 +163,15 @@ public class IgnitionCancellationScopeTests
             scope,
             cancelScopeOnFailure: true);
 
-        // This signal would take a long time but should be cancelled
+        // This signal would take a while but should be cancelled when failingSignal fails
         var longSignal = new ScopedFakeSignal(
-            new FakeSignal("long", async ct => await Task.Delay(5000, ct)),
+            new FakeSignal("long", async ct => await Task.Delay(500, ct)),
             scope,
             cancelScopeOnFailure: false);
 
         var coord = CreateCoordinator(new IIgnitionSignal[] { failingSignal, longSignal }, o =>
         {
-            o.GlobalTimeout = TimeSpan.FromSeconds(10);
+            o.GlobalTimeout = TimeSpan.FromSeconds(2);
             o.ExecutionMode = IgnitionExecutionMode.Parallel;
         });
 
@@ -196,18 +196,18 @@ public class IgnitionCancellationScopeTests
         using var scope = new CancellationScope("timeout-scope");
 
         var timedOutSignal = new ScopedFakeSignal(
-            new FakeSignal("timeout-me", async ct => await Task.Delay(5000, ct), timeout: TimeSpan.FromMilliseconds(50)),
+            new FakeSignal("timeout-me", async ct => await Task.Delay(500, ct), timeout: TimeSpan.FromMilliseconds(50)),
             scope,
             cancelScopeOnFailure: true);
 
         var waitingSignal = new ScopedFakeSignal(
-            new FakeSignal("waiting", async ct => await Task.Delay(5000, ct)),
+            new FakeSignal("waiting", async ct => await Task.Delay(500, ct)),
             scope,
             cancelScopeOnFailure: false);
 
         var coord = CreateCoordinator(new IIgnitionSignal[] { timedOutSignal, waitingSignal }, o =>
         {
-            o.GlobalTimeout = TimeSpan.FromSeconds(10);
+            o.GlobalTimeout = TimeSpan.FromSeconds(2);
             o.ExecutionMode = IgnitionExecutionMode.Parallel;
             o.CancelIndividualOnTimeout = true;
         });

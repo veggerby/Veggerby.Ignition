@@ -817,6 +817,7 @@ public static class IgnitionExtensions
         ArgumentNullException.ThrowIfNull(parent);
 
         var scope = new CancellationScope(scopeName, parent);
+        services.AddSingleton(scope);
         services.AddKeyedSingleton<ICancellationScope>(scopeName, scope);
         return scope;
     }

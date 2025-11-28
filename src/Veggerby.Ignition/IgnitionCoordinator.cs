@@ -465,7 +465,10 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                         {
                             skipStatus = IgnitionSignalStatus.Cancelled;
                             cancelReason = CancellationReason.DependencyFailed;
-                            cancelledBy = failedDeps[0]; // First failed dependency
+                            // Join all failed dependency names for accurate reporting
+                            cancelledBy = failedDeps.Count == 1
+                                ? failedDeps[0]
+                                : string.Join(", ", failedDeps);
                         }
                         else
                         {
