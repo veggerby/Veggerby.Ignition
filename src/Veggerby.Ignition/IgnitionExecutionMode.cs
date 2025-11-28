@@ -20,5 +20,12 @@ public enum IgnitionExecutionMode
     /// Independent branches execute in parallel automatically.
     /// Requires an <see cref="IIgnitionGraph"/> to be registered in the DI container.
     /// </summary>
-    DependencyAware
+    DependencyAware,
+    /// <summary>
+    /// Signals are grouped into sequential stages/phases. Within each stage, signals execute in parallel.
+    /// Stages execute sequentially (Stage 0 → Stage 1 → Stage 2 ...).
+    /// Signals implementing <see cref="IStagedIgnitionSignal"/> define their stage; others default to Stage 0.
+    /// Cross-stage constraints determine when the next stage starts (configurable via <see cref="IgnitionOptions.StagePolicy"/>).
+    /// </summary>
+    Staged
 }

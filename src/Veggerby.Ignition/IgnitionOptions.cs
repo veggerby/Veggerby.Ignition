@@ -10,6 +10,7 @@ public sealed class IgnitionOptions
     private TimeSpan _globalTimeout = TimeSpan.FromSeconds(5);
     private int _slowHandleLogCount = 3;
     private int? _maxDegreeOfParallelism;
+    private double _earlyPromotionThreshold = 1.0;
 
     /// <summary>
     /// Maximum total duration allowed for all ignition signals before the global timeout deadline elapses.
@@ -139,4 +140,49 @@ public sealed class IgnitionOptions
     /// </para>
     /// </remarks>
     public bool CancelDependentsOnFailure { get; set; } = false;
+
+    /// <summary>
+    /// Policy determining how stage transitions are handled during staged execution.
+    /// Only used when <see cref="ExecutionMode"/> is <see cref="IgnitionExecutionMode.Staged"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Controls when the coordinator moves from one stage to the next:
+    /// <list type="bullet">
+    ///   <item><see cref="IgnitionStagePolicy.AllMustSucceed"/>: All signals in the current stage must succeed before proceeding (default)</item>
+    ///   <item><see cref="IgnitionStagePolicy.BestEffort"/>: Proceed when all signals complete, regardless of status</item>
+    ///   <item><see cref="IgnitionStagePolicy.FailFast"/>: Stop immediately if any signal fails</item>
+    ///   <item><see cref="IgnitionStagePolicy.EarlyPromotion"/>: Proceed when <see cref="EarlyPromotionThreshold"/> percentage of signals succeed</item>
+    /// </list>
+    /// </para>
+    /// </remarks>
+    public IgnitionStagePolicy StagePolicy { get; set; } = IgnitionStagePolicy.AllMustSucceed;
+
+    /// <summary>
+    /// Threshold (0.0 to 1.0) for early stage promotion. When <see cref="StagePolicy"/> is <see cref="IgnitionStagePolicy.EarlyPromotion"/>,
+    /// the next stage starts when this percentage of signals in the current stage have succeeded.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when set to a value outside the range [0.0, 1.0].</exception>
+    /// <remarks>
+    /// <para>
+    /// For example, setting this to 0.8 means the next stage starts when 80% of the current stage's signals succeed.
+    /// Remaining signals in the current stage continue executing but don't block progression.
+    /// </para>
+    /// <para>
+    /// Default is 1.0 (100%), meaning all signals must succeed before promotion when using <see cref="IgnitionStagePolicy.EarlyPromotion"/>.
+    /// </para>
+    /// </remarks>
+    public double EarlyPromotionThreshold
+    {
+        get => _earlyPromotionThreshold;
+        set
+        {
+            if (value < 0.0 || value > 1.0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), "Early promotion threshold must be between 0.0 and 1.0.");
+            }
+
+            _earlyPromotionThreshold = value;
+        }
+    }
 }

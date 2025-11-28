@@ -894,4 +894,120 @@ public static class IgnitionExtensions
         public Task WaitAsync(CancellationToken cancellationToken = default)
             => _inner.WaitAsync(cancellationToken);
     }
+
+    /// <summary>
+    /// Registers an ignition signal with a specific stage/phase number for staged execution.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="signal">The signal to register.</param>
+    /// <param name="stage">The stage/phase number (0 = infrastructure, 1 = services, 2 = workers, etc.).</param>
+    /// <returns>The same service collection for chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// When using <see cref="IgnitionExecutionMode.Staged"/>, signals are grouped by their stage number.
+    /// Stage 0 executes first, then Stage 1, then Stage 2, etc.
+    /// Within each stage, signals execute in parallel.
+    /// </para>
+    /// <para>
+    /// If the provided signal already implements <see cref="IStagedIgnitionSignal"/>, it is registered directly.
+    /// Otherwise, a wrapper is created to assign the specified stage number.
+    /// </para>
+    /// </remarks>
+    public static IServiceCollection AddIgnitionSignalWithStage(
+        this IServiceCollection services,
+        IIgnitionSignal signal,
+        int stage)
+    {
+        ArgumentNullException.ThrowIfNull(signal);
+
+        if (stage < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(stage), "Stage number cannot be negative.");
+        }
+
+        var stagedSignal = signal is IStagedIgnitionSignal ? signal : new StagedSignalWrapper(signal, stage);
+        services.AddSingleton<IIgnitionSignal>(stagedSignal);
+        return services;
+    }
+
+    /// <summary>
+    /// Registers an ignition signal from a task factory with a specific stage/phase number for staged execution.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="name">Name for the signal.</param>
+    /// <param name="taskFactory">Factory that produces the readiness task.</param>
+    /// <param name="stage">The stage/phase number (0 = infrastructure, 1 = services, 2 = workers, etc.).</param>
+    /// <param name="timeout">Optional per-signal timeout.</param>
+    /// <returns>The same service collection for chaining.</returns>
+    public static IServiceCollection AddIgnitionFromTaskWithStage(
+        this IServiceCollection services,
+        string name,
+        Func<CancellationToken, Task> taskFactory,
+        int stage,
+        TimeSpan? timeout = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(taskFactory);
+
+        if (stage < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(stage), "Stage number cannot be negative.");
+        }
+
+        var signal = IgnitionSignal.FromTaskFactory(name, taskFactory, timeout);
+        var stagedSignal = new StagedSignalWrapper(signal, stage);
+        services.AddSingleton<IIgnitionSignal>(stagedSignal);
+        return services;
+    }
+
+    /// <summary>
+    /// Registers an ignition signal from an existing task with a specific stage/phase number for staged execution.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="name">Name for the signal.</param>
+    /// <param name="readyTask">The readiness task.</param>
+    /// <param name="stage">The stage/phase number (0 = infrastructure, 1 = services, 2 = workers, etc.).</param>
+    /// <param name="timeout">Optional per-signal timeout.</param>
+    /// <returns>The same service collection for chaining.</returns>
+    public static IServiceCollection AddIgnitionFromTaskWithStage(
+        this IServiceCollection services,
+        string name,
+        Task readyTask,
+        int stage,
+        TimeSpan? timeout = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(readyTask);
+
+        if (stage < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(stage), "Stage number cannot be negative.");
+        }
+
+        var signal = IgnitionSignal.FromTask(name, readyTask, timeout);
+        var stagedSignal = new StagedSignalWrapper(signal, stage);
+        services.AddSingleton<IIgnitionSignal>(stagedSignal);
+        return services;
+    }
+
+    /// <summary>
+    /// Wrapper that adds stage/phase support to an existing signal.
+    /// </summary>
+    private sealed class StagedSignalWrapper : IStagedIgnitionSignal
+    {
+        private readonly IIgnitionSignal _inner;
+
+        public StagedSignalWrapper(IIgnitionSignal inner, int stage)
+        {
+            _inner = inner;
+            Stage = stage;
+        }
+
+        public string Name => _inner.Name;
+        public TimeSpan? Timeout => _inner.Timeout;
+        public int Stage { get; }
+
+        public Task WaitAsync(CancellationToken cancellationToken = default)
+            => _inner.WaitAsync(cancellationToken);
+    }
 }
