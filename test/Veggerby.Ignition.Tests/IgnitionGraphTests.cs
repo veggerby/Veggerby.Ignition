@@ -193,7 +193,7 @@ public class IgnitionGraphTests
         //     s1
         //    /  \
         //   s2  s3
-        var executionStart = new Dictionary<string, DateTime>();
+        var executionStart = new ConcurrentDictionary<string, DateTime>();
         var s1 = new FakeSignal("s1", async _ =>
         {
             executionStart["s1"] = DateTime.UtcNow;
