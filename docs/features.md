@@ -12,6 +12,7 @@ This document provides a comprehensive overview of all features in Veggerby.Igni
 - [Dependency-Aware Execution (DAG)](#dependency-aware-execution-dag)
 - [Ignition Bundles](#ignition-bundles)
 - [Diagnostics & Observability](#diagnostics--observability)
+- [State Machine & Event Hooks](#state-machine--event-hooks)
 - [Health Checks](#health-checks)
 - [Advanced Adapters](#advanced-adapters)
 - [Performance Features](#performance-features)
@@ -455,6 +456,164 @@ options.EnableTracing = true;
 - Integrates with standard .NET diagnostics pipeline
 - Compatible with OpenTelemetry collectors
 
+## State Machine & Event Hooks
+
+The coordinator exposes a state machine with observable lifecycle events, enabling real-time monitoring without polling.
+
+### Lifecycle States
+
+| State | Description |
+|-------|-------------|
+| `NotStarted` | Coordinator has not yet started executing signals |
+| `Running` | Signals are being executed |
+| `Completed` | All signals completed successfully |
+| `Failed` | One or more signals failed |
+| `TimedOut` | Global timeout occurred before completion |
+
+### State Property
+
+Check the current state at any time:
+
+```csharp
+var coordinator = sp.GetRequiredService<IIgnitionCoordinator>();
+
+Console.WriteLine($"Current state: {coordinator.State}"); // NotStarted
+
+await coordinator.WaitAllAsync();
+
+Console.WriteLine($"Final state: {coordinator.State}"); // Completed, Failed, or TimedOut
+```
+
+### Event Hooks
+
+Subscribe to lifecycle events for real-time progress monitoring:
+
+#### SignalStarted
+
+Raised when each signal begins execution:
+
+```csharp
+coordinator.SignalStarted += (sender, e) =>
+{
+    Console.WriteLine($"[{e.Timestamp:HH:mm:ss.fff}] Signal '{e.SignalName}' started");
+};
+```
+
+**Event Arguments:**
+
+- `SignalName`: Name of the starting signal
+- `Timestamp`: UTC timestamp when the signal started
+
+#### SignalCompleted
+
+Raised when each signal finishes (success, failure, timeout, or skipped):
+
+```csharp
+coordinator.SignalCompleted += (sender, e) =>
+{
+    Console.WriteLine($"[{e.Timestamp:HH:mm:ss.fff}] Signal '{e.SignalName}': {e.Status} ({e.Duration.TotalMilliseconds:F0} ms)");
+
+    if (e.Exception != null)
+    {
+        Console.WriteLine($"  Error: {e.Exception.Message}");
+    }
+};
+```
+
+**Event Arguments:**
+
+- `SignalName`: Name of the completed signal
+- `Status`: Final status (`Succeeded`, `Failed`, `TimedOut`, `Skipped`)
+- `Duration`: Time taken by the signal
+- `Timestamp`: UTC timestamp when the signal completed
+- `Exception`: Exception if the signal failed (nullable)
+
+#### GlobalTimeoutReached
+
+Raised when the global timeout deadline elapses:
+
+```csharp
+coordinator.GlobalTimeoutReached += (sender, e) =>
+{
+    Console.WriteLine($"Global timeout ({e.GlobalTimeout.TotalSeconds}s) reached at {e.Timestamp}");
+    Console.WriteLine($"Elapsed: {e.Elapsed.TotalMilliseconds:F0} ms");
+    Console.WriteLine($"Pending signals: {string.Join(", ", e.PendingSignals)}");
+};
+```
+
+**Event Arguments:**
+
+- `GlobalTimeout`: Configured global timeout duration
+- `Elapsed`: Actual elapsed time when timeout was triggered
+- `Timestamp`: UTC timestamp when timeout occurred
+- `PendingSignals`: Names of signals that had not completed
+
+#### CoordinatorCompleted
+
+Raised when the coordinator reaches a terminal state:
+
+```csharp
+coordinator.CoordinatorCompleted += (sender, e) =>
+{
+    Console.WriteLine($"Coordinator completed: {e.FinalState}");
+    Console.WriteLine($"Total duration: {e.TotalDuration.TotalMilliseconds:F0} ms");
+    Console.WriteLine($"Signals processed: {e.Result.Results.Count}");
+};
+```
+
+**Event Arguments:**
+
+- `FinalState`: Terminal state (`Completed`, `Failed`, or `TimedOut`)
+- `TotalDuration`: Total execution time
+- `Timestamp`: UTC timestamp when coordinator completed
+- `Result`: Full `IgnitionResult` with all signal outcomes
+
+### Event Handler Guidelines
+
+- **Fast execution**: Handlers are invoked synchronously; keep them fast and non-blocking
+- **Exception safety**: Exceptions in handlers are caught, logged, and don't break coordinator execution
+- **Thread safety**: Events may be raised from different threads in parallel mode; use thread-safe operations
+- **Idempotency**: `CoordinatorCompleted` is raised exactly once, even with multiple `WaitAllAsync()` calls
+
+### Example: Progress Dashboard
+
+```csharp
+var coordinator = sp.GetRequiredService<IIgnitionCoordinator>();
+var completedCount = 0;
+var totalSignals = 0;
+
+coordinator.SignalStarted += (sender, e) =>
+{
+    Console.WriteLine($"▶ Starting: {e.SignalName}");
+};
+
+coordinator.SignalCompleted += (sender, e) =>
+{
+    var emoji = e.Status switch
+    {
+        IgnitionSignalStatus.Succeeded => "✅",
+        IgnitionSignalStatus.Failed => "❌",
+        IgnitionSignalStatus.TimedOut => "⏱️",
+        IgnitionSignalStatus.Skipped => "⏭️",
+        _ => "?"
+    };
+    Interlocked.Increment(ref completedCount);
+    Console.WriteLine($"{emoji} {e.SignalName}: {e.Status} ({e.Duration.TotalMilliseconds:F0}ms)");
+};
+
+coordinator.GlobalTimeoutReached += (sender, e) =>
+{
+    Console.WriteLine($"⚠️ Global timeout! Pending: {string.Join(", ", e.PendingSignals)}");
+};
+
+coordinator.CoordinatorCompleted += (sender, e) =>
+{
+    Console.WriteLine($"🏁 Ignition {e.FinalState}: {e.TotalDuration.TotalMilliseconds:F0}ms total");
+};
+
+await coordinator.WaitAllAsync();
+```
+
 ## Health Checks
 
 Automatic health check registration:
@@ -609,6 +768,7 @@ Veggerby.Ignition provides:
 ✅ **Composable Bundles**: Reusable signal packages for common patterns
 ✅ **Rich Diagnostics**: Result inspection, slow signal logging, failure propagation
 ✅ **Observability**: Activity tracing, health checks, structured logging
+✅ **State Machine & Events**: Real-time lifecycle monitoring with event hooks
 ✅ **Performance**: Concurrency limiting, idempotent execution, lazy evaluation
 ✅ **Zero Dependencies**: Minimal surface using only BCL + Microsoft.Extensions.*
 

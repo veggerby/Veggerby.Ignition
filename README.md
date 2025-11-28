@@ -25,6 +25,8 @@ Veggerby.Ignition is a lightweight, extensible startup readiness ("ignition") co
 - **Dependency-aware execution graph (DAG)** with topological sort and cycle detection
 - **Declarative dependency declaration** via `[SignalDependency]` attribute
 - **Automatic parallel execution** of independent branches in dependency graphs
+- **State machine with lifecycle events** for real-time observability (`NotStarted`, `Running`, `Completed`, `Failed`, `TimedOut`)
+- **Event hooks** for signal-level and coordinator-level progress monitoring
 
 📚 **[Full Documentation](docs/README.md)** | 🚀 **[Getting Started Guide](docs/getting-started.md)** | 📖 **[Features Overview](docs/features.md)**
 
@@ -101,6 +103,58 @@ services.AddIgnitionSignal<CustomConnectionSignal>();
 | FailFast | Throws if any signal fails (aggregate exceptions). |
 | BestEffort | Logs failures, continues startup (default). |
 | ContinueOnTimeout | Proceeds when global timeout elapses; logs partial results. |
+
+## State Machine & Event Hooks
+
+The coordinator exposes a state machine with observable lifecycle events, enabling real-time monitoring without polling.
+
+### Lifecycle States
+
+| State | Description |
+| ----- | ----------- |
+| `NotStarted` | Coordinator has not yet started executing signals |
+| `Running` | Signals are being executed |
+| `Completed` | All signals completed successfully |
+| `Failed` | One or more signals failed |
+| `TimedOut` | Global timeout occurred before completion |
+
+### Event Hooks
+
+Subscribe to lifecycle events for real-time progress monitoring:
+
+```csharp
+var coord = provider.GetRequiredService<IIgnitionCoordinator>();
+
+// Signal-level events
+coord.SignalStarted += (sender, e) =>
+    Console.WriteLine($"Signal '{e.SignalName}' started at {e.Timestamp}");
+
+coord.SignalCompleted += (sender, e) =>
+    Console.WriteLine($"Signal '{e.SignalName}' {e.Status} in {e.Duration.TotalMilliseconds:F0} ms");
+
+// Coordinator-level events
+coord.GlobalTimeoutReached += (sender, e) =>
+    Console.WriteLine($"Global timeout reached! Pending signals: {string.Join(", ", e.PendingSignals)}");
+
+coord.CoordinatorCompleted += (sender, e) =>
+    Console.WriteLine($"Coordinator finished: {e.FinalState} in {e.TotalDuration.TotalMilliseconds:F0} ms");
+
+// Check current state
+Console.WriteLine($"Current state: {coord.State}");
+
+await coord.WaitAllAsync();
+```
+
+### Available Events
+
+| Event | Arguments | When Raised |
+| ----- | --------- | ----------- |
+| `SignalStarted` | `SignalName`, `Timestamp` | When each signal begins execution |
+| `SignalCompleted` | `SignalName`, `Status`, `Duration`, `Timestamp`, `Exception` | When each signal finishes (success, failure, timeout, or skipped) |
+| `GlobalTimeoutReached` | `GlobalTimeout`, `Elapsed`, `Timestamp`, `PendingSignals` | When global timeout deadline elapses |
+| `CoordinatorCompleted` | `FinalState`, `TotalDuration`, `Timestamp`, `Result` | When coordinator reaches terminal state |
+
+Event handlers are invoked synchronously and should be fast/non-blocking. Exceptions in handlers are caught and logged but don't break coordinator execution.
 
 ## Diagnostics & Results
 
