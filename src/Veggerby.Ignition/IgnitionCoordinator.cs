@@ -225,6 +225,8 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                     }
                 }
 
+                // Transition to final state and raise CoordinatorCompleted before throwing.
+                // This allows observers to receive the complete result even when FailFast causes an exception.
                 var failedResult = IgnitionResult.FromResults(results, swGlobal.Elapsed);
                 TransitionToFinalState(failedResult);
                 throw new AggregateException(exceptions);
