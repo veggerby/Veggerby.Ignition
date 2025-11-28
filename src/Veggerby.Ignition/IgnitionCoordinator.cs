@@ -702,6 +702,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         var allResults = new List<IgnitionSignalResult>();
         var stageResults = new List<IgnitionStageResult>();
         bool globalTimedOut = false;
+        bool hasAnyTimeout = false;
         bool shouldStop = false;
 
         SemaphoreSlim? gate = null;
@@ -822,7 +823,8 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                         if (!stagePromoted && succeededCount >= requiredSuccesses)
                         {
                             stagePromoted = true;
-                            _logger.LogDebug("Stage {Stage} reached early promotion threshold ({Success}/{Required}).",
+                            _logger.LogDebug(
+                                "Stage {Stage} reached early promotion threshold ({Success}/{Required}).",
                                 stageNumber, succeededCount, requiredSuccesses);
                         }
                     }
@@ -835,13 +837,15 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                 }
 
                 // Collect remaining results (for cancelled tasks or those not yet collected)
+                // Use a HashSet for O(1) lookups instead of O(n) Any() calls
+                var processedSignalNames = new HashSet<string>(stageSignalResults.Select(r => r.Name));
                 for (int i = 0; i < stageTasks.Count; i++)
                 {
                     var task = stageTasks[i];
                     var signalName = signalsInStage[i].Name;
 
                     // Skip if we already have a result for this signal
-                    if (stageSignalResults.Any(r => r.Name == signalName))
+                    if (processedSignalNames.Contains(signalName))
                     {
                         continue;
                     }
@@ -936,6 +940,12 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
             int timedOutCount = stageSignalResults.Count(r => r.Status == IgnitionSignalStatus.TimedOut);
             bool stageCompleted = stageSignalResults.Count == signalsInStage.Count;
 
+            // Track if any signal timed out for the final result
+            if (timedOutCount > 0)
+            {
+                hasAnyTimeout = true;
+            }
+
             var stageResult = new IgnitionStageResult(
                 stageNumber,
                 swStage.Elapsed,
@@ -998,8 +1008,8 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
             }
         }
 
-        // Build final result
-        bool hasTimedOut = globalTimedOut || allResults.Any(r => r.Status == IgnitionSignalStatus.TimedOut);
+        // Build final result - use tracked flag to avoid O(n) scan
+        bool hasTimedOut = globalTimedOut || hasAnyTimeout;
         if (_options.LogTopSlowHandles)
         {
             foreach (var s in allResults.OrderByDescending(r => r.Duration).Take(_options.SlowHandleLogCount))

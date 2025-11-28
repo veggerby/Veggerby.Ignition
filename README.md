@@ -18,7 +18,7 @@ Veggerby.Ignition is a lightweight, extensible startup readiness ("ignition") co
 - Slow handle logging (top N longest signals)
 - Task and cancellable Task factory adapters (`IgnitionSignal.FromTask`, `FromTaskFactory`)
 - Idempotent execution (signals evaluated once, result cached)
-- Execution modes: Parallel (default), Sequential, or **Dependency-Aware (DAG)**
+- Execution modes: Parallel (default), Sequential, **Dependency-Aware (DAG)**, or **Staged (multi-phase)**
 - Optional parallelism limiting via MaxDegreeOfParallelism
 - Cooperative cancellation on global or per-signal timeout
 - **Pluggable timeout strategies** via `IIgnitionTimeoutStrategy` for advanced timeout behavior
@@ -27,6 +27,7 @@ Veggerby.Ignition is a lightweight, extensible startup readiness ("ignition") co
 - **Automatic parallel execution** of independent branches in dependency graphs
 - **State machine with lifecycle events** for real-time observability (`NotStarted`, `Running`, `Completed`, `Failed`, `TimedOut`)
 - **Event hooks** for signal-level and coordinator-level progress monitoring
+- **Staged execution (multi-phase startup pipeline)** with configurable cross-stage policies
 
 📚 **[Full Documentation](docs/README.md)** | 🚀 **[Getting Started Guide](docs/getting-started.md)** | 📖 **[Features Overview](docs/features.md)**
 
@@ -39,8 +40,8 @@ builder.Services.AddIgnition(options =>
     options.GlobalTimeout = TimeSpan.FromSeconds(10);
     options.Policy = IgnitionPolicy.BestEffort; // or FailFast / ContinueOnTimeout
     options.EnableTracing = true; // emits Activity if diagnostics consumed
-    options.ExecutionMode = IgnitionExecutionMode.Parallel; // or Sequential / DependencyAware
-    options.MaxDegreeOfParallelism = 4; // limit concurrency (Parallel/DependencyAware modes)
+    options.ExecutionMode = IgnitionExecutionMode.Parallel; // or Sequential / DependencyAware / Staged
+    options.MaxDegreeOfParallelism = 4; // limit concurrency (Parallel/DependencyAware/Staged modes)
     options.CancelOnGlobalTimeout = true; // attempt to cancel still-running signals if global timeout hits
     options.CancelIndividualOnTimeout = true; // cancel a signal if its own timeout elapses
 });
@@ -388,6 +389,122 @@ The graph builder validates acyclicity during construction. If a cycle is detect
 Ignition graph contains a cycle: s1 -> s2 -> s3 -> s1. 
 Dependency-aware execution requires an acyclic graph.
 ```
+
+## Staged Execution (Multi-Phase Startup Pipeline)
+
+Staged execution provides a middle ground between DAGs and pure parallel execution. Signals are grouped into sequential stages/phases, executing in parallel within each stage but sequentially across stages.
+
+### Defining Stages
+
+Use `IStagedIgnitionSignal` or the `AddIgnitionSignalWithStage` extension method:
+
+```csharp
+builder.Services.AddIgnition(options =>
+{
+    options.ExecutionMode = IgnitionExecutionMode.Staged;
+    options.StagePolicy = IgnitionStagePolicy.AllMustSucceed; // or BestEffort / FailFast / EarlyPromotion
+    options.GlobalTimeout = TimeSpan.FromSeconds(30);
+});
+
+// Register signals with explicit stage assignments
+// Stage 0: Infrastructure (executes first)
+builder.Services.AddIgnitionFromTaskWithStage("db-connection", ct => dbClient.ConnectAsync(ct), stage: 0);
+builder.Services.AddIgnitionFromTaskWithStage("redis-connection", ct => redis.ConnectAsync(ct), stage: 0);
+
+// Stage 1: Services (executes after Stage 0 completes)
+builder.Services.AddIgnitionFromTaskWithStage("cache-warmup", ct => cache.WarmAsync(ct), stage: 1);
+builder.Services.AddIgnitionFromTaskWithStage("search-index", ct => search.BuildIndexAsync(ct), stage: 1);
+
+// Stage 2: Workers (executes after Stage 1 completes)
+builder.Services.AddIgnitionFromTaskWithStage("background-processor", ct => processor.StartAsync(ct), stage: 2);
+```
+
+### Creating Staged Signals
+
+Implement `IStagedIgnitionSignal` for explicit stage control:
+
+```csharp
+public sealed class DatabaseConnectionSignal : IStagedIgnitionSignal
+{
+    public string Name => "db-connection";
+    public int Stage => 0; // Infrastructure stage
+    public TimeSpan? Timeout => TimeSpan.FromSeconds(10);
+
+    public async Task WaitAsync(CancellationToken cancellationToken = default)
+    {
+        await _dbClient.ConnectAsync(cancellationToken);
+    }
+}
+
+public sealed class CacheWarmupSignal : IStagedIgnitionSignal
+{
+    public string Name => "cache-warmup";
+    public int Stage => 1; // Services stage
+    public TimeSpan? Timeout => TimeSpan.FromSeconds(15);
+
+    public async Task WaitAsync(CancellationToken cancellationToken = default)
+    {
+        await _cache.WarmAsync(cancellationToken);
+    }
+}
+```
+
+### Stage Policies
+
+| Policy | Behavior |
+| ------ | -------- |
+| `AllMustSucceed` | All signals in current stage must succeed before proceeding (default) |
+| `BestEffort` | Proceed when all signals complete, regardless of status |
+| `FailFast` | Stop immediately if any signal fails |
+| `EarlyPromotion` | Proceed when X% of signals succeed (configurable via `EarlyPromotionThreshold`) |
+
+### Early Promotion
+
+Enable early promotion to start the next stage before all signals in the current stage complete:
+
+```csharp
+builder.Services.AddIgnition(options =>
+{
+    options.ExecutionMode = IgnitionExecutionMode.Staged;
+    options.StagePolicy = IgnitionStagePolicy.EarlyPromotion;
+    options.EarlyPromotionThreshold = 0.75; // Proceed when 75% of stage signals succeed
+});
+```
+
+### Stage Timing and Results
+
+Access per-stage timing and status information:
+
+```csharp
+var result = await coordinator.GetResultAsync();
+
+if (result.HasStageResults)
+{
+    foreach (var stage in result.StageResults)
+    {
+        Console.WriteLine($"Stage {stage.StageNumber}: " +
+            $"{stage.SucceededCount}/{stage.TotalSignals} succeeded in {stage.Duration.TotalMilliseconds:F0} ms");
+        
+        if (stage.HasFailures)
+        {
+            Console.WriteLine($"  Failures: {stage.FailedCount}");
+        }
+        
+        if (stage.Promoted)
+        {
+            Console.WriteLine($"  (early promoted at {stage.SuccessRatio:P0})");
+        }
+    }
+}
+```
+
+### Execution Behavior
+
+1. **Sequential Stages**: Stage 0 → Stage 1 → Stage 2 (lower numbers first)
+2. **Parallel Within Stage**: All signals in a stage execute concurrently
+3. **Policy-Controlled Transitions**: Next stage starts based on `StagePolicy`
+4. **Unstaged Signals**: Signals not implementing `IStagedIgnitionSignal` default to Stage 0
+5. **Respects `MaxDegreeOfParallelism`**: Limits concurrent signals even within stages
 
 ## Installation
 
