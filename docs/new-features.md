@@ -101,7 +101,7 @@ Allows users to build reusable ecosystem modules like:
 
 ---
 
-## 4. **Ignition State Machine with Event Hooks**
+## 4. **Ignition State Machine with Event Hooks** ✅ IMPLEMENTED
 
 Move from “run once and store result” → to a minimal finite-state model.
 
@@ -128,6 +128,17 @@ Move from “run once and store result” → to a minimal finite-state model.
 Great for systems that want progress bars, instrumentation, or live observability.
 
 Trump wouldn’t understand it, but real engineers will.
+
+**Status**: ✅ **Fully Implemented**
+
+#### Implementation Details
+
+* **Core Abstractions**: `IgnitionState` enum, `IgnitionSignalStartedEventArgs`, `IgnitionSignalCompletedEventArgs`, `IgnitionGlobalTimeoutEventArgs`, `IgnitionCoordinatorCompletedEventArgs`
+* **State Property**: `IIgnitionCoordinator.State` property for checking current lifecycle state
+* **Event Hooks**: Four events on `IIgnitionCoordinator` for real-time monitoring
+* **Thread Safety**: Events are raised via delegate capture pattern with exception handling
+* **Backward Compatible**: All 84 existing tests pass without modification
+* **Comprehensive Testing**: 28 new tests (112 total) covering state transitions, event hooks, idempotency, and exception safety
 
 ---
 
@@ -313,7 +324,7 @@ Makes Ignition adaptable to real-world startup complexities—while still tiny.
 | DAG-based execution          | 🔥 Very high | 🔥🔥🔥     | ✔                    | ✅ **IMPLEMENTED**  |
 | Staged execution             | High         | 🔥🔥       | ✔                    | 📋 Proposed         |
 | Bundles/modules              | Medium-high  | 🔥🔥       | ✔                    | ✅ **IMPLEMENTED**  |
-| Event-based state machine    | High         | 🔥🔥🔥     | ✔                    | 📋 Proposed         |
+| Event-based state machine    | High         | 🔥🔥🔥     | ✔                    | ✅ **IMPLEMENTED**  |
 | Replay & historical analysis | High         | 🔥🔥🔥     | ✔                    | 📋 Proposed         |
 | Metrics adapter              | Medium       | 🔥         | ✔                    | 📋 Proposed         |
 | Cancellation trees           | High         | 🔥🔥🔥     | ✔                    | 📋 Proposed         |
@@ -330,6 +341,6 @@ If Veggerby.Ignition were to *level up* without becoming bloated, the most impac
 2. **Composable bundles/modules** ✅
 3. **Timeout strategy plugins** ✅
 4. **Staged (multi-phase) ignition pipeline**
-5. **Ignition state machine + event hooks**
+5. **Ignition state machine + event hooks** ✅
 
 These add massive expressive power while preserving your clean architectural DNA—and unlike Elon’s product launches, they’ll actually work.
