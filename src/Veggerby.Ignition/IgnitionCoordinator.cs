@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -23,6 +24,8 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
     private readonly IgnitionOptions _options;
     private readonly ILogger<IgnitionCoordinator> _logger;
     private readonly Lazy<Task<IgnitionResult>> _lazyRun;
+    private readonly object _stateLock = new();
+    private volatile IgnitionState _state = IgnitionState.NotStarted;
 
     /// <summary>
     /// Creates a new coordinator instance.
@@ -55,6 +58,21 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         _lazyRun = new Lazy<Task<IgnitionResult>>(ExecuteAsync, isThreadSafe: true);
     }
 
+    /// <inheritdoc/>
+    public IgnitionState State => _state;
+
+    /// <inheritdoc/>
+    public event EventHandler<IgnitionSignalStartedEventArgs>? SignalStarted;
+
+    /// <inheritdoc/>
+    public event EventHandler<IgnitionSignalCompletedEventArgs>? SignalCompleted;
+
+    /// <inheritdoc/>
+    public event EventHandler<IgnitionGlobalTimeoutEventArgs>? GlobalTimeoutReached;
+
+    /// <inheritdoc/>
+    public event EventHandler<IgnitionCoordinatorCompletedEventArgs>? CoordinatorCompleted;
+
     /// <summary>
     /// Await completion of all signals (or timeout) according to configured options.
     /// </summary>
@@ -75,10 +93,14 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
     /// </summary>
     private async Task<IgnitionResult> ExecuteAsync()
     {
+        TransitionToState(IgnitionState.Running);
+
         if (_handles.Count == 0)
         {
             _logger.LogDebug("No startup wait handles registered; continuing immediately.");
-            return IgnitionResult.EmptySuccess;
+            var emptyResult = IgnitionResult.EmptySuccess;
+            TransitionToFinalState(emptyResult);
+            return emptyResult;
         }
 
         using var activity = _options.EnableTracing ? ActivitySource.StartActivity("Ignition.WaitAll") : null;
@@ -92,9 +114,9 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
 
         var (signalTasks, globalTimedOut) = _options.ExecutionMode switch
         {
-            IgnitionExecutionMode.Sequential => await RunSequentialAsync(globalCts, globalTimeoutTask),
-            IgnitionExecutionMode.DependencyAware => await RunDependencyAwareAsync(globalCts, globalTimeoutTask),
-            _ => await RunParallelAsync(globalCts, globalTimeoutTask)
+            IgnitionExecutionMode.Sequential => await RunSequentialAsync(globalCts, globalTimeoutTask, swGlobal),
+            IgnitionExecutionMode.DependencyAware => await RunDependencyAwareAsync(globalCts, globalTimeoutTask, swGlobal),
+            _ => await RunParallelAsync(globalCts, globalTimeoutTask, swGlobal)
         };
 
         // Cancel timeout delay if completed
@@ -146,7 +168,9 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
             if (_options.CancelOnGlobalTimeout)
             {
                 // Hard global timeout => always classify as timed out.
-                return IgnitionResult.FromTimeout(results, swGlobal.Elapsed);
+                var timeoutResult = IgnitionResult.FromTimeout(results, swGlobal.Elapsed);
+                TransitionToFinalState(timeoutResult);
+                return timeoutResult;
             }
 
             // Soft timeout: only classify if any per-signal timed out.
@@ -162,10 +186,14 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
 
             if (hasTimedOut)
             {
-                return IgnitionResult.FromTimeout(results, swGlobal.Elapsed);
+                var timeoutResult = IgnitionResult.FromTimeout(results, swGlobal.Elapsed);
+                TransitionToFinalState(timeoutResult);
+                return timeoutResult;
             }
             _logger.LogWarning("Global timeout elapsed (soft) with no per-signal timeouts; treating as success per Option B semantics.");
-            return IgnitionResult.FromResults(results, swGlobal.Elapsed);
+            var softTimeoutResult = IgnitionResult.FromResults(results, swGlobal.Elapsed);
+            TransitionToFinalState(softTimeoutResult);
+            return softTimeoutResult;
         }
 
         // Collect failed results with explicit loop
@@ -196,6 +224,11 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                         exceptions.Add(f.Exception);
                     }
                 }
+
+                // Transition to final state and raise CoordinatorCompleted before throwing.
+                // This allows observers to receive the complete result even when FailFast causes an exception.
+                var failedResult = IgnitionResult.FromResults(results, swGlobal.Elapsed);
+                TransitionToFinalState(failedResult);
                 throw new AggregateException(exceptions);
             }
         }
@@ -209,19 +242,30 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         }
 
         _logger.LogDebug("Startup readiness finished in {Ms} ms (failures: {Failures}).", swGlobal.Elapsed.TotalMilliseconds, failed.Count);
-        return IgnitionResult.FromResults(results, swGlobal.Elapsed);
+        var finalResult = IgnitionResult.FromResults(results, swGlobal.Elapsed);
+        TransitionToFinalState(finalResult);
+        return finalResult;
     }
 
-    private async Task<(List<Task<IgnitionSignalResult>> Tasks, bool TimedOut)> RunSequentialAsync(CancellationTokenSource globalCts, Task globalTimeoutTask)
+    private async Task<(List<Task<IgnitionSignalResult>> Tasks, bool TimedOut)> RunSequentialAsync(CancellationTokenSource globalCts, Task globalTimeoutTask, Stopwatch swGlobal)
     {
         var list = new List<Task<IgnitionSignalResult>>();
+        bool globalTimeoutRaised = false;
+
         foreach (var h in _handles)
         {
+            RaiseSignalStarted(h.Name);
             var t = WaitOneAsync(h, globalCts.Token);
             list.Add(t);
             var completed = await Task.WhenAny(t, globalTimeoutTask);
             if (completed == globalTimeoutTask)
             {
+                if (!globalTimeoutRaised)
+                {
+                    globalTimeoutRaised = true;
+                    RaiseGlobalTimeout(swGlobal.Elapsed, GetPendingSignalNames(list, _handles));
+                }
+
                 if (_options.CancelOnGlobalTimeout)
                 {
                     _logger.LogWarning("Global timeout after {Seconds:F1}s during sequential execution (cancelling).", _options.GlobalTimeout.TotalSeconds);
@@ -236,9 +280,19 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                 }
             }
 
+            // Raise signal completed event after the task completes
+            if (t.IsCompleted)
+            {
+                RaiseSignalCompleted(t.Result);
+            }
+
             if (_options.Policy == IgnitionPolicy.FailFast && t.IsCompleted && t.Result.Status == IgnitionSignalStatus.Failed)
             {
                 _logger.LogError(t.Result.Exception, "Ignition signal '{Name}' failed in sequential mode; aborting.", h.Name);
+                // Transition to final state and raise CoordinatorCompleted before throwing.
+                // This allows observers to receive the complete result even when FailFast causes an exception.
+                var failedResult = IgnitionResult.FromResults(list.Select(task => task.Result).ToList(), swGlobal.Elapsed);
+                TransitionToFinalState(failedResult);
                 // Fail-fast sequential semantics: throw immediately with the single failure.
                 throw new AggregateException(t.Result.Exception!);
             }
@@ -246,7 +300,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         return (list, false);
     }
 
-    private async Task<(List<Task<IgnitionSignalResult>> Tasks, bool TimedOut)> RunParallelAsync(CancellationTokenSource globalCts, Task globalTimeoutTask)
+    private async Task<(List<Task<IgnitionSignalResult>> Tasks, bool TimedOut)> RunParallelAsync(CancellationTokenSource globalCts, Task globalTimeoutTask, Stopwatch swGlobal)
     {
         var list = new List<Task<IgnitionSignalResult>>();
         SemaphoreSlim? gate = null;
@@ -264,9 +318,12 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
 
             var task = Task.Run(async () =>
             {
+                RaiseSignalStarted(h.Name);
                 try
                 {
-                    return await WaitOneAsync(h, globalCts.Token);
+                    var result = await WaitOneAsync(h, globalCts.Token);
+                    RaiseSignalCompleted(result);
+                    return result;
                 }
                 finally
                 {
@@ -281,6 +338,8 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         var completed = await Task.WhenAny(allTask, globalTimeoutTask);
         if (completed == globalTimeoutTask)
         {
+            RaiseGlobalTimeout(swGlobal.Elapsed, GetPendingSignalNames(list, _handles));
+
             if (_options.CancelOnGlobalTimeout)
             {
                 _logger.LogWarning("Startup readiness global timeout after {Seconds:F1}s (cancelling outstanding handles).", _options.GlobalTimeout.TotalSeconds);
@@ -307,7 +366,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         return (list, false);
     }
 
-    private async Task<(List<Task<IgnitionSignalResult>> Tasks, bool TimedOut)> RunDependencyAwareAsync(CancellationTokenSource globalCts, Task globalTimeoutTask)
+    private async Task<(List<Task<IgnitionSignalResult>> Tasks, bool TimedOut)> RunDependencyAwareAsync(CancellationTokenSource globalCts, Task globalTimeoutTask, Stopwatch swGlobal)
     {
         if (_graph is null)
         {
@@ -323,6 +382,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         var completed = new Dictionary<IIgnitionSignal, IgnitionSignalResult>();
         var failed = new HashSet<IIgnitionSignal>();
         var skipped = new HashSet<IIgnitionSignal>();
+        bool globalTimeoutRaised = false;
 
         // Track signals by their dependency count
         var pendingDependencies = new Dictionary<IIgnitionSignal, int>();
@@ -404,6 +464,8 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                             Exception: null,
                             FailedDependencies: failedDeps);
                         
+                        RaiseSignalCompleted(skipResult);
+                        
                         lock (syncLock)
                         {
                             completed[signal] = skipResult;
@@ -431,9 +493,11 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                     gateAcquired = false; // Transfer ownership to task
                     var task = Task.Run(async () =>
                     {
+                        RaiseSignalStarted(signal.Name);
                         try
                         {
                             var result = await WaitOneAsync(signal, globalCts.Token);
+                            RaiseSignalCompleted(result);
                             lock (syncLock)
                             {
                                 completed[signal] = result;
@@ -495,6 +559,12 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
 
                 if (completedTask == globalTimeoutTask)
                 {
+                    if (!globalTimeoutRaised)
+                    {
+                        globalTimeoutRaised = true;
+                        RaiseGlobalTimeout(swGlobal.Elapsed, GetPendingSignalNamesFromGraph(results, _graph));
+                    }
+
                     if (_options.CancelOnGlobalTimeout)
                     {
                         _logger.LogWarning("Global timeout in dependency-aware execution (cancelling).");
@@ -624,5 +694,166 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         {
             return new IgnitionSignalResult(h.Name, IgnitionSignalStatus.Failed, sw.Elapsed, ex);
         }
+    }
+
+    /// <summary>
+    /// Transitions the state to the specified new state in a thread-safe manner.
+    /// </summary>
+    private void TransitionToState(IgnitionState newState)
+    {
+        lock (_stateLock)
+        {
+            _state = newState;
+        }
+    }
+
+    /// <summary>
+    /// Transitions to a terminal state based on the result and raises the CoordinatorCompleted event.
+    /// </summary>
+    private void TransitionToFinalState(IgnitionResult result)
+    {
+        IgnitionState finalState;
+        if (result.TimedOut)
+        {
+            finalState = IgnitionState.TimedOut;
+        }
+        else
+        {
+            bool hasFailed = result.Results.Any(r => r.Status == IgnitionSignalStatus.Failed);
+            finalState = hasFailed ? IgnitionState.Failed : IgnitionState.Completed;
+        }
+
+        lock (_stateLock)
+        {
+            _state = finalState;
+        }
+
+        RaiseCoordinatorCompleted(finalState, result);
+    }
+
+    /// <summary>
+    /// Raises the SignalStarted event in a thread-safe manner.
+    /// </summary>
+    private void RaiseSignalStarted(string signalName)
+    {
+        var handler = SignalStarted;
+        if (handler is not null)
+        {
+            try
+            {
+                var args = new IgnitionSignalStartedEventArgs(signalName, DateTimeOffset.UtcNow);
+                handler(this, args);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Exception in SignalStarted event handler for signal '{Name}'.", signalName);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Raises the SignalCompleted event in a thread-safe manner.
+    /// </summary>
+    private void RaiseSignalCompleted(IgnitionSignalResult result)
+    {
+        var handler = SignalCompleted;
+        if (handler is not null)
+        {
+            try
+            {
+                var args = new IgnitionSignalCompletedEventArgs(
+                    result.Name,
+                    result.Status,
+                    result.Duration,
+                    DateTimeOffset.UtcNow,
+                    result.Exception);
+                handler(this, args);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Exception in SignalCompleted event handler for signal '{Name}'.", result.Name);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Raises the GlobalTimeoutReached event in a thread-safe manner.
+    /// </summary>
+    private void RaiseGlobalTimeout(TimeSpan elapsed, IReadOnlyList<string> pendingSignals)
+    {
+        var handler = GlobalTimeoutReached;
+        if (handler is not null)
+        {
+            try
+            {
+                var args = new IgnitionGlobalTimeoutEventArgs(
+                    _options.GlobalTimeout,
+                    elapsed,
+                    DateTimeOffset.UtcNow,
+                    pendingSignals);
+                handler(this, args);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Exception in GlobalTimeoutReached event handler.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Raises the CoordinatorCompleted event in a thread-safe manner.
+    /// </summary>
+    private void RaiseCoordinatorCompleted(IgnitionState finalState, IgnitionResult result)
+    {
+        var handler = CoordinatorCompleted;
+        if (handler is not null)
+        {
+            try
+            {
+                var args = new IgnitionCoordinatorCompletedEventArgs(
+                    finalState,
+                    result.TotalDuration,
+                    DateTimeOffset.UtcNow,
+                    result);
+                handler(this, args);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Exception in CoordinatorCompleted event handler.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets the names of signals that have not completed yet, including those not yet started.
+    /// </summary>
+    private static IReadOnlyList<string> GetPendingSignalNames(
+        List<Task<IgnitionSignalResult>> tasks,
+        IReadOnlyList<IIgnitionSignal> handles)
+    {
+        var pending = new List<string>();
+        for (int i = 0; i < handles.Count; i++)
+        {
+            if (i >= tasks.Count || !tasks[i].IsCompleted)
+            {
+                pending.Add(handles[i].Name);
+            }
+        }
+        return pending;
+    }
+
+    /// <summary>
+    /// Gets the names of signals from a graph that have not started or completed yet.
+    /// </summary>
+    private static IReadOnlyList<string> GetPendingSignalNamesFromGraph(
+        Dictionary<IIgnitionSignal, Task<IgnitionSignalResult>> results,
+        IIgnitionGraph graph)
+    {
+        var pending = new List<string>();
+        foreach (var signal in graph.Signals.Where(s => !results.TryGetValue(s, out var task) || !task.IsCompleted))
+        {
+            pending.Add(signal.Name);
+        }
+        return pending;
     }
 }
