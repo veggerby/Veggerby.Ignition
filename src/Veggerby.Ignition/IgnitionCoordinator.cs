@@ -289,6 +289,10 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
             if (_options.Policy == IgnitionPolicy.FailFast && t.IsCompleted && t.Result.Status == IgnitionSignalStatus.Failed)
             {
                 _logger.LogError(t.Result.Exception, "Ignition signal '{Name}' failed in sequential mode; aborting.", h.Name);
+                // Transition to final state and raise CoordinatorCompleted before throwing.
+                // This allows observers to receive the complete result even when FailFast causes an exception.
+                var failedResult = IgnitionResult.FromResults(list.Select(task => task.Result).ToList(), swGlobal.Elapsed);
+                TransitionToFinalState(failedResult);
                 // Fail-fast sequential semantics: throw immediately with the single failure.
                 throw new AggregateException(t.Result.Exception!);
             }
@@ -715,15 +719,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         }
         else
         {
-            bool hasFailed = false;
-            foreach (var r in result.Results)
-            {
-                if (r.Status == IgnitionSignalStatus.Failed)
-                {
-                    hasFailed = true;
-                    break;
-                }
-            }
+            bool hasFailed = result.Results.Any(r => r.Status == IgnitionSignalStatus.Failed);
             finalState = hasFailed ? IgnitionState.Failed : IgnitionState.Completed;
         }
 
@@ -829,16 +825,16 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
     }
 
     /// <summary>
-    /// Gets the names of signals that have not completed yet.
+    /// Gets the names of signals that have not completed yet, including those not yet started.
     /// </summary>
     private static IReadOnlyList<string> GetPendingSignalNames(
         List<Task<IgnitionSignalResult>> tasks,
         IReadOnlyList<IIgnitionSignal> handles)
     {
         var pending = new List<string>();
-        for (int i = 0; i < tasks.Count; i++)
+        for (int i = 0; i < handles.Count; i++)
         {
-            if (!tasks[i].IsCompleted && i < handles.Count)
+            if (i >= tasks.Count || !tasks[i].IsCompleted)
             {
                 pending.Add(handles[i].Name);
             }
@@ -854,12 +850,9 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         IIgnitionGraph graph)
     {
         var pending = new List<string>();
-        foreach (var signal in graph.Signals)
+        foreach (var signal in graph.Signals.Where(s => !results.TryGetValue(s, out var task) || !task.IsCompleted))
         {
-            if (!results.TryGetValue(signal, out var task) || !task.IsCompleted)
-            {
-                pending.Add(signal.Name);
-            }
+            pending.Add(signal.Name);
         }
         return pending;
     }

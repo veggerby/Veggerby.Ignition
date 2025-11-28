@@ -649,4 +649,121 @@ public class IgnitionStateMachineTests
     }
 
     #endregion
+
+    #region FailFast Event Tests
+
+    [Fact]
+    public async Task FailFast_Sequential_RaisesCoordinatorCompletedBeforeThrowing()
+    {
+        // arrange
+        IgnitionState? finalState = null;
+        var failing = new FaultingSignal("bad", new InvalidOperationException("boom"));
+        var coord = CreateCoordinator([failing], o =>
+        {
+            o.ExecutionMode = IgnitionExecutionMode.Sequential;
+            o.Policy = IgnitionPolicy.FailFast;
+            o.GlobalTimeout = TimeSpan.FromSeconds(1);
+        });
+
+        coord.CoordinatorCompleted += (sender, e) => finalState = e.FinalState;
+
+        // act
+        try { await coord.WaitAllAsync(); } catch (AggregateException) { }
+
+        // assert
+        finalState.Should().Be(IgnitionState.Failed);
+        coord.State.Should().Be(IgnitionState.Failed);
+    }
+
+    [Fact]
+    public async Task FailFast_Parallel_RaisesCoordinatorCompletedBeforeThrowing()
+    {
+        // arrange
+        IgnitionState? finalState = null;
+        var failing = new FaultingSignal("bad", new InvalidOperationException("boom"));
+        var coord = CreateCoordinator([failing], o =>
+        {
+            o.ExecutionMode = IgnitionExecutionMode.Parallel;
+            o.Policy = IgnitionPolicy.FailFast;
+            o.GlobalTimeout = TimeSpan.FromSeconds(1);
+        });
+
+        coord.CoordinatorCompleted += (sender, e) => finalState = e.FinalState;
+
+        // act
+        try { await coord.WaitAllAsync(); } catch (AggregateException) { }
+
+        // assert
+        finalState.Should().Be(IgnitionState.Failed);
+        coord.State.Should().Be(IgnitionState.Failed);
+    }
+
+    #endregion
+
+    #region GlobalTimeout Sequential Tests
+
+    [Fact]
+    public async Task GlobalTimeoutReached_Sequential_IncludesNotYetStartedSignals()
+    {
+        // arrange
+        IReadOnlyList<string>? pendingSignals = null;
+        var fast = new FakeSignal("fast", _ => Task.Delay(10));
+        var slow = new FakeSignal("slow", async ct => await Task.Delay(500, ct));
+        var never = new FakeSignal("never", _ => Task.CompletedTask);
+
+        var coord = CreateCoordinator([fast, slow, never], o =>
+        {
+            o.ExecutionMode = IgnitionExecutionMode.Sequential;
+            o.GlobalTimeout = TimeSpan.FromMilliseconds(100);
+            o.CancelOnGlobalTimeout = true;
+        });
+
+        coord.GlobalTimeoutReached += (sender, e) => pendingSignals = e.PendingSignals;
+
+        // act
+        await coord.WaitAllAsync();
+
+        // assert
+        pendingSignals.Should().NotBeNull();
+        pendingSignals.Should().Contain("slow");
+        pendingSignals.Should().Contain("never"); // This signal never started
+    }
+
+    #endregion
+
+    #region Parallel Timeout Event Ordering Tests
+
+    [Fact]
+    public async Task Events_ParallelHardTimeout_CoordinatorCompletedAfterTimeout()
+    {
+        // arrange
+        var coordinatorCompleted = false;
+        var timeoutReached = false;
+        var slow1 = new FakeSignal("slow1", async ct => await Task.Delay(500, ct));
+        var slow2 = new FakeSignal("slow2", async ct => await Task.Delay(500, ct));
+
+        var coord = CreateCoordinator([slow1, slow2], o =>
+        {
+            o.ExecutionMode = IgnitionExecutionMode.Parallel;
+            o.GlobalTimeout = TimeSpan.FromMilliseconds(100);
+            o.CancelOnGlobalTimeout = true;
+        });
+
+        coord.GlobalTimeoutReached += (sender, e) => timeoutReached = true;
+        coord.CoordinatorCompleted += (sender, e) =>
+        {
+            coordinatorCompleted = true;
+            e.FinalState.Should().Be(IgnitionState.TimedOut);
+        };
+
+        // act
+        await coord.WaitAllAsync();
+
+        // assert
+        timeoutReached.Should().BeTrue();
+        coordinatorCompleted.Should().BeTrue();
+        coord.State.Should().Be(IgnitionState.TimedOut);
+    }
+
+    #endregion
 }
