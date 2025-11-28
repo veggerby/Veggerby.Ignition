@@ -51,8 +51,18 @@ public sealed record IgnitionSignalResult(
 {
     /// <summary>
     /// Gets whether this signal was skipped due to failed dependencies.
+    /// Returns <c>true</c> only when the status is <see cref="IgnitionSignalStatus.Skipped"/>
+    /// and there are failed dependencies recorded.
     /// </summary>
-    public bool SkippedDueToDependencies => FailedDependencies is not null && FailedDependencies.Count > 0;
+    public bool SkippedDueToDependencies =>
+        Status == IgnitionSignalStatus.Skipped &&
+        FailedDependencies is not null &&
+        FailedDependencies.Count > 0;
+
+    /// <summary>
+    /// Gets whether this signal has failed dependencies, regardless of status.
+    /// </summary>
+    public bool HasFailedDependencies => FailedDependencies is not null && FailedDependencies.Count > 0;
 
     /// <summary>
     /// Gets whether this signal was cancelled due to hierarchical cancellation propagation.

@@ -881,8 +881,8 @@ public static class IgnitionExtensions
 
         public ScopedSignalWrapper(IIgnitionSignal inner, ICancellationScope scope, bool cancelScopeOnFailure)
         {
-            _inner = inner ?? throw new ArgumentNullException(nameof(inner));
-            CancellationScope = scope ?? throw new ArgumentNullException(nameof(scope));
+            _inner = inner;
+            CancellationScope = scope;
             CancelScopeOnFailure = cancelScopeOnFailure;
         }
 

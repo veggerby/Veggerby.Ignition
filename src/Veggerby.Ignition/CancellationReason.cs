@@ -22,7 +22,7 @@ public enum CancellationReason
     PerSignalTimeout,
 
     /// <summary>
-    /// The signal was cancelled because a dependency failed and the signal belongs to a scope configured to cancel on dependency failure.
+    /// The signal was cancelled because a dependency failed and <see cref="IgnitionOptions.CancelDependentsOnFailure"/> is enabled.
     /// </summary>
     DependencyFailed,
 

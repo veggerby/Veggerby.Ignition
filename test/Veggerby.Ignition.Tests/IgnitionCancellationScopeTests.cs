@@ -221,7 +221,9 @@ public class IgnitionCancellationScopeTests
         result.Results.Should().Contain(r => r.Name == "timeout-me" && r.Status == IgnitionSignalStatus.TimedOut);
         result.Results.Should().Contain(r =>
             r.Name == "waiting" &&
-            r.Status == IgnitionSignalStatus.Cancelled);
+            r.Status == IgnitionSignalStatus.Cancelled &&
+            r.CancellationReason == CancellationReason.BundleCancelled &&
+            r.CancelledBySignal == "timeout-me");
     }
 
     #endregion
@@ -431,12 +433,18 @@ public class IgnitionCancellationScopeTests
             CancellationReason: CancellationReason.DependencyFailed);
         var globalTimeout = new IgnitionSignalResult("test", IgnitionSignalStatus.TimedOut, TimeSpan.Zero,
             CancellationReason: CancellationReason.GlobalTimeout);
+        var perSignalTimeout = new IgnitionSignalResult("test", IgnitionSignalStatus.TimedOut, TimeSpan.Zero,
+            CancellationReason: CancellationReason.PerSignalTimeout);
+        var externalCancel = new IgnitionSignalResult("test", IgnitionSignalStatus.TimedOut, TimeSpan.Zero,
+            CancellationReason: CancellationReason.ExternalCancellation);
 
         // assert
         scopeCancelled.WasCancelledByScope.Should().BeTrue();
         bundleCancelled.WasCancelledByScope.Should().BeTrue();
         depFailed.WasCancelledByScope.Should().BeTrue();
         globalTimeout.WasCancelledByScope.Should().BeFalse();
+        perSignalTimeout.WasCancelledByScope.Should().BeFalse();
+        externalCancel.WasCancelledByScope.Should().BeFalse();
     }
 
     [Fact]

@@ -686,15 +686,9 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         try
         {
             // Create linked cancellation including scope token if present
-            CancellationTokenSource perHandleCts;
-            if (signalScope is not null)
-            {
-                perHandleCts = CancellationTokenSource.CreateLinkedTokenSource(globalToken, signalScope.Token);
-            }
-            else
-            {
-                perHandleCts = CancellationTokenSource.CreateLinkedTokenSource(globalToken);
-            }
+            CancellationTokenSource perHandleCts = signalScope is not null
+                ? CancellationTokenSource.CreateLinkedTokenSource(globalToken, signalScope.Token)
+                : CancellationTokenSource.CreateLinkedTokenSource(globalToken);
 
             using (perHandleCts)
             {
@@ -745,7 +739,9 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         }
         catch (OperationCanceledException)
         {
-            // Determine the cancellation reason based on which token was cancelled
+            // Determine the cancellation reason based on which token was cancelled.
+            // Check cancellation sources in priority order: scope > global > external.
+            // Scope cancellation is more specific and takes precedence over global timeout.
             CancellationReason reason;
             string? cancelledBy = null;
 

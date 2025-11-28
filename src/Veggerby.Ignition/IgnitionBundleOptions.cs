@@ -58,4 +58,3 @@ public sealed class IgnitionBundleOptions
     /// </remarks>
     public ICancellationScope? CancellationScope { get; set; }
 }
-

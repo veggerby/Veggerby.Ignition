@@ -19,6 +19,7 @@ namespace Veggerby.Ignition;
 public sealed class CancellationScope : ICancellationScope
 {
     private readonly CancellationTokenSource _cts;
+    private readonly CancellationTokenRegistration? _parentRegistration;
     private readonly object _lock = new();
     private CancellationReason _cancellationReason = CancellationReason.None;
     private string? _triggeringSignalName;
@@ -62,7 +63,7 @@ public sealed class CancellationScope : ICancellationScope
         // If linked to a parent, register to capture reason when parent is cancelled
         if (parent is not null && parent.Token.CanBeCanceled)
         {
-            parent.Token.Register(() =>
+            _parentRegistration = parent.Token.Register(() =>
             {
                 lock (_lock)
                 {
@@ -115,6 +116,11 @@ public sealed class CancellationScope : ICancellationScope
     /// <inheritdoc/>
     public void Cancel(CancellationReason reason, string? triggeringSignalName = null)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         lock (_lock)
         {
             if (_cancellationReason == CancellationReason.None)
@@ -138,6 +144,12 @@ public sealed class CancellationScope : ICancellationScope
     public ICancellationScope CreateChildScope(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(CancellationScope), "Cannot create child scope from a disposed scope.");
+        }
+
         return new CancellationScope(name, this);
     }
 
@@ -150,6 +162,7 @@ public sealed class CancellationScope : ICancellationScope
         }
 
         _disposed = true;
+        _parentRegistration?.Dispose();
         _cts.Dispose();
     }
 }
