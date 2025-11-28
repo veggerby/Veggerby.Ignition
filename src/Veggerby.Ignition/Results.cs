@@ -22,7 +22,12 @@ public enum IgnitionSignalStatus
     /// <summary>
     /// The signal was not executed because one or more of its dependencies failed (dependency-aware mode only).
     /// </summary>
-    Skipped
+    Skipped,
+    /// <summary>
+    /// The signal was cancelled due to hierarchical cancellation propagation (e.g., parent scope cancelled,
+    /// sibling signal failed within a bundle, or dependency failed with cancellation propagation enabled).
+    /// </summary>
+    Cancelled
 }
 
 /// <summary>
@@ -33,17 +38,38 @@ public enum IgnitionSignalStatus
 /// <param name="Duration">Elapsed time waiting for the signal.</param>
 /// <param name="Exception">Captured exception if <see cref="IgnitionSignalStatus.Failed"/>.</param>
 /// <param name="FailedDependencies">Names of dependency signals that failed, preventing this signal from executing (dependency-aware mode only).</param>
+/// <param name="CancellationReason">Reason for cancellation if the signal was cancelled (timed out or cancelled via scope).</param>
+/// <param name="CancelledBySignal">Name of the signal that triggered the cancellation, if applicable (hierarchical cancellation).</param>
 public sealed record IgnitionSignalResult(
     string Name,
     IgnitionSignalStatus Status,
     TimeSpan Duration,
     Exception? Exception = null,
-    IReadOnlyList<string>? FailedDependencies = null)
+    IReadOnlyList<string>? FailedDependencies = null,
+    CancellationReason CancellationReason = CancellationReason.None,
+    string? CancelledBySignal = null)
 {
     /// <summary>
     /// Gets whether this signal was skipped due to failed dependencies.
+    /// Returns <c>true</c> only when the status is <see cref="IgnitionSignalStatus.Skipped"/>
+    /// and there are failed dependencies recorded.
     /// </summary>
-    public bool SkippedDueToDependencies => FailedDependencies is not null && FailedDependencies.Count > 0;
+    public bool SkippedDueToDependencies =>
+        Status == IgnitionSignalStatus.Skipped &&
+        FailedDependencies is not null &&
+        FailedDependencies.Count > 0;
+
+    /// <summary>
+    /// Gets whether this signal has failed dependencies, regardless of status.
+    /// </summary>
+    public bool HasFailedDependencies => FailedDependencies is not null && FailedDependencies.Count > 0;
+
+    /// <summary>
+    /// Gets whether this signal was cancelled due to hierarchical cancellation propagation.
+    /// </summary>
+    public bool WasCancelledByScope => CancellationReason is CancellationReason.ScopeCancelled
+                                       or CancellationReason.BundleCancelled
+                                       or CancellationReason.DependencyFailed;
 }
 
 /// <summary>
