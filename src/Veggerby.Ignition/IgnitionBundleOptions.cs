@@ -3,7 +3,8 @@ using System;
 namespace Veggerby.Ignition;
 
 /// <summary>
-/// Configuration options for a specific ignition bundle, enabling per-bundle timeout and policy overrides.
+/// Configuration options for a specific ignition bundle, enabling per-bundle timeout, policy,
+/// and cancellation scope behavior overrides.
 /// </summary>
 /// <remarks>
 /// Bundle-level options are applied to all signals registered by the bundle unless a signal explicitly
@@ -29,4 +30,32 @@ public sealed class IgnitionBundleOptions
     /// Reserved for future enhancement supporting per-bundle policy isolation or staged execution semantics.
     /// </remarks>
     public IgnitionPolicy? Policy { get; set; }
+
+    /// <summary>
+    /// When <c>true</c>, signals registered by this bundle share a common cancellation scope.
+    /// If any signal in the bundle fails or times out, all remaining signals in the bundle are cancelled.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This enables grouped cancellation semantics for bundles. For example, a "Redis Starter Bundle"
+    /// might contain connection, ping, and warmup signals. If the connection signal fails, there's no
+    /// point continuing with ping and warmup - they should be cancelled immediately.
+    /// </para>
+    /// <para>
+    /// Default is <c>false</c> to maintain backward compatibility.
+    /// </para>
+    /// </remarks>
+    public bool EnableScopedCancellation { get; set; }
+
+    /// <summary>
+    /// Gets or sets the explicit cancellation scope for this bundle.
+    /// When set, all signals registered by this bundle will use this scope.
+    /// </summary>
+    /// <remarks>
+    /// This allows advanced scenarios where bundles share cancellation scopes with other bundles
+    /// or integrate into a larger cancellation hierarchy. If <c>null</c> and <see cref="EnableScopedCancellation"/>
+    /// is <c>true</c>, a new scope is created automatically for the bundle.
+    /// </remarks>
+    public ICancellationScope? CancellationScope { get; set; }
 }
+

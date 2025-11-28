@@ -771,4 +771,126 @@ public static class IgnitionExtensions
             return _cached!;
         }
     }
+
+    /// <summary>
+    /// Creates a new root cancellation scope and registers it as a singleton in the service collection.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="scopeName">Name for the cancellation scope.</param>
+    /// <returns>The created cancellation scope for use in further configuration.</returns>
+    /// <remarks>
+    /// <para>
+    /// Use this method to create a hierarchical cancellation scope that can be shared across multiple signals or bundles.
+    /// The scope is registered as a singleton and can be retrieved from the service provider using
+    /// <see cref="IServiceProvider.GetService(Type)"/> with the scope's name.
+    /// </para>
+    /// <para>
+    /// Child scopes can be created using <see cref="ICancellationScope.CreateChildScope(string)"/> or
+    /// <see cref="AddIgnitionCancellationScope(IServiceCollection, string, ICancellationScope)"/>.
+    /// </para>
+    /// </remarks>
+    public static ICancellationScope AddIgnitionCancellationScope(
+        this IServiceCollection services,
+        string scopeName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(scopeName);
+
+        var scope = new CancellationScope(scopeName);
+        services.AddSingleton(scope);
+        services.AddKeyedSingleton<ICancellationScope>(scopeName, scope);
+        return scope;
+    }
+
+    /// <summary>
+    /// Creates a child cancellation scope under the specified parent and registers it as a singleton.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="scopeName">Name for the child cancellation scope.</param>
+    /// <param name="parent">Parent scope that this child will inherit cancellation from.</param>
+    /// <returns>The created child cancellation scope for use in further configuration.</returns>
+    public static ICancellationScope AddIgnitionCancellationScope(
+        this IServiceCollection services,
+        string scopeName,
+        ICancellationScope parent)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(scopeName);
+        ArgumentNullException.ThrowIfNull(parent);
+
+        var scope = new CancellationScope(scopeName, parent);
+        services.AddKeyedSingleton<ICancellationScope>(scopeName, scope);
+        return scope;
+    }
+
+    /// <summary>
+    /// Registers an ignition signal that participates in hierarchical cancellation via the specified scope.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="signal">The signal to register.</param>
+    /// <param name="scope">The cancellation scope this signal belongs to.</param>
+    /// <param name="cancelScopeOnFailure">When true, failing or timing out this signal cancels all other signals in the scope.</param>
+    /// <returns>The same service collection for chaining.</returns>
+    public static IServiceCollection AddIgnitionSignalWithScope(
+        this IServiceCollection services,
+        IIgnitionSignal signal,
+        ICancellationScope scope,
+        bool cancelScopeOnFailure = false)
+    {
+        ArgumentNullException.ThrowIfNull(signal);
+        ArgumentNullException.ThrowIfNull(scope);
+
+        var scopedSignal = new ScopedSignalWrapper(signal, scope, cancelScopeOnFailure);
+        services.AddSingleton<IIgnitionSignal>(scopedSignal);
+        return services;
+    }
+
+    /// <summary>
+    /// Registers an ignition signal from a task factory that participates in hierarchical cancellation.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="name">Name for the signal.</param>
+    /// <param name="taskFactory">Factory that produces the readiness task.</param>
+    /// <param name="scope">The cancellation scope this signal belongs to.</param>
+    /// <param name="cancelScopeOnFailure">When true, failing or timing out this signal cancels all other signals in the scope.</param>
+    /// <param name="timeout">Optional per-signal timeout.</param>
+    /// <returns>The same service collection for chaining.</returns>
+    public static IServiceCollection AddIgnitionFromTaskWithScope(
+        this IServiceCollection services,
+        string name,
+        Func<CancellationToken, Task> taskFactory,
+        ICancellationScope scope,
+        bool cancelScopeOnFailure = false,
+        TimeSpan? timeout = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(taskFactory);
+        ArgumentNullException.ThrowIfNull(scope);
+
+        var signal = IgnitionSignal.FromTaskFactory(name, taskFactory, timeout);
+        var scopedSignal = new ScopedSignalWrapper(signal, scope, cancelScopeOnFailure);
+        services.AddSingleton<IIgnitionSignal>(scopedSignal);
+        return services;
+    }
+
+    /// <summary>
+    /// Wrapper that adds cancellation scope support to an existing signal.
+    /// </summary>
+    private sealed class ScopedSignalWrapper : IScopedIgnitionSignal
+    {
+        private readonly IIgnitionSignal _inner;
+
+        public ScopedSignalWrapper(IIgnitionSignal inner, ICancellationScope scope, bool cancelScopeOnFailure)
+        {
+            _inner = inner ?? throw new ArgumentNullException(nameof(inner));
+            CancellationScope = scope ?? throw new ArgumentNullException(nameof(scope));
+            CancelScopeOnFailure = cancelScopeOnFailure;
+        }
+
+        public string Name => _inner.Name;
+        public TimeSpan? Timeout => _inner.Timeout;
+        public ICancellationScope? CancellationScope { get; }
+        public bool CancelScopeOnFailure { get; }
+
+        public Task WaitAsync(CancellationToken cancellationToken = default)
+            => _inner.WaitAsync(cancellationToken);
+    }
 }

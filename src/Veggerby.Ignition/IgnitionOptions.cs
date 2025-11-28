@@ -122,4 +122,21 @@ public sealed class IgnitionOptions
     /// </para>
     /// </remarks>
     public IIgnitionTimeoutStrategy? TimeoutStrategy { get; set; }
+
+    /// <summary>
+    /// When <c>true</c> and using <see cref="IgnitionExecutionMode.DependencyAware"/>, cancels all dependent signals
+    /// when a dependency fails (not just skips them). This enables hierarchical cancellation propagation through the dependency graph.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// By default (when <c>false</c>), dependent signals are marked as <see cref="IgnitionSignalStatus.Skipped"/>
+    /// when their dependencies fail. When set to <c>true</c>, the coordinator actively cancels the pending dependent
+    /// signals, providing accurate reporting such as "Signal X cancelled due to dependency failure of Y".
+    /// </para>
+    /// <para>
+    /// This setting only affects signals that have not yet started. Signals that are already running are not cancelled
+    /// unless they implement <see cref="IScopedIgnitionSignal"/> with appropriate scope configuration.
+    /// </para>
+    /// </remarks>
+    public bool CancelDependentsOnFailure { get; set; } = false;
 }

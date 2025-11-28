@@ -213,9 +213,9 @@ It keeps Ignition small but makes it observability-friendly.
 
 ---
 
-## 7. **Cancellation Propagation Rework (Structured Cancellation Trees)**
+## 7. **Cancellation Propagation Rework (Structured Cancellation Trees)** ✅ IMPLEMENTED
 
-Right now cancellation is fairly flat: global vs per-signal. Consider a more expressive model.
+~~Right now cancellation is fairly flat: global vs per-signal. Consider a more expressive model.~~
 
 ### What the epic delivers
 
@@ -225,15 +225,28 @@ Right now cancellation is fairly flat: global vs per-signal. Consider a more exp
   * cancel a whole stage
   * cancel all signals dependent on a failed signal
   * cancel all signals sharing a bundle
-* Provide accurate reporting: “Signal X cancelled due to group cancellation triggered by Y”
+* Provide accurate reporting: "Signal X cancelled due to group cancellation triggered by Y"
 
-### Why it’s big
+### Why it's big
 
 * Introduces new hierarchical model
 * Requires updates to DI registration
 * Needs updates to result aggregation
 * Must not break deterministic guarantees
 * Test matrix explodes
+
+**Status**: ✅ **Fully Implemented**
+
+#### Implementation Details
+
+* **Core Abstractions**: `ICancellationScope`, `CancellationScope`, `IScopedIgnitionSignal`, `CancellationReason` enum
+* **New Signal Status**: `IgnitionSignalStatus.Cancelled` for hierarchical cancellation scenarios
+* **Enhanced Results**: `IgnitionSignalResult` extended with `CancellationReason` and `CancelledBySignal` properties
+* **Options**: `IgnitionOptions.CancelDependentsOnFailure` for dependency-aware cancellation propagation
+* **Bundle Support**: `IgnitionBundleOptions.EnableScopedCancellation` and `CancellationScope` properties
+* **DI Extensions**: `AddIgnitionCancellationScope`, `AddIgnitionSignalWithScope`, `AddIgnitionFromTaskWithScope`
+* **Backward Compatible**: All existing tests pass without modification
+* **Comprehensive Testing**: 19 new tests covering scope hierarchies, cancellation propagation, DI registration, and result classification
 
 ---
 
@@ -327,7 +340,7 @@ Makes Ignition adaptable to real-world startup complexities—while still tiny.
 | Event-based state machine    | High         | 🔥🔥🔥     | ✔                    | ✅ **IMPLEMENTED**  |
 | Replay & historical analysis | High         | 🔥🔥🔥     | ✔                    | 📋 Proposed         |
 | Metrics adapter              | Medium       | 🔥         | ✔                    | 📋 Proposed         |
-| Cancellation trees           | High         | 🔥🔥🔥     | ✔                    | 📋 Proposed         |
+| Cancellation trees           | High         | 🔥🔥🔥     | ✔                    | ✅ **IMPLEMENTED**  |
 | Timeline exporter            | High         | 🔥🔥       | ✔                    | 📋 Proposed         |
 | Timeout strategy plugins     | Medium-high  | 🔥🔥       | ✔                    | ✅ **IMPLEMENTED**  |
 

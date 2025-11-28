@@ -456,13 +456,32 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
 
                     if (failedDeps.Count > 0)
                     {
-                        // Skip this signal due to failed dependencies
+                        // Determine if we should use Cancelled or Skipped status
+                        IgnitionSignalStatus skipStatus;
+                        CancellationReason cancelReason;
+                        string? cancelledBy = null;
+
+                        if (_options.CancelDependentsOnFailure)
+                        {
+                            skipStatus = IgnitionSignalStatus.Cancelled;
+                            cancelReason = CancellationReason.DependencyFailed;
+                            cancelledBy = failedDeps[0]; // First failed dependency
+                        }
+                        else
+                        {
+                            skipStatus = IgnitionSignalStatus.Skipped;
+                            cancelReason = CancellationReason.None;
+                        }
+
+                        // Skip/Cancel this signal due to failed dependencies
                         var skipResult = new IgnitionSignalResult(
                             signal.Name,
-                            IgnitionSignalStatus.Skipped,
+                            skipStatus,
                             TimeSpan.Zero,
                             Exception: null,
-                            FailedDependencies: failedDeps);
+                            FailedDependencies: failedDeps,
+                            CancellationReason: cancelReason,
+                            CancelledBySignal: cancelledBy);
                         
                         RaiseSignalCompleted(skipResult);
                         
@@ -482,8 +501,10 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                             }
                         }
 
+                        var action = _options.CancelDependentsOnFailure ? "Cancelling" : "Skipping";
                         _logger.LogWarning(
-                            "Skipping signal '{Name}' due to failed dependencies: {Dependencies}",
+                            "{Action} signal '{Name}' due to failed dependencies: {Dependencies}",
+                            action,
                             signal.Name,
                             string.Join(", ", failedDeps));
                         continue;
@@ -649,49 +670,120 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
     private async Task<IgnitionSignalResult> WaitOneAsync(IIgnitionSignal h, CancellationToken globalToken)
     {
         var sw = Stopwatch.StartNew();
+
+        // Extract scope information if the signal implements IScopedIgnitionSignal
+        ICancellationScope? signalScope = null;
+        bool cancelScopeOnFailure = false;
+        if (h is IScopedIgnitionSignal scopedSignal)
+        {
+            signalScope = scopedSignal.CancellationScope;
+            cancelScopeOnFailure = scopedSignal.CancelScopeOnFailure;
+        }
+
         try
         {
-            using var perHandleCts = CancellationTokenSource.CreateLinkedTokenSource(globalToken);
-            Task work = h.WaitAsync(perHandleCts.Token);
-
-            // Determine timeout and cancellation behavior from strategy or defaults
-            TimeSpan? effectiveTimeout;
-            bool cancelOnTimeout;
-
-            if (_options.TimeoutStrategy is not null)
+            // Create linked cancellation including scope token if present
+            CancellationTokenSource perHandleCts;
+            if (signalScope is not null)
             {
-                (effectiveTimeout, cancelOnTimeout) = _options.TimeoutStrategy.GetTimeout(h, _options);
+                perHandleCts = CancellationTokenSource.CreateLinkedTokenSource(globalToken, signalScope.Token);
             }
             else
             {
-                effectiveTimeout = h.Timeout;
-                cancelOnTimeout = _options.CancelIndividualOnTimeout;
+                perHandleCts = CancellationTokenSource.CreateLinkedTokenSource(globalToken);
             }
 
-            if (effectiveTimeout.HasValue)
+            using (perHandleCts)
             {
-                var timeoutTask = Task.Delay(effectiveTimeout.Value, perHandleCts.Token);
-                var completed = await Task.WhenAny(work, timeoutTask);
-                if (completed == timeoutTask)
-                {
-                    if (cancelOnTimeout)
-                    {
-                        perHandleCts.Cancel();
-                    }
-                    return new IgnitionSignalResult(h.Name, IgnitionSignalStatus.TimedOut, sw.Elapsed);
-                }
-            }
+                Task work = h.WaitAsync(perHandleCts.Token);
 
-            await work; // propagate exceptions if failed
-            return new IgnitionSignalResult(h.Name, IgnitionSignalStatus.Succeeded, sw.Elapsed);
+                // Determine timeout and cancellation behavior from strategy or defaults
+                TimeSpan? effectiveTimeout;
+                bool cancelOnTimeout;
+
+                if (_options.TimeoutStrategy is not null)
+                {
+                    (effectiveTimeout, cancelOnTimeout) = _options.TimeoutStrategy.GetTimeout(h, _options);
+                }
+                else
+                {
+                    effectiveTimeout = h.Timeout;
+                    cancelOnTimeout = _options.CancelIndividualOnTimeout;
+                }
+
+                if (effectiveTimeout.HasValue)
+                {
+                    var timeoutTask = Task.Delay(effectiveTimeout.Value, perHandleCts.Token);
+                    var completed = await Task.WhenAny(work, timeoutTask);
+                    if (completed == timeoutTask)
+                    {
+                        if (cancelOnTimeout)
+                        {
+                            perHandleCts.Cancel();
+                        }
+
+                        // Trigger scope cancellation if configured
+                        if (cancelScopeOnFailure && signalScope is not null)
+                        {
+                            signalScope.Cancel(CancellationReason.BundleCancelled, h.Name);
+                        }
+
+                        return new IgnitionSignalResult(
+                            h.Name,
+                            IgnitionSignalStatus.TimedOut,
+                            sw.Elapsed,
+                            CancellationReason: CancellationReason.PerSignalTimeout);
+                    }
+                }
+
+                await work; // propagate exceptions if failed
+                return new IgnitionSignalResult(h.Name, IgnitionSignalStatus.Succeeded, sw.Elapsed);
+            }
         }
         catch (OperationCanceledException)
         {
-            // Treat cancellations (global or individual) as timeouts for classification.
-            return new IgnitionSignalResult(h.Name, IgnitionSignalStatus.TimedOut, sw.Elapsed);
+            // Determine the cancellation reason based on which token was cancelled
+            CancellationReason reason;
+            string? cancelledBy = null;
+
+            if (signalScope is not null && signalScope.IsCancelled)
+            {
+                reason = signalScope.CancellationReason;
+                cancelledBy = signalScope.TriggeringSignalName;
+
+                // Return Cancelled status for scope-based cancellations
+                return new IgnitionSignalResult(
+                    h.Name,
+                    IgnitionSignalStatus.Cancelled,
+                    sw.Elapsed,
+                    CancellationReason: reason,
+                    CancelledBySignal: cancelledBy);
+            }
+            else if (globalToken.IsCancellationRequested)
+            {
+                reason = CancellationReason.GlobalTimeout;
+            }
+            else
+            {
+                reason = CancellationReason.ExternalCancellation;
+            }
+
+            // Treat global/external cancellations as timeouts for backward compatibility
+            return new IgnitionSignalResult(
+                h.Name,
+                IgnitionSignalStatus.TimedOut,
+                sw.Elapsed,
+                CancellationReason: reason,
+                CancelledBySignal: cancelledBy);
         }
         catch (Exception ex)
         {
+            // Trigger scope cancellation if configured
+            if (cancelScopeOnFailure && signalScope is not null)
+            {
+                signalScope.Cancel(CancellationReason.BundleCancelled, h.Name);
+            }
+
             return new IgnitionSignalResult(h.Name, IgnitionSignalStatus.Failed, sw.Elapsed, ex);
         }
     }
@@ -719,7 +811,9 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         }
         else
         {
-            bool hasFailed = result.Results.Any(r => r.Status == IgnitionSignalStatus.Failed);
+            bool hasFailed = result.Results.Any(r =>
+                r.Status == IgnitionSignalStatus.Failed ||
+                r.Status == IgnitionSignalStatus.Cancelled);
             finalState = hasFailed ? IgnitionState.Failed : IgnitionState.Completed;
         }
 
