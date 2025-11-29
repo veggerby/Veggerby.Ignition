@@ -22,6 +22,7 @@ Veggerby.Ignition is a lightweight, extensible startup readiness ("ignition") co
 - Optional parallelism limiting via MaxDegreeOfParallelism
 - Cooperative cancellation on global or per-signal timeout
 - **Pluggable timeout strategies** via `IIgnitionTimeoutStrategy` for advanced timeout behavior
+- **Pluggable metrics adapter** via `IIgnitionMetrics` for zero-dependency observability integration
 - **Dependency-aware execution graph (DAG)** with topological sort and cycle detection
 - **Declarative dependency declaration** via `[SignalDependency]` attribute
 - **Automatic parallel execution** of independent branches in dependency graphs
@@ -363,6 +364,104 @@ The `DefaultIgnitionTimeoutStrategy` preserves backward-compatible behavior:
 - Uses the global `CancelIndividualOnTimeout` setting
 
 When no custom strategy is configured, this behavior is applied automatically.
+
+## Metrics Adapter (Zero-Dependency, Pluggable Metrics)
+
+Veggerby.Ignition provides a minimal metrics abstraction that enables integration with observability systems (OpenTelemetry, Prometheus, App Metrics, etc.) without adding any of them as dependencies. This keeps Ignition small while making it observability-friendly.
+
+### The IIgnitionMetrics Interface
+
+```csharp
+public interface IIgnitionMetrics
+{
+    void RecordSignalDuration(string name, TimeSpan duration);
+    void RecordSignalStatus(string name, IgnitionSignalStatus status);
+    void RecordTotalDuration(TimeSpan duration);
+}
+```
+
+### Creating a Custom Metrics Implementation
+
+Implement `IIgnitionMetrics` to integrate with your monitoring stack:
+
+```csharp
+public sealed class OpenTelemetryIgnitionMetrics : IIgnitionMetrics
+{
+    private readonly Histogram<double> _signalDuration;
+    private readonly Counter<int> _signalStatus;
+    private readonly Histogram<double> _totalDuration;
+
+    public OpenTelemetryIgnitionMetrics(Meter meter)
+    {
+        _signalDuration = meter.CreateHistogram<double>("ignition.signal.duration", "ms");
+        _signalStatus = meter.CreateCounter<int>("ignition.signal.status");
+        _totalDuration = meter.CreateHistogram<double>("ignition.total.duration", "ms");
+    }
+
+    public void RecordSignalDuration(string name, TimeSpan duration)
+    {
+        _signalDuration.Record(duration.TotalMilliseconds, new("signal.name", name));
+    }
+
+    public void RecordSignalStatus(string name, IgnitionSignalStatus status)
+    {
+        _signalStatus.Add(1, new("signal.name", name), new("status", status.ToString()));
+    }
+
+    public void RecordTotalDuration(TimeSpan duration)
+    {
+        _totalDuration.Record(duration.TotalMilliseconds);
+    }
+}
+```
+
+### Registering Metrics
+
+```csharp
+// Option 1: Register a metrics instance directly
+services.AddIgnition();
+services.AddIgnitionMetrics(new MyMetricsAdapter());
+
+// Option 2: Register via factory for DI dependencies
+services.AddIgnition();
+services.AddIgnitionMetrics(sp =>
+{
+    var meterFactory = sp.GetRequiredService<IMeterFactory>();
+    var meter = meterFactory.Create("Veggerby.Ignition");
+    return new OpenTelemetryIgnitionMetrics(meter);
+});
+
+// Option 3: Register by type for DI construction
+services.AddIgnition();
+services.AddIgnitionMetrics<OpenTelemetryIgnitionMetrics>();
+```
+
+Alternatively, configure directly via options:
+
+```csharp
+services.AddIgnition(options =>
+{
+    options.Metrics = new MyMetricsAdapter();
+});
+```
+
+### Default Behavior
+
+When no metrics implementation is configured (`options.Metrics = null`), no metrics are recorded and there is zero overhead. A `NullIgnitionMetrics` singleton is available for testing or explicit no-op usage:
+
+```csharp
+var noopMetrics = NullIgnitionMetrics.Instance;
+```
+
+### Metrics Recorded
+
+| Metric | When Recorded | Parameters |
+| ------ | ------------- | ---------- |
+| Signal Duration | After each signal completes | Signal name, elapsed time |
+| Signal Status | After each signal completes | Signal name, status (Succeeded/Failed/TimedOut/etc.) |
+| Total Duration | When coordinator completes | Total elapsed time |
+
+Metrics are recorded for all execution modes (Parallel, Sequential, DependencyAware, Staged) and all signal statuses.
 
 ## Dependency-Aware Execution (DAG)
 

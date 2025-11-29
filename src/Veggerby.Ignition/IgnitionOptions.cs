@@ -185,4 +185,26 @@ public sealed class IgnitionOptions
             _earlyPromotionThreshold = value;
         }
     }
+
+    /// <summary>
+    /// Optional metrics adapter for recording ignition performance and outcome data.
+    /// When <c>null</c>, no metrics are recorded (zero overhead).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Configuring a metrics implementation enables integration with observability systems
+    /// (OpenTelemetry, Prometheus, App Metrics, etc.) without adding any of them as dependencies.
+    /// </para>
+    /// <para>
+    /// The adapter records:
+    /// <list type="bullet">
+    ///   <item>Per-signal duration and status</item>
+    ///   <item>Total ignition duration</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// Implementations should be thread-safe as metrics may be recorded from multiple concurrent signals.
+    /// </para>
+    /// </remarks>
+    public IIgnitionMetrics? Metrics { get; set; }
 }
