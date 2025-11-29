@@ -25,6 +25,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bundles", "samples\Bundles\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TimeoutStrategies", "samples\TimeoutStrategies\TimeoutStrategies.csproj", "{B4942E45-F045-4132-8DA2-F71C78DEC0C6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TimelineExport", "samples\TimelineExport\TimelineExport.csproj", "{B86FD4CC-1384-4685-B83A-1E43D80CAFE6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -131,6 +133,18 @@ Global
 		{B4942E45-F045-4132-8DA2-F71C78DEC0C6}.Release|x64.Build.0 = Release|Any CPU
 		{B4942E45-F045-4132-8DA2-F71C78DEC0C6}.Release|x86.ActiveCfg = Release|Any CPU
 		{B4942E45-F045-4132-8DA2-F71C78DEC0C6}.Release|x86.Build.0 = Release|Any CPU
+		{B86FD4CC-1384-4685-B83A-1E43D80CAFE6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B86FD4CC-1384-4685-B83A-1E43D80CAFE6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B86FD4CC-1384-4685-B83A-1E43D80CAFE6}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B86FD4CC-1384-4685-B83A-1E43D80CAFE6}.Debug|x64.Build.0 = Debug|Any CPU
+		{B86FD4CC-1384-4685-B83A-1E43D80CAFE6}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B86FD4CC-1384-4685-B83A-1E43D80CAFE6}.Debug|x86.Build.0 = Debug|Any CPU
+		{B86FD4CC-1384-4685-B83A-1E43D80CAFE6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B86FD4CC-1384-4685-B83A-1E43D80CAFE6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B86FD4CC-1384-4685-B83A-1E43D80CAFE6}.Release|x64.ActiveCfg = Release|Any CPU
+		{B86FD4CC-1384-4685-B83A-1E43D80CAFE6}.Release|x64.Build.0 = Release|Any CPU
+		{B86FD4CC-1384-4685-B83A-1E43D80CAFE6}.Release|x86.ActiveCfg = Release|Any CPU
+		{B86FD4CC-1384-4685-B83A-1E43D80CAFE6}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -144,6 +158,7 @@ Global
 		{24BF368B-E2F7-47D8-B1D2-2F76FB052CF0} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 		{0A8FE0FE-F0C0-427E-9114-16D181A53C66} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 		{B4942E45-F045-4132-8DA2-F71C78DEC0C6} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
+		{B86FD4CC-1384-4685-B83A-1E43D80CAFE6} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {6B5CFCE6-EF4C-43ED-ADA2-C357D7A87040}

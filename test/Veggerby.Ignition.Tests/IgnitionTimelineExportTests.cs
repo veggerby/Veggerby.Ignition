@@ -408,4 +408,58 @@ public class IgnitionTimelineExportTests
         resultWithTimeline.HasTimelineData.Should().BeTrue();
         mixedResult.HasTimelineData.Should().BeFalse();
     }
+
+    [Fact]
+    public void ToConsoleString_ProducesValidOutput()
+    {
+        // arrange
+        var result = new IgnitionResult(
+            TimeSpan.FromMilliseconds(1000),
+            new[]
+            {
+                new IgnitionSignalResult("fast-signal", IgnitionSignalStatus.Succeeded, TimeSpan.FromMilliseconds(200),
+                    StartedAt: TimeSpan.Zero, CompletedAt: TimeSpan.FromMilliseconds(200)),
+                new IgnitionSignalResult("slow-signal", IgnitionSignalStatus.Succeeded, TimeSpan.FromMilliseconds(800),
+                    StartedAt: TimeSpan.Zero, CompletedAt: TimeSpan.FromMilliseconds(800)),
+                new IgnitionSignalResult("timeout-signal", IgnitionSignalStatus.TimedOut, TimeSpan.FromMilliseconds(500),
+                    StartedAt: TimeSpan.Zero, CompletedAt: TimeSpan.FromMilliseconds(500))
+            },
+            TimedOut: false);
+
+        var timeline = result.ExportTimeline(executionMode: "Parallel", globalTimeout: TimeSpan.FromSeconds(10));
+
+        // act
+        var consoleOutput = timeline.ToConsoleString();
+
+        // assert
+        consoleOutput.Should().NotBeNullOrEmpty();
+        consoleOutput.Should().Contain("IGNITION TIMELINE");
+        consoleOutput.Should().Contain("fast-signal");
+        consoleOutput.Should().Contain("slow-signal");
+        consoleOutput.Should().Contain("timeout-signal");
+        consoleOutput.Should().Contain("SUMMARY");
+        consoleOutput.Should().Contain("Parallel");
+        consoleOutput.Should().Contain("✅"); // Succeeded icon
+        consoleOutput.Should().Contain("⏰"); // TimedOut icon
+    }
+
+    [Fact]
+    public void ToConsoleString_HandlesEmptyTimeline()
+    {
+        // arrange
+        var result = new IgnitionResult(
+            TimeSpan.FromMilliseconds(0),
+            Array.Empty<IgnitionSignalResult>(),
+            TimedOut: false);
+
+        var timeline = result.ExportTimeline();
+
+        // act
+        var consoleOutput = timeline.ToConsoleString();
+
+        // assert
+        consoleOutput.Should().NotBeNullOrEmpty();
+        consoleOutput.Should().Contain("IGNITION TIMELINE");
+        consoleOutput.Should().Contain("Total Signals:        0");
+    }
 }

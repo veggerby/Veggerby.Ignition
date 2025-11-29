@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Veggerby.Ignition;
 
@@ -354,5 +355,171 @@ public static class IgnitionTimelineExtensions
         }
 
         return max;
+    }
+
+    /// <summary>
+    /// Formats the timeline as a console-friendly Gantt-like visualization.
+    /// </summary>
+    /// <param name="timeline">The timeline to format.</param>
+    /// <param name="width">The width of the Gantt bar section (default: 50 characters).</param>
+    /// <returns>A string containing the formatted timeline visualization.</returns>
+    /// <remarks>
+    /// The output includes:
+    /// <list type="bullet">
+    ///   <item>Header with timeline metadata (duration, timeout status, execution mode)</item>
+    ///   <item>A Gantt-like bar chart showing signal execution timing</item>
+    ///   <item>Summary statistics (slowest/fastest signals, concurrency)</item>
+    /// </list>
+    /// </remarks>
+    public static string ToConsoleString(this IgnitionTimeline timeline, int width = 50)
+    {
+        ArgumentNullException.ThrowIfNull(timeline);
+
+        var sb = new System.Text.StringBuilder();
+        var totalMs = timeline.TotalDurationMs;
+        var hasDuration = totalMs > 0;
+
+        // Header
+        sb.AppendLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+        sb.AppendLine("║                    IGNITION TIMELINE                                         ║");
+        sb.AppendLine("╠══════════════════════════════════════════════════════════════════════════════╣");
+        sb.AppendLine($"║ Total Duration: {totalMs,10:F1}ms                                               ║");
+        sb.AppendLine($"║ Timed Out:      {(timeline.TimedOut ? "YES" : "NO "),-10}                                               ║");
+        if (timeline.ExecutionMode != null)
+        {
+            sb.AppendLine($"║ Execution Mode: {timeline.ExecutionMode,-10}                                               ║");
+        }
+        if (timeline.GlobalTimeoutMs.HasValue)
+        {
+            sb.AppendLine($"║ Global Timeout: {timeline.GlobalTimeoutMs.Value,10:F1}ms                                               ║");
+        }
+        sb.AppendLine("╠══════════════════════════════════════════════════════════════════════════════╣");
+
+        // Timeline header
+        sb.AppendLine("║                                                                              ║");
+        sb.AppendLine("║ SIGNAL TIMELINE (Gantt View)                                                 ║");
+        sb.AppendLine("║                                                                              ║");
+
+        // Scale indicator
+        var scaleWidth = width;
+        var scaleStep = totalMs / 5;
+        sb.Append("║    ");
+        sb.Append("0".PadRight(scaleWidth / 5));
+        for (int i = 1; i < 5; i++)
+        {
+            sb.Append($"{(scaleStep * i):F0}".PadRight(scaleWidth / 5));
+        }
+        sb.AppendLine($"{totalMs:F0}ms".PadLeft(10) + "      ║");
+
+        sb.Append("║    ");
+        sb.Append('|');
+        for (int i = 1; i < 5; i++)
+        {
+            sb.Append(new string('-', scaleWidth / 5 - 1) + '|');
+        }
+        sb.AppendLine(new string('-', scaleWidth / 5 - 1) + "|      ║");
+
+        // Events sorted by start time
+        var sortedEvents = timeline.Events
+            .OrderBy(e => e.StartMs)
+            .ThenBy(e => e.SignalName)
+            .ToList();
+
+        foreach (var e in sortedEvents)
+        {
+            var statusIcon = e.Status switch
+            {
+                "Succeeded" => "✅",
+                "Failed" => "❌",
+                "TimedOut" => "⏰",
+                "Skipped" => "⏭️",
+                "Cancelled" => "🚫",
+                _ => "❓"
+            };
+
+            // Calculate bar position (use cached totalMs check)
+            var startPos = hasDuration ? (int)((e.StartMs / totalMs) * scaleWidth) : 0;
+            var endPos = hasDuration ? (int)((e.EndMs / totalMs) * scaleWidth) : 0;
+            var barLength = Math.Max(1, endPos - startPos);
+
+            // Build the bar
+            var bar = new string(' ', startPos) + new string('█', barLength) + new string(' ', Math.Max(0, scaleWidth - startPos - barLength));
+
+            var signalName = TruncateSignalName(e.SignalName, 20);
+            sb.AppendLine($"║ {statusIcon} {signalName} [{bar}] {e.DurationMs,7:F0}ms ║");
+        }
+
+        sb.AppendLine("║                                                                              ║");
+        sb.AppendLine("╠══════════════════════════════════════════════════════════════════════════════╣");
+
+        // Summary section
+        sb.AppendLine("║ SUMMARY                                                                      ║");
+        sb.AppendLine("║                                                                              ║");
+
+        if (timeline.Summary != null)
+        {
+            var s = timeline.Summary;
+            sb.AppendLine($"║   Total Signals:    {s.TotalSignals,5}                                                  ║");
+            sb.AppendLine($"║   ✅ Succeeded:     {s.SucceededCount,5}                                                  ║");
+            if (s.FailedCount > 0)
+            {
+                sb.AppendLine($"║   ❌ Failed:        {s.FailedCount,5}                                                  ║");
+            }
+            if (s.TimedOutCount > 0)
+            {
+                sb.AppendLine($"║   ⏰ Timed Out:     {s.TimedOutCount,5}                                                  ║");
+            }
+            if (s.SkippedCount > 0)
+            {
+                sb.AppendLine($"║   ⏭️  Skipped:       {s.SkippedCount,5}                                                  ║");
+            }
+            if (s.CancelledCount > 0)
+            {
+                sb.AppendLine($"║   🚫 Cancelled:     {s.CancelledCount,5}                                                  ║");
+            }
+            sb.AppendLine($"║   Max Concurrency:  {s.MaxConcurrency,5}                                                  ║");
+
+            if (s.SlowestSignal != null)
+            {
+                var slowestName = TruncateSignalName(s.SlowestSignal, 20);
+                sb.AppendLine($"║   🐢 Slowest:       {slowestName,-20} ({s.SlowestDurationMs:F0}ms)                ║");
+            }
+            if (s.FastestSignal != null)
+            {
+                var fastestName = TruncateSignalName(s.FastestSignal, 20);
+                sb.AppendLine($"║   🚀 Fastest:       {fastestName,-20} ({s.FastestDurationMs:F0}ms)                 ║");
+            }
+            if (s.AverageDurationMs.HasValue)
+            {
+                sb.AppendLine($"║   📊 Avg Duration:  {s.AverageDurationMs.Value,10:F1}ms                                       ║");
+            }
+        }
+
+        sb.AppendLine("║                                                                              ║");
+        sb.AppendLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Writes the timeline to the console as a Gantt-like visualization.
+    /// </summary>
+    /// <param name="timeline">The timeline to display.</param>
+    /// <param name="width">The width of the Gantt bar section (default: 50 characters).</param>
+    public static void WriteToConsole(this IgnitionTimeline timeline, int width = 50)
+    {
+        Console.WriteLine(timeline.ToConsoleString(width));
+    }
+
+    /// <summary>
+    /// Truncates a signal name to fit within the specified width.
+    /// </summary>
+    private static string TruncateSignalName(string name, int maxLength)
+    {
+        if (name.Length > maxLength)
+        {
+            return name[..(maxLength - 3)] + "...";
+        }
+        return name.PadRight(maxLength);
     }
 }
