@@ -94,7 +94,7 @@ public static class IgnitionTimelineExtensions
             var r = results[i];
 
             double startMs = r.StartedAt?.TotalMilliseconds ?? 0;
-            double endMs = r.CompletedAt?.TotalMilliseconds ?? r.Duration.TotalMilliseconds;
+            double endMs = r.CompletedAt?.TotalMilliseconds ?? (startMs + r.Duration.TotalMilliseconds);
             double durationMs = r.Duration.TotalMilliseconds;
 
             // Get stage if present
@@ -146,9 +146,9 @@ public static class IgnitionTimelineExtensions
 
         foreach (var (index, start, end) in signalWindows)
         {
-            if (start <= groupEndTime)
+            if (start < groupEndTime)
             {
-                // Overlaps or touches current group
+                // Overlaps with current group
                 groups[index] = currentGroup;
                 groupEndTime = Math.Max(groupEndTime, end);
             }
@@ -231,7 +231,8 @@ public static class IgnitionTimelineExtensions
         double slowestDurationMs = 0;
         string? fastestSignal = null;
         double fastestDurationMs = double.MaxValue;
-        double totalDurationMs = 0;
+        double executedTotalDurationMs = 0;
+        int executedCount = 0;
 
         foreach (var r in results)
         {
@@ -255,29 +256,38 @@ public static class IgnitionTimelineExtensions
             }
 
             double durationMs = r.Duration.TotalMilliseconds;
-            totalDurationMs += durationMs;
 
-            if (durationMs > slowestDurationMs)
-            {
-                slowestDurationMs = durationMs;
-                slowestSignal = r.Name;
-            }
+            // Track durations for executed signals only (exclude skipped/cancelled)
+            bool isExecuted = r.Status != IgnitionSignalStatus.Skipped &&
+                              r.Status != IgnitionSignalStatus.Cancelled;
 
-            if (durationMs < fastestDurationMs && r.Status != IgnitionSignalStatus.Skipped)
+            if (isExecuted)
             {
-                fastestDurationMs = durationMs;
-                fastestSignal = r.Name;
+                executedTotalDurationMs += durationMs;
+                executedCount++;
+
+                if (durationMs > slowestDurationMs)
+                {
+                    slowestDurationMs = durationMs;
+                    slowestSignal = r.Name;
+                }
+
+                if (durationMs < fastestDurationMs)
+                {
+                    fastestDurationMs = durationMs;
+                    fastestSignal = r.Name;
+                }
             }
         }
 
         // Calculate max concurrency from events
         int maxConcurrency = CalculateMaxConcurrency(events);
 
-        double? averageDurationMs = total > 0 ? totalDurationMs / total : null;
+        double? averageDurationMs = executedCount > 0 ? executedTotalDurationMs / executedCount : null;
 
-        // Handle edge cases
+        // Handle edge cases - use comparison with tolerance for floating point
         double? actualFastestDuration = null;
-        if (total > 0 && fastestDurationMs != double.MaxValue)
+        if (executedCount > 0 && fastestDurationMs < double.MaxValue)
         {
             actualFastestDuration = fastestDurationMs;
         }
@@ -295,7 +305,7 @@ public static class IgnitionTimelineExtensions
             CancelledCount: cancelled,
             MaxConcurrency: maxConcurrency,
             SlowestSignal: slowestSignal,
-            SlowestDurationMs: total > 0 ? slowestDurationMs : null,
+            SlowestDurationMs: executedCount > 0 ? slowestDurationMs : null,
             FastestSignal: fastestSignal,
             FastestDurationMs: actualFastestDuration,
             AverageDurationMs: averageDurationMs);

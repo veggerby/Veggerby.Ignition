@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Veggerby.Ignition;
 
@@ -133,15 +134,7 @@ public sealed record IgnitionResult(
                 return false;
             }
 
-            foreach (var result in Results)
-            {
-                if (!result.HasTimelineData)
-                {
-                    return false;
-                }
-            }
-
-            return true;
+            return Results.All(result => result.HasTimelineData);
         }
     }
 }
