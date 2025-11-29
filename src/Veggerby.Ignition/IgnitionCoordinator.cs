@@ -1250,6 +1250,13 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
     /// </summary>
     private void TransitionToFinalState(IgnitionResult result)
     {
+        // Record total duration metric if configured.
+        var metrics = _options.Metrics;
+        if (metrics is not null)
+        {
+            metrics.RecordTotalDuration(result.TotalDuration);
+        }
+
         IgnitionState finalState;
         if (result.TimedOut)
         {
@@ -1296,6 +1303,14 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
     /// </summary>
     private void RaiseSignalCompleted(IgnitionSignalResult result)
     {
+        // Record metrics if configured (null-check avoids overhead when metrics are disabled).
+        var metrics = _options.Metrics;
+        if (metrics is not null)
+        {
+            metrics.RecordSignalDuration(result.Name, result.Duration);
+            metrics.RecordSignalStatus(result.Name, result.Status);
+        }
+
         var handler = SignalCompleted;
         if (handler is not null)
         {
