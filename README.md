@@ -28,6 +28,7 @@ Veggerby.Ignition is a lightweight, extensible startup readiness ("ignition") co
 - **State machine with lifecycle events** for real-time observability (`NotStarted`, `Running`, `Completed`, `Failed`, `TimedOut`)
 - **Event hooks** for signal-level and coordinator-level progress monitoring
 - **Staged execution (multi-phase startup pipeline)** with configurable cross-stage policies
+- **Timeline export** for Gantt-like startup visualization and analysis (`result.ExportTimeline()`)
 
 📚 **[Full Documentation](docs/README.md)** | 🚀 **[Getting Started Guide](docs/getting-started.md)** | 📖 **[Features Overview](docs/features.md)**
 
@@ -173,6 +174,87 @@ foreach (var r in result.Results)
     Console.WriteLine($"{r.Name}: {r.Status} in {r.Duration.TotalMilliseconds:F0} ms");
 }
 ```
+
+## Timeline Export (Gantt-like Output)
+
+Export a structured timeline of startup events for analysis, visualization, and debugging. The timeline provides a Gantt-like view of signal execution including start/end times, concurrent groups, and timeout boundaries.
+
+```csharp
+var result = await coord.GetResultAsync();
+
+// Export to IgnitionTimeline object
+var timeline = result.ExportTimeline(
+    executionMode: "Parallel",
+    globalTimeout: TimeSpan.FromSeconds(30));
+
+// Export directly to JSON
+var json = result.ExportTimelineJson(indented: true);
+```
+
+### Timeline Data
+
+The exported timeline includes:
+
+- **Events**: Per-signal timing with start/end times relative to ignition start (milliseconds)
+- **Concurrent groups**: Signals that executed in parallel are assigned the same group ID
+- **Boundaries**: Global timeout markers and completion timestamps
+- **Stages**: Stage timing when using staged execution mode
+- **Summary**: Statistics including slowest/fastest signals, max concurrency, and status counts
+
+### JSON Schema (v1.0)
+
+```json
+{
+  "schemaVersion": "1.0",
+  "totalDurationMs": 150.5,
+  "timedOut": false,
+  "executionMode": "Parallel",
+  "globalTimeoutMs": 30000,
+  "events": [
+    {
+      "signalName": "db-connection",
+      "status": "Succeeded",
+      "startMs": 0,
+      "endMs": 50.2,
+      "durationMs": 50.2,
+      "concurrentGroup": 1
+    },
+    {
+      "signalName": "cache-warmup",
+      "status": "Succeeded",
+      "startMs": 0,
+      "endMs": 75.3,
+      "durationMs": 75.3,
+      "concurrentGroup": 1
+    }
+  ],
+  "boundaries": [
+    { "type": "GlobalTimeoutConfigured", "timeMs": 30000 },
+    { "type": "IgnitionComplete", "timeMs": 150.5 }
+  ],
+  "summary": {
+    "totalSignals": 2,
+    "succeededCount": 2,
+    "failedCount": 0,
+    "timedOutCount": 0,
+    "skippedCount": 0,
+    "cancelledCount": 0,
+    "maxConcurrency": 2,
+    "slowestSignal": "cache-warmup",
+    "slowestDurationMs": 75.3,
+    "fastestSignal": "db-connection",
+    "fastestDurationMs": 50.2,
+    "averageDurationMs": 62.75
+  }
+}
+```
+
+### Use Cases
+
+- **Startup debugging**: Identify which signals are slow or blocking others
+- **Container warmup analysis**: Visualize startup sequence in Kubernetes/Docker environments
+- **CI timing regression detection**: Compare timeline exports between builds
+- **Profiling**: Export timeline data for analysis with external visualization tools
 
 ## Health Check
 

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Veggerby.Ignition;
 
@@ -40,6 +41,8 @@ public enum IgnitionSignalStatus
 /// <param name="FailedDependencies">Names of dependency signals that failed, preventing this signal from executing (dependency-aware mode only).</param>
 /// <param name="CancellationReason">Reason for cancellation if the signal was cancelled (timed out or cancelled via scope).</param>
 /// <param name="CancelledBySignal">Name of the signal that triggered the cancellation, if applicable (hierarchical cancellation).</param>
+/// <param name="StartedAt">Offset from ignition start when this signal began execution. Used for timeline export.</param>
+/// <param name="CompletedAt">Offset from ignition start when this signal completed. Used for timeline export.</param>
 public sealed record IgnitionSignalResult(
     string Name,
     IgnitionSignalStatus Status,
@@ -47,7 +50,9 @@ public sealed record IgnitionSignalResult(
     Exception? Exception = null,
     IReadOnlyList<string>? FailedDependencies = null,
     CancellationReason CancellationReason = CancellationReason.None,
-    string? CancelledBySignal = null)
+    string? CancelledBySignal = null,
+    TimeSpan? StartedAt = null,
+    TimeSpan? CompletedAt = null)
 {
     /// <summary>
     /// Gets whether this signal was skipped due to failed dependencies.
@@ -70,6 +75,11 @@ public sealed record IgnitionSignalResult(
     public bool WasCancelledByScope => CancellationReason is CancellationReason.ScopeCancelled
                                        or CancellationReason.BundleCancelled
                                        or CancellationReason.DependencyFailed;
+
+    /// <summary>
+    /// Gets whether this signal result contains timeline data (start and completion timestamps).
+    /// </summary>
+    public bool HasTimelineData => StartedAt.HasValue && CompletedAt.HasValue;
 }
 
 /// <summary>
@@ -110,4 +120,21 @@ public sealed record IgnitionResult(
     /// Gets whether this result includes stage-level information.
     /// </summary>
     public bool HasStageResults => StageResults is not null && StageResults.Count > 0;
+
+    /// <summary>
+    /// Gets whether this result contains timeline data (per-signal start and completion timestamps).
+    /// Returns true if all signal results have timeline data populated.
+    /// </summary>
+    public bool HasTimelineData
+    {
+        get
+        {
+            if (Results.Count == 0)
+            {
+                return false;
+            }
+
+            return Results.All(result => result.HasTimelineData);
+        }
+    }
 }

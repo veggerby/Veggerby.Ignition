@@ -264,7 +264,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         foreach (var h in _handles)
         {
             RaiseSignalStarted(h.Name);
-            var t = WaitOneAsync(h, globalCts.Token);
+            var t = WaitOneAsync(h, globalCts.Token, swGlobal);
             list.Add(t);
             var completed = await Task.WhenAny(t, globalTimeoutTask);
             if (completed == globalTimeoutTask)
@@ -330,7 +330,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                 RaiseSignalStarted(h.Name);
                 try
                 {
-                    var result = await WaitOneAsync(h, globalCts.Token);
+                    var result = await WaitOneAsync(h, globalCts.Token, swGlobal);
                     RaiseSignalCompleted(result);
                     return result;
                 }
@@ -529,7 +529,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                         RaiseSignalStarted(signal.Name);
                         try
                         {
-                            var result = await WaitOneAsync(signal, globalCts.Token);
+                            var result = await WaitOneAsync(signal, globalCts.Token, swGlobal);
                             RaiseSignalCompleted(result);
                             lock (syncLock)
                             {
@@ -758,7 +758,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         _logger.LogDebug("Starting stage {Stage} with {Count} signal(s).", stageNumber, signalsInStage.Count);
 
         var swStage = Stopwatch.StartNew();
-        var stageTasks = await StartStageSignalsAsync(signalsInStage, globalCts, gate);
+        var stageTasks = await StartStageSignalsAsync(signalsInStage, globalCts, gate, swGlobal);
 
         var stageExecution = _options.StagePolicy == IgnitionStagePolicy.EarlyPromotion
             ? await ExecuteStageWithEarlyPromotionAsync(stageTasks, signalsInStage, stageNumber, globalCts, globalTimeoutTask, swGlobal, context)
@@ -789,7 +789,8 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
     private async Task<List<Task<IgnitionSignalResult>>> StartStageSignalsAsync(
         List<IIgnitionSignal> signals,
         CancellationTokenSource globalCts,
-        SemaphoreSlim? gate)
+        SemaphoreSlim? gate,
+        Stopwatch swGlobal)
     {
         var stageTasks = new List<Task<IgnitionSignalResult>>();
         foreach (var signal in signals)
@@ -804,7 +805,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                 RaiseSignalStarted(signal.Name);
                 try
                 {
-                    var result = await WaitOneAsync(signal, globalCts.Token);
+                    var result = await WaitOneAsync(signal, globalCts.Token, swGlobal);
                     RaiseSignalCompleted(result);
                     return result;
                 }
@@ -1094,8 +1095,9 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         return pending;
     }
 
-    private async Task<IgnitionSignalResult> WaitOneAsync(IIgnitionSignal h, CancellationToken globalToken)
+    private async Task<IgnitionSignalResult> WaitOneAsync(IIgnitionSignal h, CancellationToken globalToken, Stopwatch swGlobal)
     {
+        var startedAt = swGlobal.Elapsed;
         var sw = Stopwatch.StartNew();
 
         // Extract scope information if the signal implements IScopedIgnitionSignal
@@ -1149,16 +1151,25 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                             signalScope.Cancel(CancellationReason.BundleCancelled, h.Name);
                         }
 
+                        var completedAt = swGlobal.Elapsed;
                         return new IgnitionSignalResult(
                             h.Name,
                             IgnitionSignalStatus.TimedOut,
                             sw.Elapsed,
-                            CancellationReason: CancellationReason.PerSignalTimeout);
+                            CancellationReason: CancellationReason.PerSignalTimeout,
+                            StartedAt: startedAt,
+                            CompletedAt: completedAt);
                     }
                 }
 
                 await work; // propagate exceptions if failed
-                return new IgnitionSignalResult(h.Name, IgnitionSignalStatus.Succeeded, sw.Elapsed);
+                var successCompletedAt = swGlobal.Elapsed;
+                return new IgnitionSignalResult(
+                    h.Name,
+                    IgnitionSignalStatus.Succeeded,
+                    sw.Elapsed,
+                    StartedAt: startedAt,
+                    CompletedAt: successCompletedAt);
             }
         }
         catch (OperationCanceledException)
@@ -1168,6 +1179,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
             // Scope cancellation is more specific and takes precedence over global timeout.
             CancellationReason reason;
             string? cancelledBy = null;
+            var completedAt = swGlobal.Elapsed;
 
             if (signalScope is not null && signalScope.IsCancelled)
             {
@@ -1180,7 +1192,9 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                     IgnitionSignalStatus.Cancelled,
                     sw.Elapsed,
                     CancellationReason: reason,
-                    CancelledBySignal: cancelledBy);
+                    CancelledBySignal: cancelledBy,
+                    StartedAt: startedAt,
+                    CompletedAt: completedAt);
             }
             else if (globalToken.IsCancellationRequested)
             {
@@ -1197,7 +1211,9 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                 IgnitionSignalStatus.TimedOut,
                 sw.Elapsed,
                 CancellationReason: reason,
-                CancelledBySignal: cancelledBy);
+                CancelledBySignal: cancelledBy,
+                StartedAt: startedAt,
+                CompletedAt: completedAt);
         }
         catch (Exception ex)
         {
@@ -1207,7 +1223,14 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                 signalScope.Cancel(CancellationReason.BundleCancelled, h.Name);
             }
 
-            return new IgnitionSignalResult(h.Name, IgnitionSignalStatus.Failed, sw.Elapsed, ex);
+            var completedAt = swGlobal.Elapsed;
+            return new IgnitionSignalResult(
+                h.Name,
+                IgnitionSignalStatus.Failed,
+                sw.Elapsed,
+                ex,
+                StartedAt: startedAt,
+                CompletedAt: completedAt);
         }
     }
 

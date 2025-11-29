@@ -129,6 +129,164 @@ logger.LogInformation(
     summary.TotalDuration, summary.AvgDuration, summary.MaxDuration);
 ```
 
+## Timeline Export (Gantt-like Output)
+
+Export a structured timeline of signal execution for analysis, visualization, and debugging.
+
+### Basic Export
+
+```csharp
+var result = await coordinator.GetResultAsync();
+
+// Export to timeline object
+var timeline = result.ExportTimeline(
+    executionMode: "Parallel",
+    globalTimeout: TimeSpan.FromSeconds(30));
+
+// Export to JSON
+var json = timeline.ToJson(indented: true);
+```
+
+### Console Visualization
+
+Display a Gantt-like ASCII visualization:
+
+```csharp
+// Export and display
+var timeline = result.ExportTimeline();
+timeline.WriteToConsole();
+
+// Or get as string
+string output = timeline.ToConsoleString();
+Console.WriteLine(output);
+```
+
+Example output:
+
+```text
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    IGNITION TIMELINE                                         ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║ Total Duration:     1215.5ms                                               ║
+║ Timed Out:      NO                                                         ║
+║ Execution Mode: Parallel                                                   ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║ SIGNAL TIMELINE (Gantt View)                                                 ║
+║    0         243       486       729       972           1215ms             ║
+║    |---------|---------|---------|---------|---------|                      ║
+║ ✅ external-service     [████████████████████████                ] 602ms    ║
+║ ✅ configuration-load   [█████████████████                       ] 430ms    ║
+║ ✅ cache-warmup         [█████████████████████████████████████████] 1201ms  ║
+║ ✅ database-connection  [█████████████████████████████████       ] 801ms    ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║ SUMMARY                                                                      ║
+║   Total Signals:    4                                                        ║
+║   ✅ Succeeded:     4                                                        ║
+║   Max Concurrency:  4                                                        ║
+║   🐢 Slowest:       cache-warmup (1201ms)                                   ║
+║   🚀 Fastest:       configuration-load (430ms)                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+```
+
+### Timeline Properties
+
+```csharp
+var timeline = result.ExportTimeline();
+
+// Metadata
+double totalMs = timeline.TotalDurationMs;
+bool timedOut = timeline.TimedOut;
+string? mode = timeline.ExecutionMode;
+
+// Events (per-signal timing)
+foreach (var e in timeline.Events)
+{
+    string name = e.SignalName;
+    string status = e.Status;
+    double startMs = e.StartMs;   // Relative to ignition start
+    double endMs = e.EndMs;       // Relative to ignition start
+    double durationMs = e.DurationMs;
+    int? concurrentGroup = e.ConcurrentGroup;
+}
+
+// Summary statistics
+var summary = timeline.Summary;
+int total = summary.TotalSignals;
+int succeeded = summary.SucceededCount;
+int maxConcurrency = summary.MaxConcurrency;
+string? slowest = summary.SlowestSignal;
+double? slowestMs = summary.SlowestDurationMs;
+```
+
+### JSON Schema (v1.0)
+
+```json
+{
+  "schemaVersion": "1.0",
+  "totalDurationMs": 1215.5,
+  "timedOut": false,
+  "executionMode": "Parallel",
+  "globalTimeoutMs": 30000,
+  "startedAt": "2025-01-15T10:30:00.000Z",
+  "completedAt": "2025-01-15T10:30:01.215Z",
+  "events": [
+    {
+      "signalName": "database-connection",
+      "status": "Succeeded",
+      "startMs": 0,
+      "endMs": 801,
+      "durationMs": 801,
+      "concurrentGroup": 1
+    }
+  ],
+  "boundaries": [
+    { "type": "GlobalTimeoutConfigured", "timeMs": 30000 },
+    { "type": "IgnitionComplete", "timeMs": 1215.5 }
+  ],
+  "summary": {
+    "totalSignals": 4,
+    "succeededCount": 4,
+    "failedCount": 0,
+    "timedOutCount": 0,
+    "maxConcurrency": 4,
+    "slowestSignal": "cache-warmup",
+    "slowestDurationMs": 1201,
+    "fastestSignal": "configuration-load",
+    "fastestDurationMs": 430,
+    "averageDurationMs": 758.5
+  }
+}
+```
+
+### Use Cases
+
+1. **Startup Debugging**: Identify slow signals or bottlenecks
+2. **Container Warmup Analysis**: Profile Kubernetes/Docker startup
+3. **CI Timing Regression Detection**: Compare JSON exports between builds
+4. **Concurrent Execution Visualization**: See parallel execution patterns
+5. **External Tool Integration**: Export to Chrome DevTools, Perfetto, etc.
+
+### Saving Timelines for Analysis
+
+```csharp
+var result = await coordinator.GetResultAsync();
+var timeline = result.ExportTimeline(
+    executionMode: "Parallel",
+    globalTimeout: options.GlobalTimeout);
+
+// Save to file
+var json = timeline.ToJson(indented: true);
+await File.WriteAllTextAsync($"timeline-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json", json);
+
+// Or log summary
+logger.LogInformation(
+    "Startup: {Duration:F0}ms, Concurrency: {Concurrency}, Slowest: {Slowest} ({SlowestMs:F0}ms)",
+    timeline.TotalDurationMs,
+    timeline.Summary?.MaxConcurrency,
+    timeline.Summary?.SlowestSignal,
+    timeline.Summary?.SlowestDurationMs);
+```
+
 ## Slow Signal Logging
 
 Automatically identify performance bottlenecks by logging the slowest signals.
