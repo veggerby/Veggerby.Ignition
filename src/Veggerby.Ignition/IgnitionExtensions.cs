@@ -135,6 +135,76 @@ public static class IgnitionExtensions
     }
 
     /// <summary>
+    /// Configures a custom metrics adapter for recording ignition performance and outcome data.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="metrics">The metrics adapter instance to use.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// The metrics adapter is applied via <see cref="IgnitionOptions.Metrics"/> configuration.
+    /// Call this method after <see cref="AddIgnition"/> to ensure the options are properly configured.
+    /// </para>
+    /// <para>
+    /// Use this to integrate with observability systems (OpenTelemetry, Prometheus, App Metrics, etc.)
+    /// without adding any of them as dependencies to the Ignition library.
+    /// </para>
+    /// </remarks>
+    public static IServiceCollection AddIgnitionMetrics(
+        this IServiceCollection services,
+        IIgnitionMetrics metrics)
+    {
+        ArgumentNullException.ThrowIfNull(metrics);
+
+        services.Configure<IgnitionOptions>(options => options.Metrics = metrics);
+
+        return services;
+    }
+
+    /// <summary>
+    /// Configures a custom metrics adapter using a factory delegate.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="metricsFactory">Factory delegate that produces the metrics adapter using the service provider.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    /// <remarks>
+    /// Use this overload when the metrics adapter requires dependencies from the DI container.
+    /// The factory is invoked once when options are first accessed.
+    /// </remarks>
+    public static IServiceCollection AddIgnitionMetrics(
+        this IServiceCollection services,
+        Func<IServiceProvider, IIgnitionMetrics> metricsFactory)
+    {
+        ArgumentNullException.ThrowIfNull(metricsFactory);
+
+        services.AddSingleton<IIgnitionMetrics>(metricsFactory);
+        services.AddOptions<IgnitionOptions>()
+            .Configure<IIgnitionMetrics>((options, metrics) => options.Metrics = metrics);
+
+        return services;
+    }
+
+    /// <summary>
+    /// Configures a custom metrics adapter by type, allowing DI to construct the metrics instance.
+    /// </summary>
+    /// <typeparam name="TMetrics">Concrete implementation of <see cref="IIgnitionMetrics"/>.</typeparam>
+    /// <param name="services">Target DI service collection.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    /// <remarks>
+    /// The metrics type must have a constructor compatible with DI resolution.
+    /// Use this overload when the metrics adapter requires dependencies injected via constructor.
+    /// </remarks>
+    public static IServiceCollection AddIgnitionMetrics<TMetrics>(
+        this IServiceCollection services) where TMetrics : class, IIgnitionMetrics
+    {
+        services.AddSingleton<IIgnitionMetrics, TMetrics>();
+        services.AddOptions<IgnitionOptions>()
+            .Configure<IIgnitionMetrics>((options, metrics) => options.Metrics = metrics);
+
+        return services;
+    }
+
+    /// <summary>
     /// Registers a concrete ignition signal instance.
     /// </summary>
     /// <param name="services">Target DI service collection.</param>

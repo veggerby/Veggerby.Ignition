@@ -189,7 +189,7 @@ Perfect for diagnosing slow startup in prod vs dev, CI regression detection, or 
 
 ---
 
-## 6. **Ignition Metrics Adapter (Zero-Dependency, Pluggable Metrics)**
+## 6. **Ignition Metrics Adapter (Zero-Dependency, Pluggable Metrics)** ✅ IMPLEMENTED
 
 A structured internal metrics API that integrates with:
 
@@ -224,6 +224,17 @@ A structured internal metrics API that integrates with:
 ### Why it’s great
 
 It keeps Ignition small but makes it observability-friendly.
+
+**Status**: ✅ **Fully Implemented**
+
+#### Implementation Details
+
+* **Core Abstractions**: `IIgnitionMetrics`, `NullIgnitionMetrics`
+* **Options Integration**: `IgnitionOptions.Metrics` property for custom metrics configuration
+* **DI Extensions**: `AddIgnitionMetrics`, `AddIgnitionMetrics<T>`, and factory overloads
+* **Zero Overhead When Disabled**: Null-check avoids allocations when metrics are not configured
+* **Backward Compatible**: All existing tests pass without modification
+* **Comprehensive Testing**: 18 new tests covering metrics recording, DI registration, thread safety, and all execution modes
 
 ---
 
@@ -364,7 +375,7 @@ Makes Ignition adaptable to real-world startup complexities—while still tiny.
 | Bundles/modules              | Medium-high  | 🔥🔥       | ✔                    | ✅ **IMPLEMENTED**  |
 | Event-based state machine    | High         | 🔥🔥🔥     | ✔                    | ✅ **IMPLEMENTED**  |
 | Replay & historical analysis | High         | 🔥🔥🔥     | ✔                    | 📋 Proposed         |
-| Metrics adapter              | Medium       | 🔥         | ✔                    | 📋 Proposed         |
+| Metrics adapter              | Medium       | 🔥         | ✔                    | ✅ **IMPLEMENTED**  |
 | Cancellation trees           | High         | 🔥🔥🔥     | ✔                    | ✅ **IMPLEMENTED**  |
 | Timeline exporter            | High         | 🔥🔥       | ✔                    | ✅ **IMPLEMENTED**  |
 | Timeout strategy plugins     | Medium-high  | 🔥🔥       | ✔                    | ✅ **IMPLEMENTED**  |
@@ -380,5 +391,6 @@ If Veggerby.Ignition were to *level up* without becoming bloated, the most impac
 3. **Timeout strategy plugins** ✅
 4. **Staged (multi-phase) ignition pipeline** ✅
 5. **Ignition state machine + event hooks** ✅
+6. **Metrics adapter** ✅
 
 These add massive expressive power while preserving your clean architectural DNA—and unlike Elon’s product launches, they’ll actually work.
