@@ -68,6 +68,23 @@ Demonstrates:
 
 Ideal for understanding how to customize timeout behavior for different environments or signal types.
 
+### [Timeline Export Console Application](./TimelineExport/)
+
+**Complexity**: Intermediate
+**Type**: Console Application
+**Focus**: Startup analysis and visualization
+
+Demonstrates:
+
+- Exporting ignition results to structured timeline format
+- Gantt-like console visualization of signal execution
+- JSON export for external analysis tools
+- Concurrent vs sequential execution timing visualization
+- Timeout scenarios in timeline view
+- Summary statistics (slowest/fastest signals, max concurrency)
+
+Ideal for debugging slow startup issues, profiling container warmup times, and detecting CI timing regressions.
+
 ### [Dependency Graph Console Application](./DependencyGraph/)
 
 **Complexity**: Advanced
@@ -108,7 +125,7 @@ Each sample includes its own README with detailed instructions. To run any sampl
 
 ```bash
 # Navigate to the sample directory
-cd samples/[Simple|Advanced|DependencyGraph|WebApi]
+cd samples/[Simple|Advanced|DependencyGraph|TimelineExport|WebApi]
 
 # Run the sample
 dotnet run
@@ -121,8 +138,9 @@ We recommend exploring the samples in this order:
 1. **Start with Simple** - Learn the basic concepts and API
 2. **Explore Bundles** - Understand composable signal packages
 3. **Move to Advanced** - Deep dive into configuration options and policies
-4. **Study DependencyGraph** - Master dependency-aware execution (DAG mode)
-5. **Review WebApi** - See real-world integration patterns
+4. **Try TimelineExport** - Visualize and analyze startup timing
+5. **Study DependencyGraph** - Master dependency-aware execution (DAG mode)
+6. **Review WebApi** - See real-world integration patterns
 
 ## Key Concepts Demonstrated
 
@@ -150,6 +168,13 @@ We recommend exploring the samples in this order:
 - Global timeout for overall coordination
 - Per-signal timeouts for individual operations
 - Cancellation behavior configuration
+
+### Timeline Export & Analysis
+
+- Export results to JSON for external tools
+- Console-based Gantt visualization
+- Concurrent group identification
+- Summary statistics
 
 ### Integration Patterns
 
