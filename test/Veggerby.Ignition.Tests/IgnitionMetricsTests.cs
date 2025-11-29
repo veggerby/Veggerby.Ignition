@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -183,7 +185,7 @@ public class IgnitionMetricsTests
     public async Task MetricsAdapter_RecordsAllSignals_InParallel()
     {
         // arrange
-        var recordedStatuses = new System.Collections.Concurrent.ConcurrentBag<(string Name, IgnitionSignalStatus Status)>();
+        var recordedStatuses = new ConcurrentBag<(string Name, IgnitionSignalStatus Status)>();
         var metrics = new TestIgnitionMetrics
         {
             OnRecordSignalStatus = (name, status) => recordedStatuses.Add((name, status))
@@ -239,7 +241,7 @@ public class IgnitionMetricsTests
     public async Task MetricsAdapter_RecordsMixedStatuses()
     {
         // arrange
-        var recordedStatuses = new System.Collections.Concurrent.ConcurrentBag<(string Name, IgnitionSignalStatus Status)>();
+        var recordedStatuses = new ConcurrentBag<(string Name, IgnitionSignalStatus Status)>();
         var metrics = new TestIgnitionMetrics
         {
             OnRecordSignalStatus = (name, status) => recordedStatuses.Add((name, status))
