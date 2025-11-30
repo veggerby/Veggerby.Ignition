@@ -380,44 +380,67 @@ public static class IgnitionTimelineExtensions
         var hasDuration = totalMs > 0;
 
         // Header
-        sb.AppendLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-        sb.AppendLine("║                    IGNITION TIMELINE                                         ║");
-        sb.AppendLine("╠══════════════════════════════════════════════════════════════════════════════╣");
-        sb.AppendLine($"║ Total Duration: {totalMs,10:F1}ms                                               ║");
-        sb.AppendLine($"║ Timed Out:      {(timeline.TimedOut ? "YES" : "NO "),-10}                                               ║");
+        sb.AppendLine("════════════════════════════════════════════════════════════════════════════════");
+        sb.AppendLine("                    IGNITION TIMELINE                                           ");
+        sb.AppendLine("════════════════════════════════════════════════════════════════════════════════");
+
+        var totalDurStr = $"{totalMs:F1}ms";
+        sb.AppendLine($" Total Duration:        {totalDurStr}");
+
+        var timedOutStr = timeline.TimedOut ? "YES" : "NO";
+        sb.AppendLine($" Timed Out:             {timedOutStr}");
+
         if (timeline.ExecutionMode != null)
         {
-            sb.AppendLine($"║ Execution Mode: {timeline.ExecutionMode,-10}                                               ║");
+            sb.AppendLine($" Execution Mode:        {timeline.ExecutionMode}");
         }
+
         if (timeline.GlobalTimeoutMs.HasValue)
         {
-            sb.AppendLine($"║ Global Timeout: {timeline.GlobalTimeoutMs.Value,10:F1}ms                                               ║");
+            var globalTimeoutStr = $"{timeline.GlobalTimeoutMs.Value:F1}ms";
+            sb.AppendLine($" Global Timeout:        {globalTimeoutStr}");
         }
-        sb.AppendLine("╠══════════════════════════════════════════════════════════════════════════════╣");
 
-        // Timeline header
-        sb.AppendLine("║                                                                              ║");
-        sb.AppendLine("║ SIGNAL TIMELINE (Gantt View)                                                 ║");
-        sb.AppendLine("║                                                                              ║");
+        sb.AppendLine();
+        sb.AppendLine(" SIGNAL TIMELINE (Gantt View)");
+        sb.AppendLine("────────────────────────────────────────────────────────────────────────────────");
 
-        // Scale indicator
-        var scaleWidth = width;
+        // Scale indicator - bar width is 50 chars to match signal bars
+        var barWidth = 50;
         var scaleStep = totalMs / 5;
-        sb.Append("║    ");
-        sb.Append("0".PadRight(scaleWidth / 5));
-        for (int i = 1; i < 5; i++)
+        // Bars start after: emoji (2 display) + space (1) + name (20) + space (1) = 24 chars
+        var barStartOffset = 24;
+        var scaleLine = new System.Text.StringBuilder();
+        scaleLine.Append(new string(' ', barStartOffset));
+        for (int i = 0; i <= 5; i++)
         {
-            sb.Append($"{(scaleStep * i):F0}".PadRight(scaleWidth / 5));
+            var label = $"{(scaleStep * i):F0}";
+            if (i < 5)
+            {
+                scaleLine.Append(label.PadRight(10));
+            }
+            else
+            {
+                scaleLine.Append(label + "ms");
+            }
         }
-        sb.AppendLine($"{totalMs:F0}ms".PadLeft(10) + "      ║");
+        sb.AppendLine(scaleLine.ToString());
 
-        sb.Append("║    ");
-        sb.Append('|');
-        for (int i = 1; i < 5; i++)
+        // Build tick marks
+        var tickLine = new System.Text.StringBuilder();
+        tickLine.Append(new string(' ', barStartOffset));
+        for (int i = 0; i <= 5; i++)
         {
-            sb.Append(new string('-', scaleWidth / 5 - 1) + '|');
+            if (i < 5)
+            {
+                tickLine.Append('|' + new string('-', 9));
+            }
+            else
+            {
+                tickLine.Append('|');
+            }
         }
-        sb.AppendLine(new string('-', scaleWidth / 5 - 1) + "|      ║");
+        sb.AppendLine(tickLine.ToString());
 
         // Events sorted by start time
         var sortedEvents = timeline.Events
@@ -437,66 +460,72 @@ public static class IgnitionTimelineExtensions
                 _ => "❓"
             };
 
-            // Calculate bar position (use cached totalMs check)
-            var startPos = hasDuration ? (int)((e.StartMs / totalMs) * scaleWidth) : 0;
-            var endPos = hasDuration ? (int)((e.EndMs / totalMs) * scaleWidth) : 0;
-            var barLength = Math.Max(1, endPos - startPos);
-
-            // Build the bar
-            var bar = new string(' ', startPos) + new string('█', barLength) + new string(' ', Math.Max(0, scaleWidth - startPos - barLength));
+            var adjustedStartPos = hasDuration ? (int)((e.StartMs / totalMs) * barWidth) : 0;
+            var adjustedEndPos = hasDuration ? (int)((e.EndMs / totalMs) * barWidth) : 0;
+            var adjustedBarLength = Math.Max(1, adjustedEndPos - adjustedStartPos);
+            var bar = new string(' ', adjustedStartPos) + new string('█', adjustedBarLength) + new string(' ', Math.Max(0, barWidth - adjustedStartPos - adjustedBarLength));
 
             var signalName = TruncateSignalName(e.SignalName, 20);
-            sb.AppendLine($"║ {statusIcon} {signalName} [{bar}] {e.DurationMs,7:F0}ms ║");
+            var durationMs = $"{e.DurationMs:F0}ms";
+
+            sb.AppendLine($"{statusIcon} {signalName} {bar} {durationMs}");
         }
 
-        sb.AppendLine("║                                                                              ║");
-        sb.AppendLine("╠══════════════════════════════════════════════════════════════════════════════╣");
-
-        // Summary section
-        sb.AppendLine("║ SUMMARY                                                                      ║");
-        sb.AppendLine("║                                                                              ║");
+        sb.AppendLine();
+        sb.AppendLine("════════════════════════════════════════════════════════════════════════════════");
+        sb.AppendLine(" SUMMARY");
+        sb.AppendLine("────────────────────────────────────────────────────────────────────────────────");
 
         if (timeline.Summary != null)
         {
             var s = timeline.Summary;
-            sb.AppendLine($"║   Total Signals:    {s.TotalSignals,5}                                                  ║");
-            sb.AppendLine($"║   ✅ Succeeded:     {s.SucceededCount,5}                                                  ║");
+            sb.AppendLine($"   Total Signals:       {s.TotalSignals,5}");
+            sb.AppendLine($"   ✅ Succeeded:        {s.SucceededCount,5}");
+
             if (s.FailedCount > 0)
             {
-                sb.AppendLine($"║   ❌ Failed:        {s.FailedCount,5}                                                  ║");
+                sb.AppendLine($"   ❌ Failed:           {s.FailedCount,5}");
             }
+
             if (s.TimedOutCount > 0)
             {
-                sb.AppendLine($"║   ⏰ Timed Out:     {s.TimedOutCount,5}                                                  ║");
+                sb.AppendLine($"   ⏰ Timed Out:        {s.TimedOutCount,5}");
             }
+
             if (s.SkippedCount > 0)
             {
-                sb.AppendLine($"║   ⏭️  Skipped:       {s.SkippedCount,5}                                                  ║");
+                sb.AppendLine($"   ⏭️ Skipped:          {s.SkippedCount,5}");
             }
+
             if (s.CancelledCount > 0)
             {
-                sb.AppendLine($"║   🚫 Cancelled:     {s.CancelledCount,5}                                                  ║");
+                sb.AppendLine($"   🚫 Cancelled:        {s.CancelledCount,5}");
             }
-            sb.AppendLine($"║   Max Concurrency:  {s.MaxConcurrency,5}                                                  ║");
+
+            sb.AppendLine($"   Max Concurrency:     {s.MaxConcurrency,5}");
 
             if (s.SlowestSignal != null)
             {
                 var slowestName = TruncateSignalName(s.SlowestSignal, 20);
-                sb.AppendLine($"║   🐢 Slowest:       {slowestName,-20} ({s.SlowestDurationMs:F0}ms)                ║");
+                var slowestMs = $"{s.SlowestDurationMs:F0}ms";
+                sb.AppendLine($"   Slowest:             {slowestName} ({slowestMs})");
             }
+
             if (s.FastestSignal != null)
             {
                 var fastestName = TruncateSignalName(s.FastestSignal, 20);
-                sb.AppendLine($"║   🚀 Fastest:       {fastestName,-20} ({s.FastestDurationMs:F0}ms)                 ║");
+                var fastestMs = $"{s.FastestDurationMs:F0}ms";
+                sb.AppendLine($"   Fastest:             {fastestName} ({fastestMs})");
             }
+
             if (s.AverageDurationMs.HasValue)
             {
-                sb.AppendLine($"║   📊 Avg Duration:  {s.AverageDurationMs.Value,10:F1}ms                                       ║");
+                var avgStr = $"{s.AverageDurationMs.Value:F1}ms";
+                sb.AppendLine($"   Avg Duration:        {avgStr}");
             }
         }
 
-        sb.AppendLine("║                                                                              ║");
-        sb.AppendLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+        sb.AppendLine("════════════════════════════════════════════════════════════════════════════════");
 
         return sb.ToString();
     }

@@ -138,7 +138,7 @@ public class Program
 
         var startTime = DateTimeOffset.UtcNow;
         var coordinator = host.Services.GetRequiredService<IIgnitionCoordinator>();
-        
+
         await coordinator.WaitAllAsync();
         var result = await coordinator.GetResultAsync();
         var endTime = DateTimeOffset.UtcNow;
@@ -196,7 +196,7 @@ public class Program
             .Build();
 
         var coordinator = host.Services.GetRequiredService<IIgnitionCoordinator>();
-        
+
         await coordinator.WaitAllAsync();
         var result = await coordinator.GetResultAsync();
 
@@ -237,7 +237,7 @@ public class Program
             .Build();
 
         var coordinator = host.Services.GetRequiredService<IIgnitionCoordinator>();
-        
+
         await coordinator.WaitAllAsync();
         var result = await coordinator.GetResultAsync();
 

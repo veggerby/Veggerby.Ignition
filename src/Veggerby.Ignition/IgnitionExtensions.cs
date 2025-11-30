@@ -827,7 +827,7 @@ public static class IgnitionExtensions
                                 return t;
                             }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Unwrap();
                         }
-                        
+
                         _created = true;
                     }
                 }

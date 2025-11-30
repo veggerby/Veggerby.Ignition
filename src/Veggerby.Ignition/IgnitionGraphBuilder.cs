@@ -261,7 +261,7 @@ public sealed class IgnitionGraphBuilder
         {
             Signals = sortedSignals;
             _dependencies = new Dictionary<IIgnitionSignal, HashSet<IIgnitionSignal>>(dependencies);
-            
+
             // Build reverse mapping
             _dependents = [];
             foreach (var signal in Signals)
