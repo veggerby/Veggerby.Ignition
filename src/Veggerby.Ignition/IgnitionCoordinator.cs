@@ -371,7 +371,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         {
             // swallow: results gathered later
         }
-        
+
         return (list, false);
     }
 
@@ -422,7 +422,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         while (true)
         {
             IIgnitionSignal? signalToStart = null;
-            
+
             lock (syncLock)
             {
                 if (readyQueue.Count == 0 && activeTasks.Count == 0)
@@ -494,14 +494,14 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                             FailedDependencies: failedDeps,
                             CancellationReason: cancelReason,
                             CancelledBySignal: cancelledBy);
-                        
+
                         RaiseSignalCompleted(skipResult);
-                        
+
                         lock (syncLock)
                         {
                             completed[signal] = skipResult;
                             skipped.Add(signal);
-                            
+
                             // Mark dependents as ready if all their other dependencies are done
                             foreach (var dependent in _graph.GetDependents(signal))
                             {
@@ -587,7 +587,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                 {
                     anyTask = Task.WhenAny(activeTasks);
                 }
-                
+
                 var completedTask = await Task.WhenAny(anyTask, globalTimeoutTask);
 
                 if (completedTask == globalTimeoutTask)
@@ -609,7 +609,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                         {
                             tasksSnapshot = activeTasks.ToArray();
                         }
-                        
+
                         try
                         {
                             await Task.WhenAll(tasksSnapshot);
@@ -786,7 +786,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         }
     }
 
-    private async Task<List<Task<IgnitionSignalResult>>> StartStageSignalsAsync(
+    private Task<List<Task<IgnitionSignalResult>>> StartStageSignalsAsync(
         List<IIgnitionSignal> signals,
         CancellationTokenSource globalCts,
         SemaphoreSlim? gate,
@@ -817,7 +817,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
 
             stageTasks.Add(task);
         }
-        return stageTasks;
+        return Task.FromResult(stageTasks);
     }
 
     private async Task<StageExecutionResult> ExecuteStageWithEarlyPromotionAsync(

@@ -83,7 +83,7 @@ public sealed class AdaptiveTimeoutStrategy : IIgnitionTimeoutStrategy
 /// <summary>
 /// A category-based timeout strategy that assigns timeouts based on signal type prefixes.
 /// - Database signals (db:*): 5 seconds
-/// - Cache signals (cache:*): 3 seconds  
+/// - Cache signals (cache:*): 3 seconds
 /// - Service signals (svc:*): 2 seconds
 /// - Everything else: signal's own timeout
 /// </summary>
@@ -387,29 +387,30 @@ public class Program
         var result = await coordinator.GetResultAsync();
 
         Console.WriteLine();
-        Console.WriteLine("   ╔══════════════════════════════════════════════════════════════════╗");
-        Console.WriteLine($"   ║ RESULTS                                                          ║");
-        Console.WriteLine("   ╠══════════════════════════════════════════════════════════════════╣");
-        Console.WriteLine($"   ║ Total Duration: {result.TotalDuration.TotalMilliseconds,8:F0}ms                                     ║");
-        Console.WriteLine($"   ║ Timed Out:      {(result.TimedOut ? "YES" : "NO "),-10}                                     ║");
-        Console.WriteLine("   ╠══════════════════════════════════════════════════════════════════╣");
+        Console.WriteLine("   ════════════════════════════════════════════════════════════════════");
+        Console.WriteLine("    RESULTS");
+        Console.WriteLine("   ════════════════════════════════════════════════════════════════════");
+        Console.WriteLine($"    Total Duration: {result.TotalDuration.TotalMilliseconds,8:F0}ms");
+        Console.WriteLine($"    Timed Out:      {(result.TimedOut ? "YES" : "NO ")}");
+        Console.WriteLine("   ────────────────────────────────────────────────────────────────────");
 
         var succeeded = result.Results.Count(r => r.Status == IgnitionSignalStatus.Succeeded);
         var timedOut = result.Results.Count(r => r.Status == IgnitionSignalStatus.TimedOut);
         var failed = result.Results.Count(r => r.Status == IgnitionSignalStatus.Failed);
 
-        Console.WriteLine($"   ║ ✅ Succeeded:    {succeeded}/{result.Results.Count}                                           ║");
+        Console.WriteLine($"    ✅ Succeeded:      {succeeded}/{result.Results.Count}");
         if (timedOut > 0)
         {
-            Console.WriteLine($"   ║ ⏰ Timed Out:    {timedOut}                                               ║");
+            Console.WriteLine($"    ⏰ Timed Out:      {timedOut}");
         }
         if (failed > 0)
         {
-            Console.WriteLine($"   ║ ❌ Failed:       {failed}                                               ║");
+            Console.WriteLine($"    ❌ Failed:         {failed}");
         }
 
-        Console.WriteLine("   ╠══════════════════════════════════════════════════════════════════╣");
-        Console.WriteLine("   ║ Signal Details:                                                  ║");
+        Console.WriteLine("   ────────────────────────────────────────────────────────────────────");
+        Console.WriteLine("    Signal Details:");
+        Console.WriteLine();
 
         foreach (var signalResult in result.Results.OrderBy(r => r.Name))
         {
@@ -423,10 +424,11 @@ public class Program
 
             var paddedName = signalResult.Name.PadRight(25);
             var paddedStatus = signalResult.Status.ToString().PadRight(10);
-            Console.WriteLine($"   ║   {icon} {paddedName} {paddedStatus} ({signalResult.Duration.TotalMilliseconds,6:F0}ms)  ║");
+            Console.WriteLine($"      {icon} {paddedName} {paddedStatus} ({signalResult.Duration.TotalMilliseconds,6:F0}ms)");
         }
 
-        Console.WriteLine("   ╚══════════════════════════════════════════════════════════════════╝");
+        Console.WriteLine();
+        Console.WriteLine("   ════════════════════════════════════════════════════════════════════");
         Console.WriteLine();
     }
 }

@@ -235,7 +235,7 @@ public class Program
                 services.AddIgnitionGraph((builder, sp) =>
                 {
                     var signals = sp.GetServices<IIgnitionSignal>().ToList();
-                    
+
                     var db = signals.First(s => s.Name == "database");
                     var cache = signals.First(s => s.Name == "cache");
                     var config = signals.First(s => s.Name == "configuration");
@@ -243,7 +243,7 @@ public class Program
                     var api = signals.First(s => s.Name == "api");
 
                     builder.AddSignals(signals);
-                    
+
                     // Define dependencies explicitly
                     builder.DependsOn(cache, db);              // Cache depends on Database
                     builder.DependsOn(worker, cache, config);  // Worker depends on Cache AND Configuration
@@ -275,7 +275,7 @@ public class Program
             Console.WriteLine($"\n📊 {exampleName} Results:");
             Console.WriteLine($"   Total Duration: {result.TotalDuration.TotalMilliseconds:F0}ms");
             Console.WriteLine($"   Timed Out: {(result.TimedOut ? "YES" : "NO")}");
-            
+
             var succeeded = result.Results.Count(r => r.Status == IgnitionSignalStatus.Succeeded);
             var failed = result.Results.Count(r => r.Status == IgnitionSignalStatus.Failed);
             var skipped = result.Results.Count(r => r.Status == IgnitionSignalStatus.Skipped);

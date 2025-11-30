@@ -552,7 +552,7 @@ public class IgnitionStateMachineTests
         var startedCount = 0;
         var completedCount = 0;
         var coordinatorCompletedCount = 0;
-        
+
         var s1 = new FakeSignal("s1", _ => Task.CompletedTask);
         var s2 = new FakeSignal("s2", _ => Task.CompletedTask);
         var s3 = new FakeSignal("s3", _ => Task.CompletedTask);
