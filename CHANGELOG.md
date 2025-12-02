@@ -8,16 +8,98 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+- None.
+
+### Changed
+
+- None.
+
+### Fixed
+
+- None.
+
+## [0.3.0] - 2025-12-02
+
+### Added
+
+- **Staged Execution Mode (Multi-Phase Startup Pipeline)**: New `IgnitionExecutionMode.Staged` supporting sequential stages with parallel execution within each stage.
+  - `IStagedIgnitionSignal` interface with `Stage` property for declarative stage assignment
+  - `IgnitionStagePolicy` enum controlling cross-stage transition behavior (`AllSucceeded`, `AnySucceeded`, `BestEffort`)
+  - `IgnitionStageResult` record providing per-stage outcome diagnostics
+  - Configurable stage behavior via `IgnitionOptions.StagePolicy`
+  - Signals without stage info default to Stage 0
+  - Rich stage-level diagnostics in result aggregation
+- **Hierarchical Cancellation Scopes (Structured Cancellation Trees)**: Enhanced cancellation model beyond flat global vs. per-signal.
+  - `ICancellationScope` interface for hierarchical cancellation token management
+  - `CancellationScope` implementation with parent-child relationships
+  - `CancellationReason` enum for tracking cancellation causes
+  - `IScopedIgnitionSignal` interface for signals associated with specific scopes
+  - Support for grouped cancellation semantics:
+    - Cancel entire stage
+    - Cancel all signals dependent on a failed signal
+    - Cancel all signals sharing a bundle or scope
+  - Accurate reporting: "Signal X cancelled due to group cancellation triggered by Y"
+- **State Machine with Event Hooks**: Ignition coordinator now exposes observable lifecycle events.
+  - `IgnitionState` enum representing coordinator state (`NotStarted`, `Running`, `Completed`, `Failed`, `TimedOut`)
+  - `IgnitionEventArgs` event argument types for lifecycle events
+  - Observable events:
+    - `OnSignalStarted` - Fired when a signal begins execution
+    - `OnSignalCompleted` - Fired when a signal finishes (success, failure, or timeout)
+    - `OnGlobalTimeout` - Fired when global timeout elapses
+    - `OnCoordinatorCompleted` - Fired when all signals complete
+  - Thread-safe event publication
+  - Non-blocking event handler execution
+  - Real-time progress tracking support
+- **Timeout Strategy Plugins**: Pluggable timeout determination via `IIgnitionTimeoutStrategy`.
+  - `IIgnitionTimeoutStrategy` interface for custom timeout logic
+  - `DefaultIgnitionTimeoutStrategy` implementation preserving existing behavior
+  - Configurable via `IgnitionOptions.TimeoutStrategy`
+  - Enables:
+    - Exponential scaling based on failure count
+    - Adaptive timeouts (e.g., slow I/O detection)
+    - Dynamic per-stage deadlines
+    - User-defined per-class/per-assembly defaults
+  - Deterministic and thread-safe contract
+- **Metrics Adapter (Zero-Dependency, Pluggable Metrics)**: Structured internal metrics API for observability integration.
+  - `IIgnitionMetrics` interface with methods:
+    - `RecordSignalDuration(name, duration)`
+    - `RecordSignalStatus(name, status)`
+    - `RecordTotalDuration(duration)`
+  - `NullIgnitionMetrics` default no-op implementation (zero overhead)
+  - Configurable via `IgnitionOptions.Metrics`
+  - Users can plug in OpenTelemetry, Prometheus, App Metrics, or custom backends
+  - Thread-safe contract designed for hot-path efficiency
 - **Timeline Export (Gantt-like Output)**: New structured timeline export for startup analysis and visualization.
-  - `ExportTimeline()` extension method on `IgnitionResult` produces `IgnitionTimeline` object with per-signal timing data
+  - `IgnitionTimeline` record with comprehensive timing data
+  - `ExportTimeline()` extension method on `IgnitionResult` produces structured timeline
   - `ExportTimelineJson()` convenience method for direct JSON export
   - `ToConsoleString()` and `WriteToConsole()` methods for Gantt-like ASCII visualization
   - Timeline data includes: signal start/end times, concurrent groups, stage information, boundary markers
   - Summary statistics: slowest/fastest signals, max concurrency, average duration
   - JSON schema v1.0 for forward compatibility with external visualization tools
+  - New `TimelineExport` sample demonstrating all timeline features
 - Extended `IgnitionSignalResult` with `StartedAt` and `CompletedAt` timestamps (backward compatible)
-- Extended `IgnitionResult` with `HasTimelineData` property
-- New `TimelineExport` sample demonstrating all timeline features
+- Extended `IgnitionResult` with `HasTimelineData` property for timeline availability checking
+- Extended `IgnitionOptions` with `StagePolicy`, `TimeoutStrategy`, and `Metrics` properties
+- New samples: `TimelineExport`, `TimeoutStrategies` demonstrating new features
+
+### Changed
+
+- Coordinator internal flow refactored to support state machine transitions and event publication
+- Event hooks added to signal execution lifecycle without breaking existing behavior
+- Metrics recording integrated into hot path with minimal allocation overhead
+- Timeline timestamp capture now mandatory (previously duration-only)
+
+### Fixed
+
+- Improved thread-safety of event publication mechanisms
+- Refined stage transition logic for edge cases (empty stages, all-failed stages)
+
+### Performance
+
+- Metrics integration designed for zero overhead when using default `NullIgnitionMetrics`
+- Event publication uses non-blocking fire-and-forget pattern
+- Timeline data collection optimized for minimal allocation in hot path
 
 ## [0.2.0] - 2025-11-24
 
@@ -94,5 +176,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 - No known security issues.
 
+[0.3.0]: https://github.com/veggerby/Veggerby.Ignition/releases/tag/v0.3.0
 [0.2.0]: https://github.com/veggerby/Veggerby.Ignition/releases/tag/v0.2.0
 [0.1.0]: https://github.com/veggerby/Veggerby.Ignition/releases/tag/v0.1.0
