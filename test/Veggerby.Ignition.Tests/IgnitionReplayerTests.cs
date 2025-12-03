@@ -246,7 +246,7 @@ public class IgnitionReplayerTests
     #region What-If Simulation Tests
 
     [Fact]
-    public void SimulateEarlierTimeout_MarkesSignalAsTimedOut()
+    public void SimulateEarlierTimeout_MarksSignalAsTimedOut()
     {
         // arrange
         var recording = new IgnitionRecording
@@ -353,7 +353,7 @@ public class IgnitionReplayerTests
     }
 
     [Fact]
-    public void SimulateFailure_MarkesSignalAsFailed()
+    public void SimulateFailure_MarksSignalAsFailed()
     {
         // arrange
         var recording = new IgnitionRecording
