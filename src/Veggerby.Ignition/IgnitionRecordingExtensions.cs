@@ -111,13 +111,11 @@ public static class IgnitionRecordingExtensions
             // Try to get stage from stage results if available
             if (result.StageResults is not null)
             {
-                foreach (var stageResult in result.StageResults)
+                var matchingStageResult = result.StageResults
+                    .FirstOrDefault(stageResult => stageResult.Results.Any(sr => sr.Name == r.Name));
+                if (matchingStageResult is not null)
                 {
-                    if (stageResult.Results.Any(sr => sr.Name == r.Name))
-                    {
-                        stage = stageResult.StageNumber;
-                        break;
-                    }
+                    stage = matchingStageResult.StageNumber;
                 }
             }
 

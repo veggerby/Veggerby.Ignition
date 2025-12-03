@@ -195,15 +195,24 @@ public sealed class IgnitionReplayer
         var simulatedSignals = new List<IgnitionRecordedSignal>();
         var affectedSignals = new List<string>();
 
+        // Determine if the signal would time out
+        bool wouldTimeout = signal.DurationMs > newTimeoutMs;
+        if (wouldTimeout)
+        {
+            affectedSignals.Add(signalName);
+        }
+
+        // Build dependency map for transitive dependency checking
+        var dependents = BuildDependentsMap();
+
         foreach (var s in _recording.Signals)
         {
             if (s.SignalName == signalName)
             {
                 // Apply the timeout simulation
-                if (s.DurationMs > newTimeoutMs)
+                if (wouldTimeout)
                 {
                     // Signal would have timed out
-                    affectedSignals.Add(s.SignalName);
                     simulatedSignals.Add(s with
                     {
                         Status = "TimedOut",
@@ -218,9 +227,9 @@ public sealed class IgnitionReplayer
                     simulatedSignals.Add(s);
                 }
             }
-            else if (s.Dependencies?.Contains(signalName) == true && affectedSignals.Contains(signalName))
+            else if (wouldTimeout && WouldBeAffectedByFailure(s.SignalName, signalName, dependents, new HashSet<string>()))
             {
-                // This signal depends on the timed-out signal
+                // This signal would be skipped due to dependency failure (using recursive check)
                 affectedSignals.Add(s.SignalName);
                 simulatedSignals.Add(s with
                 {
@@ -350,13 +359,7 @@ public sealed class IgnitionReplayer
         }
 
         // Find signals only in second recording
-        foreach (var kvp in signals2)
-        {
-            if (!signals1.ContainsKey(kvp.Key))
-            {
-                added.Add(kvp.Key);
-            }
-        }
+        added.AddRange(signals2.Keys.Where(key => !signals1.ContainsKey(key)));
 
         return new RecordingComparisonResult(
             _recording,
@@ -619,15 +622,12 @@ public sealed class IgnitionReplayer
         }
 
         // Check if timeout and actual duration are consistent
-        if (_recording.TimedOut && config.GlobalTimeoutMs > 0)
+        if (_recording.TimedOut && config.GlobalTimeoutMs > 0 && _recording.TotalDurationMs < config.GlobalTimeoutMs - 100) // 100ms tolerance
         {
-            if (_recording.TotalDurationMs < config.GlobalTimeoutMs - 100) // 100ms tolerance
-            {
-                issues.Add(new ReplayValidationIssue(
-                    ReplayValidationSeverity.Warning,
-                    "PREMATURE_TIMEOUT",
-                    $"Recording marked as timed out but total duration ({_recording.TotalDurationMs}ms) is less than global timeout ({config.GlobalTimeoutMs}ms)"));
-            }
+            issues.Add(new ReplayValidationIssue(
+                ReplayValidationSeverity.Warning,
+                "PREMATURE_TIMEOUT",
+                $"Recording marked as timed out but total duration ({_recording.TotalDurationMs}ms) is less than global timeout ({config.GlobalTimeoutMs}ms)"));
         }
     }
 
@@ -650,9 +650,9 @@ public sealed class IgnitionReplayer
 
         foreach (var signal in _recording.Signals)
         {
-            if (actualCounts.ContainsKey(signal.Status))
+            if (actualCounts.TryGetValue(signal.Status, out var count))
             {
-                actualCounts[signal.Status]++;
+                actualCounts[signal.Status] = count + 1;
             }
         }
 
