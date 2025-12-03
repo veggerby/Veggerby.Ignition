@@ -18,6 +18,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 - None.
 
+## [0.3.1] - 2025-12-03
+
+### Added
+
+- **Ignition Replay + Historical Recordings**: Ability to record ignition runs and replay them for diagnostics/testing.
+  - `IgnitionRecording` record for serializable execution records
+  - `IgnitionRecordedSignal` record capturing per-signal timing, dependencies, failures, and cancellation details
+  - `RecordExecution()` extension method on `IgnitionResult` to produce structured recordings
+  - `ExportRecordingJson()` convenience method for JSON serialization
+  - `IgnitionReplayer` class for validating and analyzing recorded executions
+  - Replay validation features:
+    - Timing drift detection (signals completing in unexpected order relative to recording)
+    - Dependency consistency validation
+    - Invariant checking (e.g., all dependencies completed before dependent signals)
+  - JSON schema v1.0 for stable serialization format
+  - New `Replay` sample demonstrating recording and replay features
+- New sample project: `Replay` demonstrating recording, serialization, and replay analysis
+
+### Changed
+
+- **Framework Support**: Added .NET 10.0 target while maintaining .NET 8.0 and .NET 9.0 support
+  - All projects now multi-target `net10.0;net9.0;net8.0`
+- **Dependency Updates**: Updated all Microsoft.Extensions.* packages to version 10.0.x
+- **Package Updates**:
+  - Swashbuckle.AspNetCore updated to 10.0.1
+  - Microsoft.NET.Test.Sdk updated to 18.0.1
+  - xunit updated to 2.9.3
+  - xunit.runner.visualstudio updated to 3.1.5
+  - NSubstitute updated to 5.3.0
+  - AwesomeAssertions updated to 9.3.0
+
 ## [0.3.0] - 2025-12-02
 
 ### Added
@@ -176,6 +207,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 - No known security issues.
 
+[0.3.1]: https://github.com/veggerby/Veggerby.Ignition/releases/tag/v0.3.1
 [0.3.0]: https://github.com/veggerby/Veggerby.Ignition/releases/tag/v0.3.0
 [0.2.0]: https://github.com/veggerby/Veggerby.Ignition/releases/tag/v0.2.0
 [0.1.0]: https://github.com/veggerby/Veggerby.Ignition/releases/tag/v0.1.0
