@@ -130,7 +130,7 @@ var groups = replayer.GetConcurrentGroups();
 └─────────────────────────────────────────────────────────────────────────────┘
 
 📼 RECORDING CAPTURED:
-   Recording ID: a1b2c3d4e5f6
+   Recording ID: a1b2c3d4-e5f6-7890-abcd-ef1234567890
    Recorded At:  2024-01-15T10:30:00Z
    Total Duration: 1250.5ms
    Timed Out: False
@@ -161,7 +161,7 @@ The recording captures:
 ```json
 {
   "schemaVersion": "1.0",
-  "recordingId": "a1b2c3d4e5f6",
+  "recordingId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "recordedAt": "2024-01-15T10:30:00Z",
   "totalDurationMs": 1250.5,
   "timedOut": false,

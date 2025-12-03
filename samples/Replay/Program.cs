@@ -205,7 +205,7 @@ public class Program
         var json = recording.ToJson(indented: true);
         Console.WriteLine("📄 JSON EXPORT (first 600 chars):");
         Console.WriteLine("─".PadRight(60, '─'));
-        Console.WriteLine(json.Length > 600 ? json.Substring(0, 600) + "..." : json);
+        Console.WriteLine(json.Length > 600 ? json[..600] + "..." : json);
         Console.WriteLine();
         Console.WriteLine($"   Full JSON length: {json.Length} characters");
         Console.WriteLine("   Save to file: File.WriteAllText(\"ignition-recording.json\", json)");
