@@ -85,6 +85,23 @@ Demonstrates:
 
 Ideal for debugging slow startup issues, profiling container warmup times, and detecting CI timing regressions.
 
+### [Recording & Replay Console Application](./Replay/)
+
+**Complexity**: Intermediate
+**Type**: Console Application
+**Focus**: Recording, replay, and what-if analysis
+
+Demonstrates:
+
+- Recording ignition runs with full timing and configuration capture
+- Validating recordings for consistency and invariant violations
+- Comparing recordings to detect performance regressions
+- What-if simulations (timeout and failure scenarios)
+- Identifying slow signals and critical path analysis
+- Concurrent group identification and execution order analysis
+
+Ideal for CI regression detection, prod vs dev comparison, failure analysis, capacity planning, and incident post-mortems.
+
 ### [Dependency Graph Console Application](./DependencyGraph/)
 
 **Complexity**: Advanced
@@ -125,7 +142,7 @@ Each sample includes its own README with detailed instructions. To run any sampl
 
 ```bash
 # Navigate to the sample directory
-cd samples/[Simple|Advanced|DependencyGraph|TimelineExport|WebApi]
+cd samples/[Simple|Advanced|DependencyGraph|TimelineExport|Replay|WebApi]
 
 # Run the sample
 dotnet run
@@ -139,8 +156,9 @@ We recommend exploring the samples in this order:
 2. **Explore Bundles** - Understand composable signal packages
 3. **Move to Advanced** - Deep dive into configuration options and policies
 4. **Try TimelineExport** - Visualize and analyze startup timing
-5. **Study DependencyGraph** - Master dependency-aware execution (DAG mode)
-6. **Review WebApi** - See real-world integration patterns
+5. **Try Replay** - Learn recording, replay, and what-if analysis
+6. **Study DependencyGraph** - Master dependency-aware execution (DAG mode)
+7. **Review WebApi** - See real-world integration patterns
 
 ## Key Concepts Demonstrated
 
@@ -175,6 +193,14 @@ We recommend exploring the samples in this order:
 - Console-based Gantt visualization
 - Concurrent group identification
 - Summary statistics
+
+### Recording & Replay
+
+- Recording ignition runs for offline analysis
+- Validating recordings for consistency
+- Comparing recordings (regression detection)
+- What-if simulations (timeout/failure scenarios)
+- Critical path analysis
 
 ### Integration Patterns
 
