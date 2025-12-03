@@ -30,6 +30,7 @@ Veggerby.Ignition is a lightweight, extensible startup readiness ("ignition") co
 - **Event hooks** for signal-level and coordinator-level progress monitoring
 - **Staged execution (multi-phase startup pipeline)** with configurable cross-stage policies
 - **Timeline export** for Gantt-like startup visualization and analysis (`result.ExportTimeline()`)
+- **Recording and replay** for diagnosing startup issues, CI regression detection, and what-if simulations (`result.ExportRecording()`, `IgnitionReplayer`)
 
 📚 **[Full Documentation](docs/README.md)** | 🚀 **[Getting Started Guide](docs/getting-started.md)** | 📖 **[Features Overview](docs/features.md)**
 
@@ -256,6 +257,226 @@ The exported timeline includes:
 - **Container warmup analysis**: Visualize startup sequence in Kubernetes/Docker environments
 - **CI timing regression detection**: Compare timeline exports between builds
 - **Profiling**: Export timeline data for analysis with external visualization tools
+
+## Recording and Replay
+
+Veggerby.Ignition provides comprehensive recording and replay capabilities for diagnosing slow startup, CI regression detection, and offline simulation. Record ignition runs with full timing, dependency, and failure information, then replay them for analysis.
+
+### Recording an Ignition Run
+
+Export a complete recording from any ignition result:
+
+```csharp
+var result = await coordinator.GetResultAsync();
+var options = serviceProvider.GetRequiredService<IOptions<IgnitionOptions>>().Value;
+
+// Export to recording object
+var recording = result.ExportRecording(
+    options: options,
+    metadata: new Dictionary<string, string>
+    {
+        ["environment"] = "production",
+        ["version"] = "1.2.3",
+        ["hostname"] = Environment.MachineName
+    });
+
+// Export directly to JSON
+var json = result.ExportRecordingJson(options: options, indented: true);
+
+// Save to file
+File.WriteAllText($"ignition-{DateTime.UtcNow:yyyy-MM-dd-HHmmss}.json", json);
+```
+
+### Recording Data
+
+The recording captures:
+
+- **Signals**: Name, status, start/end times, duration, stage, dependencies, exception info
+- **Configuration**: Execution mode, policy, timeout settings, parallelism settings
+- **Stages**: Per-stage timing and outcomes when using staged execution
+- **Summary**: Total signals, success/failure counts, slowest/fastest signals, max concurrency
+
+### Replaying and Analyzing Recordings
+
+Use `IgnitionReplayer` to analyze recorded ignition runs:
+
+```csharp
+// Load a recording
+var json = File.ReadAllText("ignition-recording.json");
+var recording = IgnitionRecording.FromJson(json);
+var replayer = new IgnitionReplayer(recording);
+
+// Or create directly from a result
+var replayer = result.ToReplayer(options);
+```
+
+### Validating Recordings
+
+Check recordings for invariant violations and consistency issues:
+
+```csharp
+var validation = replayer.Validate();
+
+if (!validation.IsValid)
+{
+    Console.WriteLine($"Found {validation.ErrorCount} errors and {validation.WarningCount} warnings");
+    
+    foreach (var issue in validation.Issues)
+    {
+        Console.WriteLine($"[{issue.Severity}] {issue.Code}: {issue.Message}");
+        if (issue.SignalName != null)
+            Console.WriteLine($"  Signal: {issue.SignalName}");
+    }
+}
+```
+
+Validation checks include:
+- **Timing validation**: Negative durations, end before start, duration drift
+- **Dependency order**: Signals starting before dependencies complete
+- **Stage execution**: Correct stage ordering and timing
+- **Configuration consistency**: Timeout vs actual duration consistency
+- **Summary accuracy**: Count matches between signals and summary
+
+### What-If Simulations
+
+Simulate scenarios to understand how changes would affect startup:
+
+```csharp
+// Simulate what happens if a signal times out earlier
+var timeoutSim = replayer.SimulateEarlierTimeout("slow-database", newTimeoutMs: 500);
+Console.WriteLine($"Affected signals: {string.Join(", ", timeoutSim.AffectedSignals)}");
+
+foreach (var signal in timeoutSim.SimulatedSignals.Where(s => s.Status != "Succeeded"))
+{
+    Console.WriteLine($"  {signal.SignalName}: {signal.Status}");
+}
+
+// Simulate what happens if a signal fails
+var failureSim = replayer.SimulateFailure("cache-connection");
+Console.WriteLine($"Failure would affect: {string.Join(", ", failureSim.AffectedSignals)}");
+```
+
+### Comparing Recordings
+
+Compare two recordings to detect regressions or differences between environments:
+
+```csharp
+var baseline = IgnitionRecording.FromJson(File.ReadAllText("prod-baseline.json"));
+var current = IgnitionRecording.FromJson(File.ReadAllText("current-run.json"));
+
+var baselineReplayer = new IgnitionReplayer(baseline);
+var comparison = baselineReplayer.CompareTo(current);
+
+Console.WriteLine($"Total duration change: {comparison.DurationDifferenceMs:F0}ms ({comparison.DurationChangePercent:+0.0;-0.0}%)");
+
+if (comparison.AddedSignals.Count > 0)
+    Console.WriteLine($"New signals: {string.Join(", ", comparison.AddedSignals)}");
+
+if (comparison.RemovedSignals.Count > 0)
+    Console.WriteLine($"Removed signals: {string.Join(", ", comparison.RemovedSignals)}");
+
+// Find signals with status changes
+var statusChanges = comparison.SignalComparisons.Where(c => c.StatusChanged);
+foreach (var change in statusChanges)
+{
+    Console.WriteLine($"  {change.SignalName}: {change.Status1} -> {change.Status2}");
+}
+
+// Find signals that got significantly slower
+var slowdowns = comparison.SignalComparisons.Where(c => c.DurationChangePercent > 20);
+foreach (var slow in slowdowns.OrderByDescending(c => c.DurationChangePercent))
+{
+    Console.WriteLine($"  {slow.SignalName}: +{slow.DurationDifferenceMs:F0}ms ({slow.DurationChangePercent:+0}%)");
+}
+```
+
+### Analysis Methods
+
+Additional analysis capabilities:
+
+```csharp
+// Find slow signals (above threshold)
+var slowSignals = replayer.IdentifySlowSignals(minDurationMs: 100);
+foreach (var slow in slowSignals)
+{
+    Console.WriteLine($"Slow: {slow.SignalName} ({slow.DurationMs:F0}ms)");
+}
+
+// Find signals on the critical path (blocking total duration)
+var criticalPath = replayer.IdentifyCriticalPath();
+Console.WriteLine($"Critical path: {string.Join(" -> ", criticalPath.Select(s => s.SignalName))}");
+
+// Get execution order
+var order = replayer.GetExecutionOrder();
+Console.WriteLine($"Execution order: {string.Join(", ", order)}");
+
+// Find concurrent groups
+var groups = replayer.GetConcurrentGroups();
+Console.WriteLine($"Found {groups.Count} concurrent groups");
+foreach (var group in groups)
+{
+    Console.WriteLine($"  Parallel: {string.Join(", ", group)}");
+}
+```
+
+### Recording JSON Schema (v1.0)
+
+```json
+{
+  "schemaVersion": "1.0",
+  "recordingId": "a1b2c3d4e5f6",
+  "recordedAt": "2024-01-15T10:30:00Z",
+  "totalDurationMs": 1250.5,
+  "timedOut": false,
+  "finalState": "Completed",
+  "configuration": {
+    "executionMode": "Parallel",
+    "policy": "BestEffort",
+    "globalTimeoutMs": 30000,
+    "cancelOnGlobalTimeout": false,
+    "cancelIndividualOnTimeout": true
+  },
+  "signals": [
+    {
+      "signalName": "db-connection",
+      "status": "Succeeded",
+      "startMs": 0,
+      "endMs": 150.2,
+      "durationMs": 150.2,
+      "configuredTimeoutMs": 10000
+    },
+    {
+      "signalName": "cache-warmup",
+      "status": "Failed",
+      "startMs": 0,
+      "endMs": 500,
+      "durationMs": 500,
+      "exceptionType": "System.TimeoutException",
+      "exceptionMessage": "Connection timed out"
+    }
+  ],
+  "summary": {
+    "totalSignals": 2,
+    "succeededCount": 1,
+    "failedCount": 1,
+    "maxConcurrency": 2,
+    "slowestSignalName": "cache-warmup",
+    "slowestDurationMs": 500
+  },
+  "metadata": {
+    "environment": "production",
+    "version": "1.2.3"
+  }
+}
+```
+
+### Use Cases
+
+- **Prod vs Dev Comparison**: Record startup in production and development, compare to identify environment-specific slowdowns
+- **CI Regression Detection**: Save baseline recordings, compare against new builds to catch startup performance regressions
+- **Failure Analysis**: Simulate failures to understand dependency chains and cascading effects
+- **Capacity Planning**: Analyze critical path to identify optimization opportunities
+- **Incident Post-Mortems**: Record and replay startup issues for offline analysis
 
 ## Health Check
 
