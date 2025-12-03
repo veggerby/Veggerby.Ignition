@@ -35,7 +35,7 @@ Docs: Inline XML documentation; root `README.md` (usage, semantics). Add or upda
 
 ## Libraries & Frameworks
 
-* .NET (C#) targeting current LTS / latest (net9.0 currently).
+* .NET (C#) targeting current LTS / latest (net10.0 currently).
 * Microsoft.Extensions.* (Logging, Options, DependencyInjection, Diagnostics.HealthChecks).
 * xUnit + AwesomeAssertions + NSubstitute for testing.
 * No other runtime dependencies (keep surface minimal).

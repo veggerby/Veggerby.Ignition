@@ -378,7 +378,7 @@ options.MaxDegreeOfParallelism = Environment.ProcessorCount + 2;
 
 ```csharp
 [MemoryDiagnoser]
-[SimpleJob(RuntimeMoniker.Net90)]
+[SimpleJob(RuntimeMoniker.net100)]
 public class StartupBenchmarks
 {
     private IServiceProvider _serviceProvider;
