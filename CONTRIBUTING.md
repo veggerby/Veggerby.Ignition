@@ -50,7 +50,7 @@ Please follow these basic guidelines to keep everything smooth:
 ## 🛠 Local Setup
 
 - Clone the repository.
-- Build the solution (`Veggerby.Ignition.sln`) using .NET 9 or later.
+- Build the solution (`Veggerby.Ignition.sln`) using .NET 10 or later.
 - Run the tests (`Veggerby.Ignition.Tests`) to ensure everything passes before you push.
 
 ```bash

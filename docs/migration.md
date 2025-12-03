@@ -11,7 +11,7 @@ Latest stable version: **1.0.0** (check [NuGet](https://www.nuget.org/packages/V
 ### Version Compatibility
 
 - .NET 8.0+
-- .NET 9.0+
+- .NET 10.0+
 
 ## Upgrading to v1.0.0
 
