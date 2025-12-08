@@ -85,8 +85,8 @@ builder.Services.AddIgnition(options =>
 });
 
 // Register your readiness signals
-builder.Services.AddTransient<IIgnitionSignal, DatabaseConnectionSignal>();
-builder.Services.AddTransient<IIgnitionSignal, MessageQueueConnectionSignal>();
+builder.Services.AddIgnitionSignal<DatabaseConnectionSignal>();
+builder.Services.AddIgnitionSignal<MessageQueueConnectionSignal>();
 
 // Register background workers
 builder.Services.AddSingleton<MyWorkerService>();
