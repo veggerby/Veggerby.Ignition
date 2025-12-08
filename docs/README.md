@@ -18,6 +18,13 @@ Welcome to the comprehensive documentation for Veggerby.Ignition, a lightweight 
   - ASP.NET Core integration
   - Basic troubleshooting
 
+- [Integration Recipes](integration-recipes.md)
+  - Copy-paste-ready patterns for ASP.NET Core Web API
+  - Generic Host / Worker Service integration with IHostedService
+  - Console application patterns
+  - Production deployment checklists
+  - Kubernetes integration examples
+
 ### Execution Strategies
 
 - [Dependency-Aware Execution (DAG)](dependency-aware-execution.md)

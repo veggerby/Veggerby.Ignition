@@ -1101,6 +1101,7 @@ Individual signal timeouts (via `IIgnitionSignal.Timeout`) override bundle defau
 ### Core Guides
 
 - 📖 **[Getting Started](docs/getting-started.md)** - Installation, first signal, common patterns, ASP.NET Core integration
+- 🎨 **[Integration Recipes](docs/integration-recipes.md)** - Copy-paste-ready patterns for Web API, Worker, and Console hosting
 - 🔀 **[Dependency-Aware Execution](docs/dependency-aware-execution.md)** - DAG mode, topological sort, cycle detection
 - ⏱ **[Timeout Management](docs/timeout-management.md)** - Two-layer timeouts, soft vs hard semantics, classification matrix
 - 📦 **[Bundles](docs/bundles.md)** - Reusable signal packages, built-in bundles, custom bundle creation
@@ -1122,6 +1123,7 @@ Individual signal timeouts (via `IIgnitionSignal.Timeout`) override bundle defau
 - [DependencyGraph](samples/DependencyGraph/README.md) - DAG execution
 - [Bundles](samples/Bundles/README.md) - Bundle usage
 - [WebApi](samples/WebApi/README.md) - ASP.NET Core integration
+- [Worker](samples/Worker/README.md) - Generic Host / Worker Service integration
 
 ## License
 
