@@ -7,6 +7,46 @@
 
 Veggerby.Ignition is a lightweight, extensible startup readiness ("ignition") coordination library for .NET applications. Register ignition signals representing asynchronous initialization tasks (cache warmers, external connections, background services) and await them collectively with rich diagnostics, configurable policies, timeouts, tracing, and health checks.
 
+## Simple Mode (Recommended for Most Apps)
+
+For 80-90% of use cases, use the **Simple Mode API** to get production-ready startup coordination in fewer than 10 lines:
+
+```csharp
+// Web API Application
+builder.Services.AddSimpleIgnition(ignition => ignition
+    .UseWebApiProfile()
+    .AddSignal("database", async ct => await db.ConnectAsync(ct))
+    .AddSignal("cache", async ct => await cache.WarmAsync(ct))
+    .AddSignal("external-api", async ct => await api.HealthCheckAsync(ct)));
+
+var app = builder.Build();
+await app.Services.GetRequiredService<IIgnitionCoordinator>().WaitAllAsync();
+```
+
+**Pre-configured Profiles:**
+
+- **`.UseWebApiProfile()`**: 30s timeout, BestEffort policy, Parallel execution, Tracing enabled
+- **`.UseWorkerProfile()`**: 60s timeout, FailFast policy, Parallel execution, Tracing enabled
+- **`.UseCliProfile()`**: 15s timeout, FailFast policy, Sequential execution, Tracing disabled
+
+**Customization:** Override any profile defaults or access advanced features:
+
+```csharp
+services.AddSimpleIgnition(ignition => ignition
+    .UseWebApiProfile()
+    .WithGlobalTimeout(TimeSpan.FromSeconds(45))
+    .WithDefaultSignalTimeout(TimeSpan.FromSeconds(15))
+    .WithTracing(false)
+    .AddSignal("my-signal", ...)
+    .ConfigureAdvanced(options =>
+    {
+        options.MaxDegreeOfParallelism = 5;
+        options.CancelOnGlobalTimeout = true;
+    }));
+```
+
+📚 **[Simple Mode Sample](samples/SimpleMode/README.md)** | 🚀 **[Full API Documentation](#quick-start)**
+
 ## Features
 
 - Simple `IIgnitionSignal` abstraction (name, optional timeout, `WaitAsync`)
