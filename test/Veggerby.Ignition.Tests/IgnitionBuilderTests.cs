@@ -25,7 +25,7 @@ public class IgnitionBuilderTests
     }
 
     [Fact]
-    public async Task AddSimpleIgnition_WithWebApiProfile_AppliesCorrectDefaults()
+    public void AddSimpleIgnition_WithWebApiProfile_AppliesCorrectDefaults()
     {
         // arrange
         var services = CreateServicesWithLogging();
@@ -49,7 +49,7 @@ public class IgnitionBuilderTests
     }
 
     [Fact]
-    public async Task AddSimpleIgnition_WithWorkerProfile_AppliesCorrectDefaults()
+    public void AddSimpleIgnition_WithWorkerProfile_AppliesCorrectDefaults()
     {
         // arrange
         var services = CreateServicesWithLogging();
@@ -70,7 +70,7 @@ public class IgnitionBuilderTests
     }
 
     [Fact]
-    public async Task AddSimpleIgnition_WithCliProfile_AppliesCorrectDefaults()
+    public void AddSimpleIgnition_WithCliProfile_AppliesCorrectDefaults()
     {
         // arrange
         var services = CreateServicesWithLogging();
@@ -127,7 +127,7 @@ public class IgnitionBuilderTests
     }
 
     [Fact]
-    public async Task AddSimpleIgnition_WithCustomTimeout_OverridesProfileDefaults()
+    public void AddSimpleIgnition_WithCustomTimeout_OverridesProfileDefaults()
     {
         // arrange
         var services = CreateServicesWithLogging();
@@ -146,7 +146,7 @@ public class IgnitionBuilderTests
     }
 
     [Fact]
-    public async Task AddSimpleIgnition_WithTracingDisabled_SetsTracingToFalse()
+    public void AddSimpleIgnition_WithTracingDisabled_SetsTracingToFalse()
     {
         // arrange
         var services = CreateServicesWithLogging();
@@ -165,7 +165,7 @@ public class IgnitionBuilderTests
     }
 
     [Fact]
-    public async Task AddSimpleIgnition_WithAdvancedConfiguration_AppliesCustomSettings()
+    public void AddSimpleIgnition_WithAdvancedConfiguration_AppliesCustomSettings()
     {
         // arrange
         var services = CreateServicesWithLogging();
@@ -258,7 +258,7 @@ public class IgnitionBuilderTests
     }
 
     [Fact]
-    public async Task AddSimpleIgnition_WithPerSignalTimeout_AppliesTimeout()
+    public void AddSimpleIgnition_WithPerSignalTimeout_AppliesTimeout()
     {
         // arrange
         var services = CreateServicesWithLogging();
@@ -277,7 +277,7 @@ public class IgnitionBuilderTests
     }
 
     [Fact]
-    public async Task AddSimpleIgnition_WithDefaultSignalTimeout_AppliesDefaultToSignalsWithoutExplicitTimeout()
+    public void AddSimpleIgnition_WithDefaultSignalTimeout_AppliesDefaultToSignalsWithoutExplicitTimeout()
     {
         // arrange
         var services = CreateServicesWithLogging();
@@ -336,7 +336,7 @@ public class IgnitionBuilderTests
     }
 
     [Fact]
-    public async Task AddSimpleIgnition_NoProfile_UsesDefaultSettings()
+    public void AddSimpleIgnition_NoProfile_UsesDefaultSettings()
     {
         // arrange
         var services = CreateServicesWithLogging();
