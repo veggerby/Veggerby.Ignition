@@ -8,7 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
-- None.
+- **Simple Mode API (Opinionated Startup Facade)**: New minimal-configuration API for 80-90% of use cases.
+  - `IIgnitionBuilder` fluent builder interface with single entry point
+  - `AddSimpleIgnition()` extension method for streamlined configuration
+  - Pre-configured profiles for common application types:
+    - `.UseWebApiProfile()`: 30s timeout, BestEffort policy, Parallel execution, Tracing enabled
+    - `.UseWorkerProfile()`: 60s timeout, FailFast policy, Parallel execution, Tracing enabled
+    - `.UseCliProfile()`: 15s timeout, FailFast policy, Sequential execution, Tracing disabled
+  - Fluent signal registration: `.AddSignal(name, factory)`, `.AddSignal<TSignal>()`
+  - Override capabilities: `.WithGlobalTimeout()`, `.WithDefaultSignalTimeout()`, `.WithTracing()`
+  - Advanced feature access via `.ConfigureAdvanced(options => ...)` for power users
+  - Production-ready setup in fewer than 10 lines of code
+  - Full backward compatibility with existing `AddIgnition()` API
+  - New `SimpleMode` sample demonstrating all profiles and customization options
 
 ### Changed
 

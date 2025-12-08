@@ -1080,4 +1080,43 @@ public static class IgnitionExtensions
         public Task WaitAsync(CancellationToken cancellationToken = default)
             => _inner.WaitAsync(cancellationToken);
     }
+
+    /// <summary>
+    /// Registers ignition services using the simplified builder API with sensible defaults.
+    /// This is the recommended entry point for most applications.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="configure">Configuration delegate for the fluent builder.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// The Simple Mode API provides an opinionated, minimal-configuration experience for 80-90% of use cases.
+    /// It automatically applies sensible defaults and allows optional profiles for common application types.
+    /// </para>
+    /// <para>
+    /// Example usage:
+    /// <code>
+    /// services.AddSimpleIgnition(ignition => ignition
+    ///     .UseWebApiProfile()
+    ///     .AddSignal("database", async ct => await db.ConnectAsync(ct))
+    ///     .AddSignal("cache", async ct => await cache.WarmAsync(ct)));
+    /// </code>
+    /// </para>
+    /// <para>
+    /// For advanced scenarios (DAG execution, custom timeout strategies, staged execution),
+    /// use <see cref="AddIgnition"/> or the <see cref="IIgnitionBuilder.ConfigureAdvanced"/> method.
+    /// </para>
+    /// </remarks>
+    public static IServiceCollection AddSimpleIgnition(
+        this IServiceCollection services,
+        Action<IIgnitionBuilder> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+
+        var builder = new IgnitionBuilder(services);
+        configure(builder);
+        builder.Build();
+
+        return services;
+    }
 }
