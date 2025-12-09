@@ -3,6 +3,8 @@
 This guide will help you get up and running with Veggerby.Ignition, a lightweight startup readiness
 coordination library for .NET applications.
 
+> 💡 **Looking for ready-to-use patterns?** Check out the **[Integration Recipes](integration-recipes.md)** for copy-paste-ready code for ASP.NET Core Web APIs, Generic Host Workers, and Console applications.
+
 ## What is Veggerby.Ignition?
 
 Veggerby.Ignition coordinates asynchronous startup tasks (called "signals") in your application. It ensures

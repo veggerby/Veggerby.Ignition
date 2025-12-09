@@ -136,6 +136,23 @@ Demonstrates:
 
 Best for understanding how to integrate Ignition in production web applications.
 
+### [Worker Service Application](./Worker/)
+
+**Complexity**: Advanced
+**Type**: Generic Host / Worker Service
+**Focus**: Background worker integration patterns
+
+Demonstrates:
+
+- Generic Host integration with IHostedService blocking pattern
+- Worker readiness coordination using TaskCompletionSource
+- Startup blocking behavior (host doesn't reach "running" until ready)
+- FailFast policy for worker scenarios
+- Real-world worker signals (message queue, database, distributed cache)
+- Background service readiness integration
+
+Best for understanding how to integrate Ignition in background workers and long-running services.
+
 ## Quick Start
 
 Each sample includes its own README with detailed instructions. To run any sample:
@@ -158,7 +175,8 @@ We recommend exploring the samples in this order:
 4. **Try TimelineExport** - Visualize and analyze startup timing
 5. **Try Replay** - Learn recording, replay, and what-if analysis
 6. **Study DependencyGraph** - Master dependency-aware execution (DAG mode)
-7. **Review WebApi** - See real-world integration patterns
+7. **Review WebApi** - See real-world web application integration patterns
+8. **Review Worker** - See real-world background worker integration patterns
 
 ## Key Concepts Demonstrated
 
