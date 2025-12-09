@@ -8,6 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+- None.
+
+### Changed
+
+- None.
+
+### Fixed
+
+- None.
+
+## [0.4.0] - 2025-12-09
+
+### Added
+
 - **Simple Mode API (Opinionated Startup Facade)**: New minimal-configuration API for 80-90% of use cases.
   - `IIgnitionBuilder` fluent builder interface with single entry point
   - `AddSimpleIgnition()` extension method for streamlined configuration
@@ -24,7 +38,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Changed
 
-- None.
+- **Package Restructuring**: Reorganized source files into logical folders with updated namespaces for improved code organization and discoverability.
+  - **Core/** (`Veggerby.Ignition`): Essential startup coordination (interfaces, coordinator, builder, options, policies, results)
+  - **Graph/** (`Veggerby.Ignition`): Dependency-aware execution (DAG builder, graph interface, dependency attributes)
+  - **Stages/** (`Veggerby.Ignition.Stages`): Multi-phase execution (staged signals, stage policies, stage results)
+  - **Diagnostics/** (`Veggerby.Ignition.Diagnostics`): Recording, replay, and timeline export functionality
+  - **HealthChecks/** (`Veggerby.Ignition.HealthChecks`): ASP.NET health check integration
+  - **Metrics/** (`Veggerby.Ignition.Metrics`): Observability and metrics interfaces
+  - **Extensions/** (`Veggerby.Ignition`): Extension points (bundles, timeout strategies, DI extensions, helpers)
+  - **Bundles/** (`Veggerby.Ignition.Bundles`): Built-in bundle implementations
+  - **BREAKING**: Namespace changes for specialized functionality:
+    - `Veggerby.Ignition.Diagnostics`: Timeline, Recording, and Replay types (add `using Veggerby.Ignition.Diagnostics;`)
+    - `Veggerby.Ignition.Stages`: Staged execution types like `IStagedIgnitionSignal`, `IgnitionStagePolicy`, `IgnitionStageResult`
+    - `Veggerby.Ignition.Bundles`: Bundle implementations like `DatabaseTrioBundle`, `HttpDependencyBundle`
+    - `Veggerby.Ignition.Metrics`: Metrics interfaces like `IIgnitionMetrics`
+    - `Veggerby.Ignition.HealthChecks`: Internal health check implementation (not typically referenced by users)
+  - Core types remain in `Veggerby.Ignition` namespace (backward compatible)
 
 ### Fixed
 

@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Logging;
-
 using Veggerby.Ignition;
 
 namespace Worker.Signals;
