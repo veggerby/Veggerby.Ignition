@@ -6,6 +6,7 @@ Welcome to the comprehensive documentation for Veggerby.Ignition, a lightweight 
 
 - [Getting Started](getting-started.md) - Installation and first steps
 - [Features Overview](features.md) - Complete feature reference
+- **[Cookbook](cookbook.md)** - **Battle-tested recipes for real startup problems**
 
 ## Core Guides
 
@@ -17,6 +18,18 @@ Welcome to the comprehensive documentation for Veggerby.Ignition, a lightweight 
   - Common patterns and use cases
   - ASP.NET Core integration
   - Basic troubleshooting
+
+- **[Cookbook](cookbook.md)** - **Battle-tested recipes and architecture patterns**
+  - External dependency readiness (multi-stage warmup)
+  - Cache warmup strategies
+  - Background worker orchestration
+  - Kubernetes readiness & liveness probes
+  - Multi-stage startup pipelines
+  - Recording/replay for production diagnosis
+  - OpenTelemetry metrics integration
+  - DAG vs Stages decision guide
+  - Graceful degradation patterns
+  - Testing startup sequences
 
 - [Integration Recipes](integration-recipes.md)
   - Copy-paste-ready patterns for ASP.NET Core Web API
