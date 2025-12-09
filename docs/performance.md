@@ -2,6 +2,8 @@
 
 This guide covers performance characteristics, optimization techniques, and tuning recommendations for Veggerby.Ignition.
 
+> 💡 **See Also**: [Performance Contract](performance-contract.md) for official performance guarantees, benchmarks, and determinism guarantees.
+
 ## Performance Characteristics
 
 ### Execution Mode Performance
@@ -517,6 +519,7 @@ More CPU/memory improves:
 
 ## Related Topics
 
+- [Performance Contract](performance-contract.md) - Official performance guarantees and benchmarks
 - [Getting Started](getting-started.md) - Basic configuration
 - [Dependency-Aware Execution](dependency-aware-execution.md) - DAG performance
 - [Timeout Management](timeout-management.md) - Timeout tuning
