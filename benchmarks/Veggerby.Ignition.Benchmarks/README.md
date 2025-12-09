@@ -38,6 +38,30 @@ Compares different execution modes (Parallel vs Sequential) with varying signal 
 - `ExecutionMode`: Parallel, Sequential
 - `SignalDelayMs`: 10ms (simulated work)
 
+### DependencyAwareExecutionBenchmarks
+Evaluates DAG execution performance with dependency chains.
+
+**Key Metrics:**
+- Graph construction overhead
+- Parallel execution within independent chains
+- Scaling with signal count
+
+**Parameters:**
+- `SignalCount`: 10, 50, 100
+- Graph structure: Independent chains of 10 signals each
+
+### StagedExecutionBenchmarks
+Measures staged (multi-phase) execution performance.
+
+**Key Metrics:**
+- Stage transition overhead
+- Parallel execution within stages
+- Scaling with stage count
+
+**Parameters:**
+- `StageCount`: 2, 5, 10
+- `SignalsPerStage`: 10
+
 ### ObservabilityOverheadBenchmarks
 Measures overhead introduced by tracing and metrics collection.
 
