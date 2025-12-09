@@ -259,9 +259,9 @@ builder.Services.AddIgnition(options =>
 });
 
 // Register startup readiness signals
-builder.Services.AddTransient<IIgnitionSignal, DatabaseConnectionSignal>();
-builder.Services.AddTransient<IIgnitionSignal, MessageQueueConnectionSignal>();
-builder.Services.AddTransient<IIgnitionSignal, DistributedCacheSignal>();
+builder.Services.AddIgnitionSignal<DatabaseConnectionSignal>();
+builder.Services.AddIgnitionSignal<MessageQueueConnectionSignal>();
+builder.Services.AddIgnitionSignal<DistributedCacheSignal>();
 
 // Register background worker
 builder.Services.AddSingleton<MessageProcessorWorker>();
@@ -436,8 +436,8 @@ var host = Host.CreateDefaultBuilder(args)
         });
 
         // Register signals
-        services.AddTransient<IIgnitionSignal, ConfigLoadSignal>();
-        services.AddTransient<IIgnitionSignal, DatabaseConnectionSignal>();
+        services.AddIgnitionSignal<ConfigLoadSignal>();
+        services.AddIgnitionSignal<DatabaseConnectionSignal>();
     })
     .Build();
 
