@@ -1101,6 +1101,7 @@ Individual signal timeouts (via `IIgnitionSignal.Timeout`) override bundle defau
 ### Core Guides
 
 - 📖 **[Getting Started](docs/getting-started.md)** - Installation, first signal, common patterns, ASP.NET Core integration
+- 👨‍🍳 **[Cookbook](docs/cookbook.md)** - **Battle-tested recipes for real startup problems** (external dependencies, cache warmup, Kubernetes, OpenTelemetry, DAG vs Stages)
 - 🎨 **[Integration Recipes](docs/integration-recipes.md)** - Copy-paste-ready patterns for Web API, Worker, and Console hosting
 - 🔀 **[Dependency-Aware Execution](docs/dependency-aware-execution.md)** - DAG mode, topological sort, cycle detection
 - ⏱ **[Timeout Management](docs/timeout-management.md)** - Two-layer timeouts, soft vs hard semantics, classification matrix
