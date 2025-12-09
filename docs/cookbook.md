@@ -53,67 +53,26 @@ builder.Services.AddIgnition(options =>
 });
 
 // Stage 0: Infrastructure (databases connect in parallel)
-builder.Services.AddIgnitionFromTaskWithStage(
-    "sql-connection",
-    async ct =>
-    {
-        var db = builder.Services.BuildServiceProvider()
-            .GetRequiredService<SqlConnection>();
-        await db.OpenAsync(ct);
-        Console.WriteLine("SQL connected");
-    },
-    stage: 0,
-    timeout: TimeSpan.FromSeconds(15));
+// Production note: Create dedicated IStagedIgnitionSignal classes with constructor injection
+// for better testability and to avoid service locator anti-pattern. See Recipe 3 for examples.
+builder.Services.AddSingleton<IIgnitionSignal>(sp => new DatabaseConnectionStageSignal(
+    sp.GetRequiredService<SqlConnection>(), stage: 0));
 
-builder.Services.AddIgnitionFromTaskWithStage(
-    "redis-connection",
-    async ct =>
-    {
-        var redis = builder.Services.BuildServiceProvider()
-            .GetRequiredService<IConnectionMultiplexer>();
-        await redis.GetDatabase().PingAsync();
-        Console.WriteLine("Redis connected");
-    },
-    stage: 0,
-    timeout: TimeSpan.FromSeconds(10));
+builder.Services.AddSingleton<IIgnitionSignal>(sp => new RedisConnectionStageSignal(
+    sp.GetRequiredService<IConnectionMultiplexer>(), stage: 0));
 
 // Stage 1: Cache warmup (executes after Stage 0 completes)
-builder.Services.AddIgnitionFromTaskWithStage(
-    "user-cache-warmup",
-    async ct =>
-    {
-        var cache = builder.Services.BuildServiceProvider()
-            .GetRequiredService<IUserCache>();
-        await cache.WarmupAsync(ct);
-        Console.WriteLine("User cache warmed");
-    },
-    stage: 1,
-    timeout: TimeSpan.FromSeconds(20));
+builder.Services.AddSingleton<IIgnitionSignal>(sp => new CacheWarmupStageSignal(
+    sp.GetRequiredService<IUserCache>(), "user-cache-warmup", stage: 1));
 
-builder.Services.AddIgnitionFromTaskWithStage(
-    "product-cache-warmup",
-    async ct =>
-    {
-        var cache = builder.Services.BuildServiceProvider()
-            .GetRequiredService<IProductCache>();
-        await cache.WarmupAsync(ct);
-        Console.WriteLine("Product cache warmed");
-    },
-    stage: 1,
-    timeout: TimeSpan.FromSeconds(20));
+builder.Services.AddSingleton<IIgnitionSignal>(sp => new CacheWarmupStageSignal(
+    sp.GetRequiredService<IProductCache>(), "product-cache-warmup", stage: 1));
 
 // Stage 2: Search index building (executes after Stage 1 completes)
-builder.Services.AddIgnitionFromTaskWithStage(
-    "elasticsearch-index",
-    async ct =>
-    {
-        var elastic = builder.Services.BuildServiceProvider()
-            .GetRequiredService<IElasticClient>();
-        await elastic.Indices.RefreshAsync(ct: ct);
-        Console.WriteLine("Elasticsearch index refreshed");
-    },
-    stage: 2,
-    timeout: TimeSpan.FromSeconds(30));
+builder.Services.AddSingleton<IIgnitionSignal>(sp => new ElasticsearchIndexStageSignal(
+    sp.GetRequiredService<IElasticClient>(), stage: 2));
+
+// Note: Signal class implementations shown in Getting Started guide
 
 var app = builder.Build();
 
