@@ -465,6 +465,7 @@ spec:
             port: 8080
           initialDelaySeconds: 0
           periodSeconds: 5
+          timeoutSeconds: 3
           failureThreshold: 12  # 12 * 5s = 60s max startup time
         
         # Readiness probe: Check if app can accept traffic
@@ -474,6 +475,7 @@ spec:
             port: 8080
           initialDelaySeconds: 0
           periodSeconds: 10
+          timeoutSeconds: 3
           failureThreshold: 3
         
         # Liveness probe: Check if app is still responsive
@@ -483,6 +485,7 @@ spec:
             port: 8080
           initialDelaySeconds: 10
           periodSeconds: 30
+          timeoutSeconds: 5
           failureThreshold: 3
 ```
 
@@ -698,7 +701,7 @@ var recording = result.ExportRecording(
 var json = result.ExportRecordingJson(options: options, indented: true);
 
 // Save to blob storage or logging system
-await File.WriteTextAsync($"/logs/ignition-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json", json);
+await File.WriteAllTextAsync($"/logs/ignition-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json", json, Encoding.UTF8);
 Console.WriteLine($"Recording saved: {recording.RecordingId}");
 ```
 
@@ -706,7 +709,7 @@ Console.WriteLine($"Recording saved: {recording.RecordingId}");
 
 ```csharp
 // Load recording from file or blob storage
-var json = await File.ReadAllTextAsync("ignition-20250109-103000.json");
+var json = await File.ReadAllTextAsync("ignition-20250109-103000.json", Encoding.UTF8);
 var recording = IgnitionRecording.FromJson(json);
 var replayer = new IgnitionReplayer(recording);
 
@@ -744,11 +747,11 @@ Console.WriteLine($"\n📋 Execution order: {string.Join(", ", order)}");
 ```csharp
 // Load baseline (previous production run)
 var baseline = IgnitionRecording.FromJson(
-    await File.ReadAllTextAsync("baseline-prod-20250108.json"));
+    await File.ReadAllTextAsync("baseline-prod-20250108.json", Encoding.UTF8));
 
 // Load current run
 var current = IgnitionRecording.FromJson(
-    await File.ReadAllTextAsync("current-prod-20250109.json"));
+    await File.ReadAllTextAsync("current-prod-20250109.json", Encoding.UTF8));
 
 var baselineReplayer = new IgnitionReplayer(baseline);
 var comparison = baselineReplayer.CompareTo(current);
