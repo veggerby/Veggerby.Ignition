@@ -279,6 +279,8 @@ Your application has multiple `BackgroundService` workers (message consumers, jo
 
 #### Pattern A: Using TaskCompletionSource in BackgroundService
 
+**Note**: This pattern uses Veggerby.Ignition's `Ignited()` and `IgnitionFailed()` extension methods for `TaskCompletionSource`. These provide semantic sugar for `SetResult()` and `SetException()`.
+
 ```csharp
 public class MessageConsumerWorker : BackgroundService
 {
@@ -286,7 +288,7 @@ public class MessageConsumerWorker : BackgroundService
     private readonly TaskCompletionSource _readyTcs = new();
     private readonly ILogger<MessageConsumerWorker> _logger;
 
-    public Task ReadyTask => _readyTcs.Task;
+    public Task ReadyTask => _readyTcs.Task; // Exposed for Ignition coordination
 
     public MessageConsumerWorker(IMessageQueue queue, ILogger<MessageConsumerWorker> logger)
     {
@@ -303,7 +305,7 @@ public class MessageConsumerWorker : BackgroundService
             await _queue.SubscribeAsync("orders", stoppingToken);
 
             _logger.LogInformation("Message consumer ready");
-            _readyTcs.Ignited(); // Signal ready
+            _readyTcs.Ignited(); // Veggerby.Ignition extension: marks ready
 
             // Continue processing messages
             await ProcessMessagesAsync(stoppingToken);
@@ -311,7 +313,7 @@ public class MessageConsumerWorker : BackgroundService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to start message consumer");
-            _readyTcs.IgnitionFailed(ex); // Signal failure
+            _readyTcs.IgnitionFailed(ex); // Veggerby.Ignition extension: marks failed
             throw;
         }
     }
@@ -368,7 +370,7 @@ app.Run(); // Workers are ready, start accepting traffic
 ### Expected Behavior
 
 1. `BackgroundService.StartAsync` triggers immediately (hosted services start)
-2. Each worker signals readiness via `TaskCompletionSource.Ignited()`
+2. Each worker signals readiness via `TaskCompletionSource.Ignited()` (Veggerby.Ignition extension)
 3. Ignition coordinator waits for all workers to signal ready
 4. If DAG mode: workers start in dependency order (consumer first, then monitor)
 5. Application traffic starts only after all workers are ready
