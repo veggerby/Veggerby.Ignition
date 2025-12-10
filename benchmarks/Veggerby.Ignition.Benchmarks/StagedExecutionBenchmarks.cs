@@ -37,7 +37,7 @@ internal sealed class StagedTestSignal : IStagedIgnitionSignal
 /// Benchmarks for Staged execution mode with varying stage counts.
 /// </summary>
 [MemoryDiagnoser]
-[SimpleJob(RuntimeMoniker.Net90)]
+[SimpleJob(RuntimeMoniker.HostProcess)]
 public class StagedExecutionBenchmarks
 {
     private IServiceProvider _serviceProvider = null!;
@@ -48,7 +48,7 @@ public class StagedExecutionBenchmarks
     [Params(10)]
     public int SignalsPerStage { get; set; }
 
-    [GlobalSetup]
+    [IterationSetup]
     public void Setup()
     {
         var services = new ServiceCollection();
@@ -80,7 +80,7 @@ public class StagedExecutionBenchmarks
         await coordinator.WaitAllAsync();
     }
 
-    [GlobalCleanup]
+    [IterationCleanup]
     public void Cleanup()
     {
         if (_serviceProvider is IDisposable disposable)

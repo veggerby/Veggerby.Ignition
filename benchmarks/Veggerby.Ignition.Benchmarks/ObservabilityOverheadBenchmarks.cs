@@ -12,7 +12,7 @@ namespace Veggerby.Ignition.Benchmarks;
 /// Benchmarks comparing performance with and without metrics/tracing enabled.
 /// </summary>
 [MemoryDiagnoser]
-[SimpleJob(RuntimeMoniker.Net90)]
+[SimpleJob(RuntimeMoniker.HostProcess)]
 public class ObservabilityOverheadBenchmarks
 {
     private IServiceProvider _serviceProvider = null!;
@@ -23,7 +23,7 @@ public class ObservabilityOverheadBenchmarks
     [Params(true, false)]
     public bool EnableTracing { get; set; }
 
-    [GlobalSetup]
+    [IterationSetup]
     public void Setup()
     {
         var services = new ServiceCollection();
@@ -51,7 +51,7 @@ public class ObservabilityOverheadBenchmarks
         await coordinator.WaitAllAsync();
     }
 
-    [GlobalCleanup]
+    [IterationCleanup]
     public void Cleanup()
     {
         if (_serviceProvider is IDisposable disposable)

@@ -12,7 +12,7 @@ namespace Veggerby.Ignition.Benchmarks;
 /// Benchmarks measuring coordinator overhead (minimal work signals).
 /// </summary>
 [MemoryDiagnoser]
-[SimpleJob(RuntimeMoniker.Net90)]
+[SimpleJob(RuntimeMoniker.HostProcess)]
 public class CoordinatorOverheadBenchmarks
 {
     private IServiceProvider _serviceProvider = null!;
@@ -20,7 +20,7 @@ public class CoordinatorOverheadBenchmarks
     [Params(1, 10, 100, 1000)]
     public int SignalCount { get; set; }
 
-    [GlobalSetup]
+    [IterationSetup]
     public void Setup()
     {
         var services = new ServiceCollection();
@@ -48,7 +48,7 @@ public class CoordinatorOverheadBenchmarks
         await coordinator.WaitAllAsync();
     }
 
-    [GlobalCleanup]
+    [IterationCleanup]
     public void Cleanup()
     {
         if (_serviceProvider is IDisposable disposable)

@@ -308,7 +308,7 @@ public class DeterminismAndStabilityTests
         {
           "schemaVersion": "1.0",
           "recordingId": "test123",
-          "recordedAt": "2025-12-09T18:00:00Z",
+          "recordedAt": "2023-01-01T00:00:00Z",
           "totalDurationMs": 100.5,
           "timedOut": false,
           "finalState": "Completed",

@@ -12,7 +12,7 @@ namespace Veggerby.Ignition.Benchmarks;
 /// Benchmarks for concurrency limiting via MaxDegreeOfParallelism.
 /// </summary>
 [MemoryDiagnoser]
-[SimpleJob(RuntimeMoniker.Net90)]
+[SimpleJob(RuntimeMoniker.HostProcess)]
 public class ConcurrencyLimitingBenchmarks
 {
     private IServiceProvider _serviceProvider = null!;
@@ -23,7 +23,7 @@ public class ConcurrencyLimitingBenchmarks
     [Params(1, 4, 8, -1)]
     public int MaxDegreeOfParallelism { get; set; }
 
-    [GlobalSetup]
+    [IterationSetup]
     public void Setup()
     {
         var services = new ServiceCollection();
@@ -52,7 +52,7 @@ public class ConcurrencyLimitingBenchmarks
         await coordinator.WaitAllAsync();
     }
 
-    [GlobalCleanup]
+    [IterationCleanup]
     public void Cleanup()
     {
         if (_serviceProvider is IDisposable disposable)

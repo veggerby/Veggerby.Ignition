@@ -13,7 +13,7 @@ namespace Veggerby.Ignition.Benchmarks;
 /// with varying signal counts.
 /// </summary>
 [MemoryDiagnoser]
-[SimpleJob(RuntimeMoniker.Net90)]
+[SimpleJob(RuntimeMoniker.HostProcess)]
 public class ExecutionModeBenchmarks
 {
     private IServiceProvider _serviceProvider = null!;
@@ -27,7 +27,7 @@ public class ExecutionModeBenchmarks
     [Params(10)]
     public int SignalDelayMs { get; set; }
 
-    [GlobalSetup]
+    [IterationSetup]
     public void Setup()
     {
         var services = new ServiceCollection();
@@ -57,7 +57,7 @@ public class ExecutionModeBenchmarks
         await coordinator.WaitAllAsync();
     }
 
-    [GlobalCleanup]
+    [IterationCleanup]
     public void Cleanup()
     {
         if (_serviceProvider is IDisposable disposable)

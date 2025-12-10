@@ -13,7 +13,7 @@ namespace Veggerby.Ignition.Benchmarks;
 /// Uses the declarative attribute-based approach for simplicity.
 /// </summary>
 [MemoryDiagnoser]
-[SimpleJob(RuntimeMoniker.Net90)]
+[SimpleJob(RuntimeMoniker.HostProcess)]
 public class DependencyAwareExecutionBenchmarks
 {
     private IServiceProvider _serviceProvider = null!;
@@ -21,7 +21,7 @@ public class DependencyAwareExecutionBenchmarks
     [Params(10, 50, 100)]
     public int SignalCount { get; set; }
 
-    [GlobalSetup]
+    [IterationSetup]
     public void Setup()
     {
         var services = new ServiceCollection();
@@ -38,20 +38,11 @@ public class DependencyAwareExecutionBenchmarks
         int chainLength = 10;
         int chainCount = SignalCount / chainLength;
 
-        for (int chain = 0; chain < chainCount; chain++)
-        {
-            for (int link = 0; link < chainLength; link++)
-            {
-                var name = $"chain-{chain}-link-{link}";
-                services.AddIgnitionFromTask(name, ct => Task.Delay(10, ct));
-            }
-        }
-
         // Use manual graph builder to add dependencies
         var graphBuilder = new IgnitionGraphBuilder();
         var signalsByName = new Dictionary<string, IIgnitionSignal>();
 
-        // First pass: create and register all signals
+        // Create and register all signals
         for (int chain = 0; chain < chainCount; chain++)
         {
             for (int link = 0; link < chainLength; link++)
@@ -60,10 +51,11 @@ public class DependencyAwareExecutionBenchmarks
                 var signal = new BenchmarkSignal(name, delayMs: 10);
                 signalsByName[name] = signal;
                 graphBuilder.AddSignal(signal);
+                services.AddIgnitionSignal(signal);
             }
         }
 
-        // Second pass: add dependencies (each link depends on previous link in chain)
+        // Add dependencies (each link depends on previous link in chain)
         for (int chain = 0; chain < chainCount; chain++)
         {
             for (int link = 1; link < chainLength; link++)
@@ -85,7 +77,7 @@ public class DependencyAwareExecutionBenchmarks
         await coordinator.WaitAllAsync();
     }
 
-    [GlobalCleanup]
+    [IterationCleanup]
     public void Cleanup()
     {
         if (_serviceProvider is IDisposable disposable)
