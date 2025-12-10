@@ -29,8 +29,11 @@ Veggerby.Ignition provides startup coordination with **predictable, bounded over
 - Signal task wrapper: ~200 bytes
 - Result metadata: ~300 bytes
 - Event/diagnostic overhead (tracing enabled): ~500 bytes
+- Additional overhead (DI, logging, etc.): ~2 KB
 
-**Total**: < 1 KB per signal (typical), < 2 KB per signal (with tracing)
+**Total**: < 3.5 KB per signal (typical), < 4 KB per signal (with tracing)
+
+**Actual benchmarks** (100 signals): 323KB = ~3.2KB per signal
 
 **Validation**: Run `MemoryDiagnoser` benchmarks to confirm allocation patterns.
 
@@ -39,11 +42,13 @@ Veggerby.Ignition provides startup coordination with **predictable, bounded over
 #### Parallel Mode
 
 **Characteristics**:
+
 - All signals start simultaneously
 - Completion time ≈ longest signal duration + coordinator overhead
 - CPU usage: scales with parallelism (up to MaxDegreeOfParallelism or CPU cores)
 
 **Scaling**:
+
 - **Linear** throughput up to CPU core count
 - **Sublinear** beyond CPU saturation (if signals are CPU-bound)
 - **Near-constant** time for I/O-bound signals (network, disk)
@@ -57,12 +62,14 @@ Veggerby.Ignition provides startup coordination with **predictable, bounded over
 ```
 
 **Best For**:
+
 - Independent signals
 - I/O-bound initialization (database connections, HTTP health checks)
 - Fastest startup time
 - Systems with multiple CPU cores
 
 **Avoid When**:
+
 - Signals share limited resources (connection pools)
 - Memory-constrained environments
 - Signals have ordering dependencies
@@ -70,10 +77,12 @@ Veggerby.Ignition provides startup coordination with **predictable, bounded over
 #### Sequential Mode
 
 **Characteristics**:
+
 - Signals execute one at a time in registration order
 - Completion time = sum of all signal durations + coordinator overhead
 
 **Scaling**:
+
 - **Linear** with signal count and duration
 - **Predictable** resource usage (only 1 signal active at a time)
 
@@ -86,29 +95,34 @@ Veggerby.Ignition provides startup coordination with **predictable, bounded over
 ```
 
 **Best For**:
+
 - Resource-constrained environments (limited memory, single CPU core)
 - Signals with strict ordering requirements
 - Debugging/troubleshooting (easier to trace execution order)
 - Environments where predictable, low-concurrency behavior is required
 
 **Avoid When**:
+
 - Startup speed is critical
 - Signals are independent and I/O-bound
 
 #### DependencyAware Mode (DAG)
 
 **Characteristics**:
+
 - Independent branches run in parallel
 - Dependent chains run sequentially
 - Automatic topological sorting and cycle detection
 
 **Scaling**:
+
 - **Depends on graph structure**:
   - Fully independent signals → same as Parallel mode
   - Fully sequential chain → same as Sequential mode
   - Mixed (typical) → parallelism within independent branches
 
 **Complexity**:
+
 - Dependency graph construction: **O(V + E)** where V = vertices (signals), E = edges (dependencies)
 - Topological sort: **O(V + E)**
 - Execution overhead: **~2-5ms for 100 signals** (graph building, scheduling)
@@ -123,18 +137,21 @@ Result: A and C and E start parallel → max(100,100,100) = 100ms
 ```
 
 **Best For**:
+
 - Complex initialization with dependencies (e.g., database → cache → worker threads)
 - Mixed independent/dependent signals
 - Automatic parallelization of independent branches
 - Enforcing correct initialization order
 
 **Avoid When**:
+
 - Signal count > 1000 (graph overhead becomes noticeable)
 - All signals are independent (use Parallel instead)
 - All signals are sequential (use Sequential instead)
 - Dynamic dependencies (graph is static at coordinator creation)
 
 **Recommendations**:
+
 - Keep dependency graphs **shallow** (< 10 levels deep) for best performance
 - Prefer **wide** graphs (many independent branches) over **narrow** chains
 - Limit total signal count to **< 1000** for sub-100ms graph overhead
@@ -143,11 +160,13 @@ Result: A and C and E start parallel → max(100,100,100) = 100ms
 #### Staged Mode (Multi-Phase)
 
 **Characteristics**:
+
 - Signals grouped into sequential stages (0, 1, 2, ...)
 - Within each stage: parallel execution
 - Between stages: sequential execution
 
 **Scaling**:
+
 - Completion time = sum of stage durations + coordinator overhead
 - Stage duration ≈ longest signal in that stage (parallel within stage)
 
@@ -161,16 +180,19 @@ Total: ~380ms + overhead
 ```
 
 **Best For**:
+
 - Logical startup phases (infrastructure → services → application logic)
 - Large signal counts (1000+) with implicit ordering
 - Coarse-grained dependency expression (stage-level, not signal-level)
 - Simple mental model (stages are explicit)
 
 **Avoid When**:
+
 - Fine-grained dependencies needed (use DAG instead)
 - Signal count < 50 (overhead not justified)
 
 **Recommendations**:
+
 - Keep **2-5 stages** for clarity (too many stages = sequential overhead)
 - Balance signals across stages (avoid 1 slow signal holding up entire stage)
 - Use `IgnitionStagePolicy` to control cross-stage failure behavior
@@ -178,10 +200,12 @@ Total: ~380ms + overhead
 ### Tracing Overhead
 
 **Impact**:
+
 - **Enabled**: ~5-10% overhead (Activity creation, propagation)
 - **Disabled**: near-zero overhead (no diagnostic allocation)
 
 **Recommendation**:
+
 - Enable in **development** for observability
 - Enable in **production** if tracing infrastructure is present (OpenTelemetry, Application Insights)
 - Disable in **performance-critical** environments or when tracing is not consumed
@@ -189,20 +213,24 @@ Total: ~380ms + overhead
 ### Timeout Management Overhead
 
 **Per-Signal Timeout**:
+
 - Adds `CancellationTokenSource` per signal: ~100 bytes allocation
 - Timeout evaluation: ~0.1ms per signal
 
 **Global Timeout**:
+
 - Single `CancellationTokenSource` for all signals: ~100 bytes
 - Negligible overhead (shared across signals)
 
 **Recommendation**:
+
 - Use **global timeout** for simplicity and minimal overhead
 - Use **per-signal timeout** only when signals have significantly different expected durations
 
 ## Concurrency Limits (MaxDegreeOfParallelism)
 
 **Effect**:
+
 - Limits concurrent signal execution in Parallel, DependencyAware, and Staged modes
 - Signals queue until a slot is available
 
@@ -233,12 +261,14 @@ options.MaxDegreeOfParallelism = 10;
 **Guarantee**: Given identical signal tasks and options, coordinator produces **identical** `IgnitionResult` classification.
 
 **What is deterministic**:
+
 - Signal status (Succeeded, Failed, TimedOut)
 - Timeout classification (global vs per-signal)
 - Policy application (FailFast, BestEffort, ContinueOnTimeout)
 - Result aggregation
 
 **What is NOT deterministic**:
+
 - **Exact durations** (I/O, CPU scheduling variability)
 - **Execution order** in Parallel mode (thread scheduling)
 - **Concurrency patterns** (OS-level scheduling)
@@ -252,6 +282,7 @@ options.MaxDegreeOfParallelism = 10;
 **Schema Version**: `1.0` (current)
 
 **Stability Contract**:
+
 - Adding optional fields: **allowed** (non-breaking)
 - Removing fields: **not allowed** (breaking, requires version bump)
 - Renaming fields: **not allowed** (breaking)
@@ -273,6 +304,7 @@ options.MaxDegreeOfParallelism = 10;
 ### Known Bottlenecks
 
 **When to avoid Ignition**:
+
 - **> 100,000 signals**: Consider breaking into multiple coordinators or batching
 - **Real-time constraints**: Ignition is for startup, not runtime orchestration
 - **Dynamic dependencies**: DAG is static; runtime dependency changes not supported
@@ -323,6 +355,7 @@ dotnet run -- --exporters json --baseline baseline/results.json
 ### Typical Startup Profiles
 
 **Web API** (20 signals):
+
 - Database connection: 500ms
 - Cache warmup: 300ms
 - External API health check: 200ms
@@ -332,6 +365,7 @@ dotnet run -- --exporters json --baseline baseline/results.json
 **Expected Total**: ~600ms (Parallel mode), ~1500ms (Sequential mode)
 
 **Worker Service** (10 signals):
+
 - Message queue connection: 400ms
 - Database migration check: 600ms
 - Scheduler initialization: 100ms

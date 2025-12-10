@@ -48,6 +48,10 @@ public class StagedExecutionBenchmarks
     [Params(10)]
     public int SignalsPerStage { get; set; }
 
+    // 10ms delay represents realistic signal work
+    // Shorter iterations are acceptable as we measure coordinator overhead, not synthetic delays
+    private const int SignalDelayMs = 10;
+
     [IterationSetup]
     public void Setup()
     {
@@ -65,7 +69,7 @@ public class StagedExecutionBenchmarks
             for (int i = 0; i < SignalsPerStage; i++)
             {
                 var name = $"stage-{stage}-signal-{i}";
-                var signal = new StagedTestSignal(name, stage, delayMs: 10);
+                var signal = new StagedTestSignal(name, stage, delayMs: SignalDelayMs);
                 services.AddIgnitionSignal(signal);
             }
         }

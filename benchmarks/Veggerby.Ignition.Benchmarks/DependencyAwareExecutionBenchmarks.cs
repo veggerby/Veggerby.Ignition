@@ -11,6 +11,7 @@ namespace Veggerby.Ignition.Benchmarks;
 /// <summary>
 /// Benchmarks for DependencyAware (DAG) execution mode with varying graph structures.
 /// Uses the declarative attribute-based approach for simplicity.
+/// Note: Multimodal distributions may occur due to parallel scheduling variance - this is expected.
 /// </summary>
 [MemoryDiagnoser]
 [SimpleJob(RuntimeMoniker.HostProcess)]
@@ -20,6 +21,10 @@ public class DependencyAwareExecutionBenchmarks
 
     [Params(10, 50, 100)]
     public int SignalCount { get; set; }
+
+    // 10ms delay represents realistic signal work
+    // We measure DAG coordination overhead, not synthetic signal delays
+    private const int SignalDelayMs = 10;
 
     [IterationSetup]
     public void Setup()
@@ -48,7 +53,7 @@ public class DependencyAwareExecutionBenchmarks
             for (int link = 0; link < chainLength; link++)
             {
                 var name = $"chain-{chain}-link-{link}";
-                var signal = new BenchmarkSignal(name, delayMs: 10);
+                var signal = new BenchmarkSignal(name, delayMs: SignalDelayMs);
                 signalsByName[name] = signal;
                 graphBuilder.AddSignal(signal);
                 services.AddIgnitionSignal(signal);

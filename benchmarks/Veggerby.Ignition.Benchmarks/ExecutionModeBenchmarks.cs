@@ -24,6 +24,7 @@ public class ExecutionModeBenchmarks
     [Params(IgnitionExecutionMode.Parallel, IgnitionExecutionMode.Sequential)]
     public IgnitionExecutionMode ExecutionMode { get; set; }
 
+    // 10ms represents realistic signal work; we measure coordinator overhead
     [Params(10)]
     public int SignalDelayMs { get; set; }
 

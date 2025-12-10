@@ -233,5 +233,5 @@ _Pvt_Extensions
 
 # FAKE - F# Make
 .fake/
-BenchmarkDotNet.Artifacts/*
+
 src/Veggerby.Ignition*/Veggerby.Ignition*.xml
