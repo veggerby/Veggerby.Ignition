@@ -18,6 +18,51 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 - None.
 
+## [0.4.1] - 2025-12-18
+
+### Added
+
+- **Ignition Cookbook**: Comprehensive production-ready recipes documentation (`docs/cookbook.md`) with 10 battle-tested startup patterns:
+  - External Dependency Readiness (multi-stage warmup: Redis → SQL → Elasticsearch)
+  - Cache Warmup Strategies (critical vs optional caches with concurrency limiting)
+  - Background Worker Orchestration (`BackgroundService` coordination patterns)
+  - Kubernetes Integration (complete deployment YAML with startup/readiness/liveness probes)
+  - Multi-Stage Pipelines (5-phase startup orchestration)
+  - Recording/Replay Workflows (production diagnosis with comparison, validation, what-if simulation)
+  - OpenTelemetry Metrics Integration (`IIgnitionMetrics` implementation with Prometheus)
+  - DAG vs Stages Decision Matrix (criteria and examples for choosing execution model)
+  - Graceful Degradation Patterns (optional service failure handling)
+  - Testing Patterns (unit/integration test helpers)
+  - Each recipe includes problem statement, configuration pattern, expected behavior, and usage guidance
+- **Performance Benchmarks & Contract**:
+  - New `benchmarks/Veggerby.Ignition.Benchmarks` project using BenchmarkDotNet
+  - 6 comprehensive benchmark suites covering all execution modes:
+    - `CoordinatorOverheadBenchmarks` with memory diagnostics
+    - `ExecutionModeBenchmarks` (Parallel, Sequential, 1-1000 signals)
+    - `DependencyAwareExecutionBenchmarks` (DAG with 10-100 signals)
+    - `StagedExecutionBenchmarks` (2-10 stages)
+    - `ObservabilityOverheadBenchmarks` (tracing enabled/disabled)
+    - `ConcurrencyLimitingBenchmarks` (MaxDegreeOfParallelism variations)
+  - Performance contract documentation (`docs/performance-contract.md`) with official guarantees:
+    - Overhead per signal characteristics (< 1ms per signal for small counts, < 100ms for 1000 signals)
+    - Scaling characteristics for all execution modes
+    - Recommendations for signal count limits per execution mode
+    - Determinism and serialization stability contracts
+  - 9 new determinism and stability tests in `DeterminismAndStabilityTests.cs`:
+    - Schema version validation (v1.0)
+    - JSON serialization round-trip stability
+    - Classification determinism verification
+    - Backward compatibility testing
+  - Updated `docs/performance.md` with cross-references to performance contract
+
+### Changed
+
+- None.
+
+### Fixed
+
+- Set `IsPackable` to `false` in test and benchmark project files to prevent accidental NuGet packaging of non-library projects.
+
 ## [0.4.0] - 2025-12-09
 
 ### Added
@@ -248,6 +293,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 - No known security issues.
 
+[Unreleased]: https://github.com/veggerby/Veggerby.Ignition/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/veggerby/Veggerby.Ignition/releases/tag/v0.4.1
+[0.4.0]: https://github.com/veggerby/Veggerby.Ignition/releases/tag/v0.4.0
 [0.3.1]: https://github.com/veggerby/Veggerby.Ignition/releases/tag/v0.3.1
 [0.3.0]: https://github.com/veggerby/Veggerby.Ignition/releases/tag/v0.3.0
 [0.2.0]: https://github.com/veggerby/Veggerby.Ignition/releases/tag/v0.2.0
