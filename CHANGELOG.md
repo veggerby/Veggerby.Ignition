@@ -293,6 +293,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 - No known security issues.
 
+[Unreleased]: https://github.com/veggerby/Veggerby.Ignition/compare/v0.4.1...HEAD
 [0.4.1]: https://github.com/veggerby/Veggerby.Ignition/releases/tag/v0.4.1
 [0.4.0]: https://github.com/veggerby/Veggerby.Ignition/releases/tag/v0.4.0
 [0.3.1]: https://github.com/veggerby/Veggerby.Ignition/releases/tag/v0.3.1
