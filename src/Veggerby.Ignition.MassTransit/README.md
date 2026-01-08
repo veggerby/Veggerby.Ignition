@@ -35,16 +35,6 @@ builder.Services.AddMassTransitReadiness(options =>
 });
 ```
 
-### With Custom Timeout
-
-```csharp
-builder.Services.AddMassTransitReadiness(options =>
-{
-    options.Timeout = TimeSpan.FromSeconds(10);
-    options.BusReadyTimeout = TimeSpan.FromSeconds(45);
-});
-```
-
 ## Configuration Options
 
 ### `MassTransitReadinessOptions`
