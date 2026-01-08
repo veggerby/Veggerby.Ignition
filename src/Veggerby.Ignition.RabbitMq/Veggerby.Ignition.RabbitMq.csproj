@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Package Metadata -->
+  <PropertyGroup>
+    <PackageId>Veggerby.Ignition.RabbitMq</PackageId>
+    <Description>RabbitMQ readiness signals for Veggerby.Ignition - verify broker connections, queues, and exchanges during application startup.</Description>
+    <PackageTags>startup readiness ignition rabbitmq messaging broker healthcheck</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="RabbitMQ.Client" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Veggerby.Ignition/Veggerby.Ignition.csproj" />
+  </ItemGroup>
+
+</Project>

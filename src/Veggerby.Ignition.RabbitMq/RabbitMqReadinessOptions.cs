@@ -1,0 +1,78 @@
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+
+#pragma warning disable IDE0130 // Namespace does not match folder structure
+namespace Veggerby.Ignition.RabbitMq;
+#pragma warning restore IDE0130 // Namespace does not match folder structure
+
+/// <summary>
+/// Configuration options for RabbitMQ readiness verification.
+/// </summary>
+public sealed class RabbitMqReadinessOptions
+{
+    /// <summary>
+    /// Optional per-signal timeout. If <c>null</c>, the global timeout configured via <see cref="IgnitionOptions"/> applies.
+    /// </summary>
+    public TimeSpan? Timeout { get; set; }
+
+    /// <summary>
+    /// Queue names to verify during readiness check.
+    /// If specified, the signal will attempt to verify each queue exists and is accessible.
+    /// Empty by default (no queue verification performed).
+    /// </summary>
+    public ICollection<string> VerifyQueues { get; } = new List<string>();
+
+    /// <summary>
+    /// Exchange names to verify during readiness check.
+    /// If specified, the signal will attempt to declare each exchange passively to verify it exists.
+    /// Empty by default (no exchange verification performed).
+    /// </summary>
+    public ICollection<string> VerifyExchanges { get; } = new List<string>();
+
+    /// <summary>
+    /// When true, missing queues or exchanges will cause the signal to fail.
+    /// When false, missing topology is logged as a warning but does not fail the signal.
+    /// Default is <c>true</c> (fail on missing topology).
+    /// </summary>
+    public bool FailOnMissingTopology { get; set; } = true;
+
+    /// <summary>
+    /// When true, performs a publish/consume round-trip test on a temporary queue.
+    /// This validates end-to-end messaging capability but adds overhead.
+    /// Default is <c>false</c> (connection verification only).
+    /// </summary>
+    public bool PerformRoundTripTest { get; set; } = false;
+
+    /// <summary>
+    /// Maximum time to wait for the round-trip test message acknowledgment.
+    /// Only applies when <see cref="PerformRoundTripTest"/> is <c>true</c>.
+    /// Default is 5 seconds.
+    /// </summary>
+    public TimeSpan RoundTripTestTimeout { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Adds a queue name to the list of queues to verify.
+    /// </summary>
+    /// <param name="queueName">Name of the queue to verify.</param>
+    /// <returns>This options instance for fluent chaining.</returns>
+    [ExcludeFromCodeCoverage]
+    public RabbitMqReadinessOptions WithQueue(string queueName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(queueName, nameof(queueName));
+        VerifyQueues.Add(queueName);
+        return this;
+    }
+
+    /// <summary>
+    /// Adds an exchange name to the list of exchanges to verify.
+    /// </summary>
+    /// <param name="exchangeName">Name of the exchange to verify.</param>
+    /// <returns>This options instance for fluent chaining.</returns>
+    [ExcludeFromCodeCoverage]
+    public RabbitMqReadinessOptions WithExchange(string exchangeName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(exchangeName, nameof(exchangeName));
+        VerifyExchanges.Add(exchangeName);
+        return this;
+    }
+}

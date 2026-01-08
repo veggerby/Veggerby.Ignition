@@ -35,6 +35,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "benchmarks", "benchmarks", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Veggerby.Ignition.Benchmarks", "benchmarks\Veggerby.Ignition.Benchmarks\Veggerby.Ignition.Benchmarks.csproj", "{B531B297-F7FD-4394-A526-FDD0ACBFF5C2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Veggerby.Ignition.MassTransit", "src\Veggerby.Ignition.MassTransit\Veggerby.Ignition.MassTransit.csproj", "{CD55F18B-E170-4E76-9293-34A826DB740F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -189,6 +191,18 @@ Global
 		{B531B297-F7FD-4394-A526-FDD0ACBFF5C2}.Release|x64.Build.0 = Release|Any CPU
 		{B531B297-F7FD-4394-A526-FDD0ACBFF5C2}.Release|x86.ActiveCfg = Release|Any CPU
 		{B531B297-F7FD-4394-A526-FDD0ACBFF5C2}.Release|x86.Build.0 = Release|Any CPU
+		{CD55F18B-E170-4E76-9293-34A826DB740F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CD55F18B-E170-4E76-9293-34A826DB740F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CD55F18B-E170-4E76-9293-34A826DB740F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{CD55F18B-E170-4E76-9293-34A826DB740F}.Debug|x64.Build.0 = Debug|Any CPU
+		{CD55F18B-E170-4E76-9293-34A826DB740F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{CD55F18B-E170-4E76-9293-34A826DB740F}.Debug|x86.Build.0 = Debug|Any CPU
+		{CD55F18B-E170-4E76-9293-34A826DB740F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CD55F18B-E170-4E76-9293-34A826DB740F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CD55F18B-E170-4E76-9293-34A826DB740F}.Release|x64.ActiveCfg = Release|Any CPU
+		{CD55F18B-E170-4E76-9293-34A826DB740F}.Release|x64.Build.0 = Release|Any CPU
+		{CD55F18B-E170-4E76-9293-34A826DB740F}.Release|x86.ActiveCfg = Release|Any CPU
+		{CD55F18B-E170-4E76-9293-34A826DB740F}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -206,6 +220,7 @@ Global
 		{991ECB2F-BC05-40AA-A4A8-72B2424B0D55} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 		{97B9A781-EB71-4DC9-B6A7-DE7CF8266F89} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 		{B531B297-F7FD-4394-A526-FDD0ACBFF5C2} = {66320409-64EC-F7C5-3DEF-65E7510DAAD1}
+		{CD55F18B-E170-4E76-9293-34A826DB740F} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {6B5CFCE6-EF4C-43ED-ADA2-C357D7A87040}

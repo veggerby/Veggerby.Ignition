@@ -34,6 +34,12 @@
     <!-- Benchmarking -->
     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
 
+    <!-- Messaging -->
+    <PackageVersion Include="RabbitMQ.Client" Version="7.0.0" />
+    <PackageVersion Include="MassTransit" Version="8.3.5" />
+    <PackageVersion Include="MassTransit.RabbitMQ" Version="8.3.5" />
+    <PackageVersion Include="Testcontainers.RabbitMq" Version="4.4.0" />
+
   </ItemGroup>
 
 </Project>
