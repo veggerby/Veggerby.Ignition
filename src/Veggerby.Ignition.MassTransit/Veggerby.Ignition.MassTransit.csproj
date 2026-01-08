@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Package Metadata -->
+  <PropertyGroup>
+    <PackageId>Veggerby.Ignition.MassTransit</PackageId>
+    <Description>MassTransit bus readiness signals for Veggerby.Ignition - verify message bus startup and connectivity during application initialization.</Description>
+    <PackageTags>startup readiness ignition masstransit messaging bus healthcheck</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MassTransit" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Veggerby.Ignition/Veggerby.Ignition.csproj" />
+  </ItemGroup>
+
+</Project>

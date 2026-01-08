@@ -1,0 +1,97 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+using RabbitMQ.Client;
+
+#pragma warning disable IDE0130 // Namespace does not match folder structure
+namespace Veggerby.Ignition.RabbitMq;
+#pragma warning restore IDE0130 // Namespace does not match folder structure
+
+/// <summary>
+/// Extension methods for registering RabbitMQ readiness signals with dependency injection.
+/// </summary>
+public static class RabbitMqIgnitionExtensions
+{
+    /// <summary>
+    /// Registers a RabbitMQ readiness signal using a connection string.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="connectionString">RabbitMQ connection string (e.g., "amqp://guest:guest@localhost:5672/").</param>
+    /// <param name="configure">Optional configuration delegate for readiness options.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    /// <remarks>
+    /// The signal name defaults to "rabbitmq-readiness". For connection-only verification,
+    /// no additional configuration is required. To verify queues or exchanges, use the
+    /// <paramref name="configure"/> delegate to specify topology elements.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// services.AddRabbitMqReadiness("amqp://localhost", options =>
+    /// {
+    ///     options.WithQueue("orders");
+    ///     options.WithExchange("events");
+    ///     options.Timeout = TimeSpan.FromSeconds(5);
+    /// });
+    /// </code>
+    /// </example>
+    public static IServiceCollection AddRabbitMqReadiness(
+        this IServiceCollection services,
+        string connectionString,
+        Action<RabbitMqReadinessOptions>? configure = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(connectionString, nameof(connectionString));
+
+        var factory = new ConnectionFactory
+        {
+            Uri = new Uri(connectionString)
+        };
+
+        return AddRabbitMqReadiness(services, factory, configure);
+    }
+
+    /// <summary>
+    /// Registers a RabbitMQ readiness signal using a pre-configured connection factory.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="connectionFactory">Pre-configured RabbitMQ connection factory.</param>
+    /// <param name="configure">Optional configuration delegate for readiness options.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    /// <remarks>
+    /// Use this overload when you need fine-grained control over connection factory settings
+    /// (e.g., SSL/TLS configuration, custom endpoints, credential management).
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var factory = new ConnectionFactory
+    /// {
+    ///     HostName = "rabbitmq.example.com",
+    ///     Port = 5671,
+    ///     Ssl = new SslOption { Enabled = true }
+    /// };
+    /// 
+    /// services.AddRabbitMqReadiness(factory, options =>
+    /// {
+    ///     options.PerformRoundTripTest = true;
+    ///     options.Timeout = TimeSpan.FromSeconds(10);
+    /// });
+    /// </code>
+    /// </example>
+    public static IServiceCollection AddRabbitMqReadiness(
+        this IServiceCollection services,
+        IConnectionFactory connectionFactory,
+        Action<RabbitMqReadinessOptions>? configure = null)
+    {
+        ArgumentNullException.ThrowIfNull(connectionFactory, nameof(connectionFactory));
+
+        services.AddSingleton<IIgnitionSignal>(sp =>
+        {
+            var options = new RabbitMqReadinessOptions();
+            configure?.Invoke(options);
+
+            var logger = sp.GetRequiredService<ILogger<RabbitMqReadinessSignal>>();
+            return new RabbitMqReadinessSignal(connectionFactory, options, logger);
+        });
+
+        return services;
+    }
+}
