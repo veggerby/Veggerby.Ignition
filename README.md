@@ -114,6 +114,64 @@ await app.Services.GetRequiredService<IIgnitionCoordinator>().WaitAllAsync();
 
 📚 **[Messaging Sample](samples/Messaging/README.md)** demonstrates both packages with Docker setup guide.
 
+### Databases
+
+- **[Veggerby.Ignition.SqlServer](src/Veggerby.Ignition.SqlServer/README.md)** - SQL Server connection and schema readiness
+  - Connection establishment verification
+  - Optional validation query execution
+  - Activity tracing and structured logging
+  - ```dotnet add package Veggerby.Ignition.SqlServer```
+
+- **[Veggerby.Ignition.Postgres](src/Veggerby.Ignition.Postgres/README.md)** - PostgreSQL connection and schema readiness
+  - Connection establishment verification
+  - Optional validation query execution
+  - Activity tracing and structured logging
+  - ```dotnet add package Veggerby.Ignition.Postgres```
+
+- **[Veggerby.Ignition.Marten](src/Veggerby.Ignition.Marten/README.md)** - Marten document store readiness
+  - Document store connectivity verification
+  - Integrates with existing `IDocumentStore`
+  - Activity tracing and structured logging
+  - ```dotnet add package Veggerby.Ignition.Marten```
+
+- **[Veggerby.Ignition.MongoDb](src/Veggerby.Ignition.MongoDb/README.md)** - MongoDB cluster connection readiness
+  - Cluster connectivity verification (ping)
+  - Optional collection existence validation
+  - Activity tracing and structured logging
+  - ```dotnet add package Veggerby.Ignition.MongoDb```
+
+**Example:** Verify database readiness before startup:
+
+```csharp
+builder.Services.AddIgnition();
+
+// SQL Server
+builder.Services.AddSqlServerReadiness(
+    "Server=localhost;Database=MyDb;Trusted_Connection=True;",
+    options => options.ValidationQuery = "SELECT 1");
+
+// PostgreSQL
+builder.Services.AddPostgresReadiness(
+    "Host=localhost;Database=mydb;Username=user;Password=pass",
+    options => options.ValidationQuery = "SELECT 1");
+
+// Marten (requires Marten to be configured first)
+builder.Services.AddMarten(opts => opts.Connection(connectionString));
+builder.Services.AddMartenReadiness();
+
+// MongoDB
+builder.Services.AddMongoDbReadiness(
+    "mongodb://localhost:27017",
+    options =>
+    {
+        options.DatabaseName = "mydb";
+        options.VerifyCollection = "users";
+    });
+
+var app = builder.Build();
+await app.Services.GetRequiredService<IIgnitionCoordinator>().WaitAllAsync();
+```
+
 ## Quick Start
 
 ```csharp
