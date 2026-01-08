@@ -1,0 +1,25 @@
+#pragma warning disable IDE0130 // Namespace does not match folder structure
+namespace Veggerby.Ignition.SqlServer;
+#pragma warning restore IDE0130 // Namespace does not match folder structure
+
+/// <summary>
+/// Configuration options for SQL Server readiness verification.
+/// </summary>
+public sealed class SqlServerReadinessOptions
+{
+    /// <summary>
+    /// Optional per-signal timeout. If <c>null</c>, the global timeout configured via <see cref="IgnitionOptions"/> applies.
+    /// </summary>
+    public TimeSpan? Timeout { get; set; }
+
+    /// <summary>
+    /// Optional SQL query to execute for validation after connection is established.
+    /// If <c>null</c>, only connection establishment is verified.
+    /// Default is <c>null</c> (connection verification only).
+    /// </summary>
+    /// <remarks>
+    /// Use simple queries like "SELECT 1" for basic health checks.
+    /// More complex queries can verify schema readiness or data availability.
+    /// </remarks>
+    public string? ValidationQuery { get; set; }
+}
