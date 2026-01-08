@@ -74,6 +74,46 @@ services.AddSimpleIgnition(ignition => ignition
 
 📚 **[Full Documentation](docs/README.md)** | 🚀 **[Getting Started Guide](docs/getting-started.md)** | 📖 **[Features Overview](docs/features.md)**
 
+## Integration Packages
+
+Extend Ignition with ready-made signals for popular infrastructure components:
+
+### Message Brokers
+
+- **[Veggerby.Ignition.RabbitMq](src/Veggerby.Ignition.RabbitMq/README.md)** - RabbitMQ connection and topology verification
+  - Connection and channel readiness
+  - Optional queue/exchange verification
+  - Publish/consume round-trip test
+  - ```dotnet add package Veggerby.Ignition.RabbitMq```
+
+- **[Veggerby.Ignition.MassTransit](src/Veggerby.Ignition.MassTransit/README.md)** - MassTransit bus readiness via health checks
+  - Transport-agnostic (RabbitMQ, Azure Service Bus, in-memory, etc.)
+  - Leverages MassTransit's built-in health checks
+  - Works with existing `IBus` instance
+  - ```dotnet add package Veggerby.Ignition.MassTransit```
+
+**Example:** Verify RabbitMQ and MassTransit readiness:
+
+```csharp
+builder.Services.AddIgnition();
+
+// Direct RabbitMQ verification
+builder.Services.AddRabbitMqReadiness("amqp://localhost", options =>
+{
+    options.WithQueue("orders");
+    options.Timeout = TimeSpan.FromSeconds(5);
+});
+
+// MassTransit bus readiness
+builder.Services.AddMassTransit(/* configure transport */);
+builder.Services.AddMassTransitReadiness();
+
+var app = builder.Build();
+await app.Services.GetRequiredService<IIgnitionCoordinator>().WaitAllAsync();
+```
+
+📚 **[Messaging Sample](samples/Messaging/README.md)** demonstrates both packages with Docker setup guide.
+
 ## Quick Start
 
 ```csharp
