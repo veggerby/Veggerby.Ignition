@@ -1,13 +1,10 @@
 using System.Linq;
 
 using MassTransit;
-
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-
 using RabbitMQ.Client;
-
 using Veggerby.Ignition;
 using Veggerby.Ignition.MassTransit;
 using Veggerby.Ignition.RabbitMq;

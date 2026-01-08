@@ -4,7 +4,6 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using Microsoft.Extensions.Logging;
-
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 
@@ -57,7 +56,9 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
             }
         }
 
-        return _cachedTask.WaitAsync(cancellationToken);
+        return cancellationToken.CanBeCanceled && !_cachedTask.IsCompleted
+            ? _cachedTask.WaitAsync(cancellationToken)
+            : _cachedTask;
     }
 
     private async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -112,13 +113,13 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
         {
             if (channel is not null)
             {
-                await channel.CloseAsync(cancellationToken);
+                await channel.CloseAsync(CancellationToken.None);
                 await channel.DisposeAsync();
             }
 
             if (connection is not null)
             {
-                await connection.CloseAsync(cancellationToken);
+                await connection.CloseAsync(CancellationToken.None);
                 await connection.DisposeAsync();
             }
         }

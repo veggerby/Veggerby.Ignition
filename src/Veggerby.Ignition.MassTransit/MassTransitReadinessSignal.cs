@@ -4,9 +4,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-using global::MassTransit;
-
 using Microsoft.Extensions.Logging;
+using global::MassTransit;
 
 #pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.MassTransit;
@@ -57,7 +56,9 @@ public sealed class MassTransitReadinessSignal : IIgnitionSignal
             }
         }
 
-        return _cachedTask.WaitAsync(cancellationToken);
+        return cancellationToken.CanBeCanceled && !_cachedTask.IsCompleted
+            ? _cachedTask.WaitAsync(cancellationToken)
+            : _cachedTask;
     }
 
     private async Task ExecuteAsync(CancellationToken cancellationToken)

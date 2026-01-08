@@ -1,7 +1,5 @@
-using global::MassTransit;
-
 using Microsoft.Extensions.Logging;
-
+using global::MassTransit;
 using Veggerby.Ignition.MassTransit;
 
 namespace Veggerby.Ignition.MassTransit.Tests;
