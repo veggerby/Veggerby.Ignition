@@ -35,12 +35,13 @@ builder.Services.AddMassTransitReadiness(options =>
 });
 ```
 
-### Skip Endpoint Verification
+### With Custom Timeout
 
 ```csharp
 builder.Services.AddMassTransitReadiness(options =>
 {
-    options.VerifyReceiveEndpoints = false; // only check bus connectivity
+    options.Timeout = TimeSpan.FromSeconds(10);
+    options.BusReadyTimeout = TimeSpan.FromSeconds(45);
 });
 ```
 
@@ -52,12 +53,10 @@ builder.Services.AddMassTransitReadiness(options =>
 |----------|------|---------|-------------|
 | `Timeout` | `TimeSpan?` | `null` | Per-signal timeout (overrides global) |
 | `BusReadyTimeout` | `TimeSpan` | 30s | Max time to wait for bus to become healthy |
-| `VerifyReceiveEndpoints` | `bool` | `true` | Check that all receive endpoints are ready |
 
 ## Features
 
 - **Bus Health Verification**: Uses MassTransit's built-in health checks
-- **Receive Endpoint Validation**: Ensures all configured endpoints are ready
 - **Transport Agnostic**: Works with any MassTransit transport (RabbitMQ, Azure Service Bus, in-memory, etc.)
 - **Activity Tracing**: Emits diagnostic tags for observability
 - **Structured Logging**: Detailed logs at Info/Debug/Warning/Error levels
