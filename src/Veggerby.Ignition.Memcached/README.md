@@ -183,7 +183,7 @@ Structured logging output:
 [Information] Memcached readiness check starting using strategy Stats
 [Debug] Memcached client initialized
 [Debug] Executing Memcached stats command
-[Debug] Memcached stats retrieved successfully from 2 server(s)
+[Debug] Memcached stats retrieved successfully
 [Information] Memcached readiness check completed successfully
 ```
 
