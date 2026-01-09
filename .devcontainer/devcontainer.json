@@ -31,7 +31,7 @@
             "version": "lts"
         },
         "ghcr.io/devcontainers-extra/features/apt-get-packages:1": {
-            "packages": "bash-completion xdg-utils pass sshpass"
+            "packages": "bash-completion xdg-utils pass sshpass build-essential python3 python3-pip curl wget netcat-traditional iputils-ping dnsutils git-lfs sqlite3 vim less"
         },
         "ghcr.io/eitsupi/devcontainer-features/jq-likes:2": {
             "jq": "latest",
@@ -62,12 +62,18 @@
 	},
 
     "mounts": [
-        "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached,readOnly=true"
+        "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached,readOnly=true",
+        "source=${localEnv:HOME}${localEnv:USERPROFILE}/.codex,target=/home/vscode/.codex,type=bind,consistency=cached"
     ],
 
     "remoteEnv": {
-        "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
+        "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}",
+        "PNPM_HOME": "/home/vscode/.local/share/pnpm",
+        "PATH": "/home/vscode/.local/share/pnpm:${containerEnv:PATH}"
     },
 
-	"postCreateCommand": ".devcontainer/scripts/post_create"
+	"postCreateCommand": {
+        "install-global-packages": "bash ${containerWorkspaceFolder}/.devcontainer/scripts/install-global-packages.sh",
+        "install-script": "bash ${containerWorkspaceFolder}/.devcontainer/scripts/post_create.sh"
+    }
 }
