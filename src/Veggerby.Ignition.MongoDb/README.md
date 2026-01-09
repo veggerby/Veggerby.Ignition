@@ -98,15 +98,9 @@ When tracing is enabled, the signal adds these tags:
 builder.Services.AddIgnition();
 builder.Services.AddMongoDbReadiness("mongodb://localhost:27017");
 
-builder.Services.AddHealthChecks()
-    .AddCheck("ignition-readiness", () =>
-    {
-        var coordinator = app.Services.GetRequiredService<IIgnitionCoordinator>();
-        var result = coordinator.GetResultAsync().Result;
-        return result.Succeeded
-            ? HealthCheckResult.Healthy()
-            : HealthCheckResult.Unhealthy();
-    });
+builder.Services
+    .AddHealthChecks()
+    .AddCheck<IgnitionHealthCheck>("ignition-readiness");
 ```
 
 ### Sharded Cluster Setup

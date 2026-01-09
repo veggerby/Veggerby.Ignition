@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using Veggerby.Ignition.MongoDb;
 
@@ -92,5 +93,100 @@ public class MongoDbReadinessSignalTests
 
         // act & assert
         signal.Timeout.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task WaitAsync_SuccessfulPing_CompletesSuccessfully()
+    {
+        // arrange
+        var client = Substitute.For<IMongoClient>();
+        var database = Substitute.For<IMongoDatabase>();
+        
+        client.GetDatabase("admin").Returns(database);
+        database.RunCommandAsync<BsonDocument>(Arg.Any<Command<BsonDocument>>(), Arg.Any<ReadPreference>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new BsonDocument()));
+
+        var options = new MongoDbReadinessOptions();
+        var logger = Substitute.For<ILogger<MongoDbReadinessSignal>>();
+        var signal = new MongoDbReadinessSignal(client, options, logger);
+
+        // act
+        await signal.WaitAsync();
+
+        // assert
+        await database.Received(1).RunCommandAsync<BsonDocument>(Arg.Any<Command<BsonDocument>>(), Arg.Any<ReadPreference>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task WaitAsync_PingFailure_ThrowsException()
+    {
+        // arrange
+        var client = Substitute.For<IMongoClient>();
+        var database = Substitute.For<IMongoDatabase>();
+        
+        client.GetDatabase("admin").Returns(database);
+        database.RunCommandAsync<BsonDocument>(Arg.Any<Command<BsonDocument>>(), Arg.Any<ReadPreference>(), Arg.Any<CancellationToken>())
+            .Returns<Task<BsonDocument>>(x => throw new MongoException("Connection failed"));
+
+        var options = new MongoDbReadinessOptions();
+        var logger = Substitute.For<ILogger<MongoDbReadinessSignal>>();
+        var signal = new MongoDbReadinessSignal(client, options, logger);
+
+        // act & assert
+        await Assert.ThrowsAsync<MongoException>(() => signal.WaitAsync());
+    }
+
+    [Fact]
+    public async Task WaitAsync_IdempotentExecution_UsesCachedResult()
+    {
+        // arrange
+        var client = Substitute.For<IMongoClient>();
+        var database = Substitute.For<IMongoDatabase>();
+        
+        client.GetDatabase("admin").Returns(database);
+        database.RunCommandAsync<BsonDocument>(Arg.Any<Command<BsonDocument>>(), Arg.Any<ReadPreference>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new BsonDocument()));
+
+        var options = new MongoDbReadinessOptions();
+        var logger = Substitute.For<ILogger<MongoDbReadinessSignal>>();
+        var signal = new MongoDbReadinessSignal(client, options, logger);
+
+        // act
+        await signal.WaitAsync();
+        await signal.WaitAsync();
+        await signal.WaitAsync();
+
+        // assert - ping called only once
+        await database.Received(1).RunCommandAsync<BsonDocument>(Arg.Any<Command<BsonDocument>>(), Arg.Any<ReadPreference>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task WaitAsync_WithCancellationToken_RespectsCancellation()
+    {
+        // arrange
+        var client = Substitute.For<IMongoClient>();
+        var database = Substitute.For<IMongoDatabase>();
+        
+        client.GetDatabase("admin").Returns(database);
+        
+        // Make the RunCommandAsync throw OperationCanceledException when cancellation token is used
+        database.RunCommandAsync<BsonDocument>(Arg.Any<Command<BsonDocument>>(), Arg.Any<ReadPreference>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var token = callInfo.ArgAt<CancellationToken>(2);
+                token.ThrowIfCancellationRequested();
+                return Task.FromResult(new BsonDocument());
+            });
+
+        var options = new MongoDbReadinessOptions();
+        var logger = Substitute.For<ILogger<MongoDbReadinessSignal>>();
+        var signal = new MongoDbReadinessSignal(client, options, logger);
+        
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        // act & assert - TaskCanceledException is a subclass of OperationCanceledException
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => signal.WaitAsync(cts.Token));
+        exception.Should().NotBeNull();
     }
 }
