@@ -9,6 +9,7 @@
 
     <!-- Core runtime deps -->
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.1" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.1" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.1" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.1" />
@@ -55,6 +56,13 @@
     <PackageVersion Include="Grpc.HealthCheck" Version="2.76.0" />
     <PackageVersion Include="Grpc.Tools" Version="2.76.0" />
     <PackageVersion Include="Microsoft.Orleans.Client" Version="9.0.1" />
+
+    <!-- Cache Providers -->
+    <PackageVersion Include="StackExchange.Redis" Version="2.8.16" />
+    <PackageVersion Include="EnyimMemcachedCore" Version="2.7.0" />
+    <PackageVersion Include="MessagePack" Version="2.5.187" />
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageVersion Include="Testcontainers.Redis" Version="4.4.0" />
 
   </ItemGroup>
 
