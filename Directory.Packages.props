@@ -49,6 +49,13 @@
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.4.0" />
     <PackageVersion Include="Testcontainers.MongoDb" Version="4.4.0" />
 
+    <!-- HTTP & External Services -->
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.1" />
+    <PackageVersion Include="Grpc.Net.Client" Version="2.76.0" />
+    <PackageVersion Include="Grpc.HealthCheck" Version="2.76.0" />
+    <PackageVersion Include="Grpc.Tools" Version="2.76.0" />
+    <PackageVersion Include="Microsoft.Orleans.Client" Version="9.0.1" />
+
   </ItemGroup>
 
 </Project>

@@ -172,6 +172,64 @@ var app = builder.Build();
 await app.Services.GetRequiredService<IIgnitionCoordinator>().WaitAllAsync();
 ```
 
+### HTTP & External Services
+
+- **[Veggerby.Ignition.Http](src/Veggerby.Ignition.Http/README.md)** - HTTP endpoint readiness verification
+  - Flexible status code matching (200, 204, etc.)
+  - Custom response body validation (JSON, text)
+  - Custom headers support (Authorization, User-Agent)
+  - Efficient HttpClient reuse via IHttpClientFactory
+  - ```dotnet add package Veggerby.Ignition.Http```
+
+- **[Veggerby.Ignition.Grpc](src/Veggerby.Ignition.Grpc/README.md)** - gRPC service readiness via health check protocol
+  - Standard grpc.health.v1.Health protocol support
+  - Service-specific health queries
+  - Channel state verification
+  - Efficient gRPC channel reuse
+  - ```dotnet add package Veggerby.Ignition.Grpc```
+
+- **[Veggerby.Ignition.Orleans](src/Veggerby.Ignition.Orleans/README.md)** - Orleans cluster client readiness
+  - Cluster client availability verification
+  - Works with existing registered `IClusterClient`
+  - Activity tracing and structured logging
+  - ```dotnet add package Veggerby.Ignition.Orleans```
+
+**Example:** Verify external service readiness:
+
+```csharp
+builder.Services.AddIgnition();
+
+// HTTP endpoint with response validation
+builder.Services.AddHttpReadiness(
+    "https://api.example.com/health",
+    options =>
+    {
+        options.ExpectedStatusCodes = [200, 204];
+        options.ValidateResponse = async (response) =>
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            return content.Contains("healthy");
+        };
+        options.Timeout = TimeSpan.FromSeconds(5);
+    });
+
+// gRPC service
+builder.Services.AddGrpcReadiness(
+    "https://grpc.example.com",
+    options =>
+    {
+        options.ServiceName = "myservice";
+        options.Timeout = TimeSpan.FromSeconds(5);
+    });
+
+// Orleans cluster (requires IClusterClient to be registered)
+builder.Services.AddOrleansClient(clientBuilder => clientBuilder.UseLocalhostClustering());
+builder.Services.AddOrleansReadiness(options => options.Timeout = TimeSpan.FromSeconds(10));
+
+var app = builder.Build();
+await app.Services.GetRequiredService<IIgnitionCoordinator>().WaitAllAsync();
+```
+
 ## Quick Start
 
 ```csharp

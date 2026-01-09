@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Package Metadata -->
+  <PropertyGroup>
+    <PackageId>Veggerby.Ignition.Grpc</PackageId>
+    <Description>gRPC readiness signals for Veggerby.Ignition - verify gRPC services using health check protocol during application startup.</Description>
+    <PackageTags>startup readiness ignition grpc healthcheck service external-service</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Grpc.Net.Client" />
+    <PackageReference Include="Grpc.HealthCheck" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Veggerby.Ignition/Veggerby.Ignition.csproj" />
+  </ItemGroup>
+
+</Project>
