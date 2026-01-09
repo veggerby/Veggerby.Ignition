@@ -172,6 +172,46 @@ var app = builder.Build();
 await app.Services.GetRequiredService<IIgnitionCoordinator>().WaitAllAsync();
 ```
 
+### Caches
+
+- **[Veggerby.Ignition.Redis](src/Veggerby.Ignition.Redis/README.md)** - Redis cache connection and operation readiness
+  - Multiple verification strategies (ConnectionOnly, Ping, PingAndTestKey)
+  - Support for StackExchange.Redis IConnectionMultiplexer
+  - Test key cleanup (TTL + explicit delete)
+  - Activity tracing and structured logging
+  - ```dotnet add package Veggerby.Ignition.Redis```
+
+- **[Veggerby.Ignition.Memcached](src/Veggerby.Ignition.Memcached/README.md)** - Memcached cache connection and operation readiness
+  - Multiple verification strategies (ConnectionOnly, Stats, TestKey)
+  - Support for EnyimMemcachedCore client
+  - Test key cleanup (expiration + explicit delete)
+  - Activity tracing and structured logging
+  - ```dotnet add package Veggerby.Ignition.Memcached```
+
+**Example:** Verify cache readiness:
+
+```csharp
+builder.Services.AddIgnition();
+
+// Redis with test key verification
+builder.Services.AddRedisReadiness("localhost:6379", options =>
+{
+    options.VerificationStrategy = RedisVerificationStrategy.PingAndTestKey;
+    options.TestKeyPrefix = "ignition:readiness:";
+    options.Timeout = TimeSpan.FromSeconds(5);
+});
+
+// Memcached with stats verification
+builder.Services.AddMemcachedReadiness(new[] { "localhost:11211" }, options =>
+{
+    options.VerificationStrategy = MemcachedVerificationStrategy.Stats;
+    options.Timeout = TimeSpan.FromSeconds(3);
+});
+
+var app = builder.Build();
+await app.Services.GetRequiredService<IIgnitionCoordinator>().WaitAllAsync();
+```
+
 ### HTTP & External Services
 
 - **[Veggerby.Ignition.Http](src/Veggerby.Ignition.Http/README.md)** - HTTP endpoint readiness verification
