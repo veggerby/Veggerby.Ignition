@@ -19,14 +19,13 @@ public static class OrleansIgnitionExtensions
     /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
     /// <remarks>
     /// The signal name defaults to "orleans-readiness". Requires an <see cref="IClusterClient"/>
-    /// to be registered in the service collection. Verifies cluster client initialization and
-    /// optionally tests grain activation.
+    /// to be registered in the service collection. Verifies that the cluster client is available
+    /// from the DI container.
     /// </remarks>
     /// <example>
     /// <code>
     /// services.AddOrleansReadiness(options =>
     /// {
-    ///     options.VerifyGrainActivation = true;
     ///     options.Timeout = TimeSpan.FromSeconds(10);
     /// });
     /// </code>

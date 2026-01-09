@@ -38,12 +38,17 @@ builder.Services.AddOrleansReadiness(options =>
 
 ## Features
 
-- **Cluster Client Verification**: Checks if cluster client is available and accessible
+- **Cluster Client Registration Verification**: Verifies IClusterClient is registered in DI container
 - **Activity Tracing**: Tags for cluster verification status
 - **Structured Logging**: Information, Debug, and Error level diagnostics
 - **Efficient Client Reuse**: Uses existing registered IClusterClient
 - **Idempotent Execution**: Cached results prevent redundant checks
 - **Thread-Safe**: Concurrent readiness checks execute once
+
+> **Note**: This signal performs basic verification that the Orleans cluster client is available in the DI container.
+> For more comprehensive cluster connectivity checks (e.g., testing grain activation, verifying cluster membership,
+> or checking silo availability), implement a custom `IIgnitionSignal` that makes actual grain calls or uses
+> management grain methods specific to your Orleans configuration.
 
 ## Configuration Options
 
@@ -163,7 +168,35 @@ builder.Services.AddOrleansClient(clientBuilder =>
 
 ## Advanced Verification
 
-For more advanced cluster verification (such as testing grain activation or checking active silos), you can implement custom signals that use grain calls or the management grain interface. The basic Orleans readiness signal focuses on verifying the cluster client is available and can be accessed from the dependency injection container.
+For more comprehensive cluster verification (such as testing grain activation or checking active silos), 
+implement a custom signal:
+
+```csharp
+public class OrleansClusterHealthSignal : IIgnitionSignal
+{
+    private readonly IClusterClient _clusterClient;
+    
+    public string Name => "orleans-cluster-health";
+    public TimeSpan? Timeout => TimeSpan.FromSeconds(30);
+    
+    public async Task WaitAsync(CancellationToken cancellationToken)
+    {
+        // Example: Verify you can get a grain reference and make a call
+        var healthGrain = _clusterClient.GetGrain<IHealthCheckGrain>(0);
+        await healthGrain.CheckHealthAsync();
+        
+        // Or use management grain for more thorough checks if available
+        // var mgmt = _clusterClient.GetGrain<IManagementGrain>(0);
+        // var hosts = await mgmt.GetHosts(onlyActive: true);
+        // if (hosts.Count == 0) throw new InvalidOperationException("No active silos");
+    }
+}
+
+services.AddSingleton<IIgnitionSignal, OrleansClusterHealthSignal>();
+```
+
+The basic Orleans readiness signal provided by this package focuses on verifying DI registration,
+which is sufficient for ensuring Orleans client configuration is complete during application startup.
 
 ## License
 

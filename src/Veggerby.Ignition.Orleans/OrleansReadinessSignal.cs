@@ -10,8 +10,14 @@ namespace Veggerby.Ignition.Orleans;
 #pragma warning restore IDE0130 // Namespace does not match folder structure
 
 /// <summary>
-/// Ignition signal for verifying Orleans cluster readiness.
+/// Ignition signal for verifying Orleans cluster client registration.
 /// </summary>
+/// <remarks>
+/// This signal verifies that an <see cref="IClusterClient"/> is properly registered in the 
+/// dependency injection container. For more comprehensive cluster connectivity verification
+/// (such as testing grain activation or checking cluster membership), implement a custom
+/// signal that makes actual grain calls or uses management grain methods.
+/// </remarks>
 public sealed class OrleansReadinessSignal : IIgnitionSignal
 {
     private readonly IClusterClient _clusterClient;
@@ -68,13 +74,6 @@ public sealed class OrleansReadinessSignal : IIgnitionSignal
         {
             _logger.LogDebug("Verifying Orleans cluster client connectivity");
 
-            if (_clusterClient == null)
-            {
-                var message = "Orleans cluster client is null";
-                _logger.LogError(message);
-                throw new InvalidOperationException(message);
-            }
-
             activity?.SetTag("orleans.cluster_check", "basic_connectivity");
 
             _logger.LogInformation("Orleans readiness check completed successfully");
@@ -84,7 +83,5 @@ public sealed class OrleansReadinessSignal : IIgnitionSignal
             _logger.LogError(ex, "Orleans readiness check failed");
             throw;
         }
-
-        await Task.CompletedTask;
     }
 }

@@ -21,6 +21,7 @@ public static class GrpcIgnitionExtensions
     /// <remarks>
     /// The signal name defaults to "grpc-readiness". Creates a gRPC channel for the specified URL
     /// and uses the gRPC health check protocol (grpc.health.v1.Health) to verify service readiness.
+    /// The channel is created as a singleton and will be disposed when the application shuts down.
     /// </remarks>
     /// <example>
     /// <code>
@@ -38,12 +39,18 @@ public static class GrpcIgnitionExtensions
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serviceUrl, nameof(serviceUrl));
 
+        services.AddSingleton(sp =>
+        {
+            var channel = GrpcChannel.ForAddress(serviceUrl);
+            return channel;
+        });
+
         services.AddSingleton<IIgnitionSignal>(sp =>
         {
             var options = new GrpcReadinessOptions();
             configure?.Invoke(options);
 
-            var channel = GrpcChannel.ForAddress(serviceUrl);
+            var channel = sp.GetRequiredService<GrpcChannel>();
             var logger = sp.GetRequiredService<ILogger<GrpcReadinessSignal>>();
 
             return new GrpcReadinessSignal(channel, serviceUrl, options, logger);
