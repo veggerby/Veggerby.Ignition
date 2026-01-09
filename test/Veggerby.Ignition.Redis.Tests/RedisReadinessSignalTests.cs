@@ -145,10 +145,17 @@ public class RedisReadinessSignalTests
     public async Task WaitAsync_PingAndTestKey_CallsPingAndKeyOperations()
     {
         // arrange
+        string? capturedValue = null;
         var db = Substitute.For<IDatabase>();
         db.PingAsync(Arg.Any<CommandFlags>()).Returns(TimeSpan.FromMilliseconds(1));
-        db.StringSetAsync(Arg.Any<RedisKey>(), Arg.Any<RedisValue>(), Arg.Any<TimeSpan?>(), Arg.Any<bool>(), Arg.Any<When>(), Arg.Any<CommandFlags>()).Returns(true);
-        db.StringGetAsync(Arg.Any<RedisKey>(), Arg.Any<CommandFlags>()).Returns(callInfo => callInfo.ArgAt<RedisKey>(0).ToString().Contains("ignition") ? "test-value" : RedisValue.Null);
+        db.StringSetAsync(Arg.Any<RedisKey>(), Arg.Any<RedisValue>(), Arg.Any<TimeSpan?>(), Arg.Any<bool>(), Arg.Any<When>(), Arg.Any<CommandFlags>())
+            .Returns(callInfo =>
+            {
+                capturedValue = callInfo.ArgAt<RedisValue>(1).ToString();
+                return true;
+            });
+        db.StringGetAsync(Arg.Any<RedisKey>(), Arg.Any<CommandFlags>())
+            .Returns(callInfo => (RedisValue)(capturedValue ?? string.Empty));
         db.KeyDeleteAsync(Arg.Any<RedisKey>(), Arg.Any<CommandFlags>()).Returns(true);
 
         var multiplexer = Substitute.For<IConnectionMultiplexer>();
