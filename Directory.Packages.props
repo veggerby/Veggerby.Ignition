@@ -65,6 +65,13 @@
     <PackageVersion Include="Testcontainers" Version="4.4.0" />
     <PackageVersion Include="Testcontainers.Redis" Version="4.4.0" />
 
+    <!-- Cloud Storage Providers -->
+    <PackageVersion Include="Azure.Storage.Blobs" Version="12.23.0" />
+    <PackageVersion Include="Azure.Storage.Queues" Version="12.21.0" />
+    <PackageVersion Include="Azure.Data.Tables" Version="12.9.1" />
+    <PackageVersion Include="AWSSDK.S3" Version="3.7.410.11" />
+    <PackageVersion Include="Testcontainers.Azurite" Version="4.4.0" />
+
   </ItemGroup>
 
 </Project>
