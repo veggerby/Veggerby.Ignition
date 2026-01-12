@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
+using Azure;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
 
@@ -99,47 +100,31 @@ public sealed class AzureTableReadinessSignal : IIgnitionSignal
 
     private async Task VerifyTableAsync(CancellationToken cancellationToken)
     {
+        var tableClient = _tableServiceClient.GetTableClient(_options.TableName);
+
         _logger.LogDebug("Verifying Azure Table existence: {TableName}", _options.TableName);
 
+        // Use CreateIfNotExists to safely check and optionally create the table
+        // If CreateIfNotExists=false, we'll get an exception if the table doesn't exist
         try
         {
-            // Query the table service to check if table exists
-            var existingTables = _tableServiceClient.QueryAsync(
-                filter: $"TableName eq '{_options.TableName}'",
-                cancellationToken: cancellationToken);
-
-            var exists = false;
-            await foreach (var table in existingTables)
+            if (_options.CreateIfNotExists)
             {
-                if (table.Name == _options.TableName)
-                {
-                    exists = true;
-                    break;
-                }
-            }
-
-            if (!exists)
-            {
-                if (_options.CreateIfNotExists)
-                {
-                    _logger.LogInformation("Creating Azure Table: {TableName}", _options.TableName);
-                    await _tableServiceClient.CreateTableAsync(_options.TableName, cancellationToken);
-                }
-                else
-                {
-                    throw new InvalidOperationException(
-                        $"Azure Table '{_options.TableName}' does not exist");
-                }
+                _logger.LogInformation("Ensuring Azure Table exists: {TableName}", _options.TableName);
+                await tableClient.CreateIfNotExistsAsync(cancellationToken);
             }
             else
             {
+                // Attempt to get table properties to verify existence
+                // This will throw RequestFailedException if table doesn't exist
+                await tableClient.GetAccessPoliciesAsync(cancellationToken);
                 _logger.LogDebug("Azure Table exists: {TableName}", _options.TableName);
             }
         }
-        catch (Exception ex) when (ex is not InvalidOperationException && ex is not OperationCanceledException)
+        catch (RequestFailedException ex) when (ex.Status == 404)
         {
             throw new InvalidOperationException(
-                $"Failed to verify Azure Table '{_options.TableName}'", ex);
+                $"Azure Table '{_options.TableName}' does not exist", ex);
         }
     }
 

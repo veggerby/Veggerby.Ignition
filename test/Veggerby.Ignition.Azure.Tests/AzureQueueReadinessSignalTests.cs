@@ -20,6 +20,28 @@ public class AzureQueueReadinessSignalTests
     }
 
     [Fact]
+    public void Constructor_NullOptions_ThrowsArgumentNullException()
+    {
+        // arrange
+        var client = Substitute.For<QueueServiceClient>();
+        var logger = Substitute.For<ILogger<AzureQueueReadinessSignal>>();
+
+        // act & assert
+        Assert.Throws<ArgumentNullException>(() => new AzureQueueReadinessSignal(client, null!, logger));
+    }
+
+    [Fact]
+    public void Constructor_NullLogger_ThrowsArgumentNullException()
+    {
+        // arrange
+        var client = Substitute.For<QueueServiceClient>();
+        var options = new AzureQueueReadinessOptions();
+
+        // act & assert
+        Assert.Throws<ArgumentNullException>(() => new AzureQueueReadinessSignal(client, options, null!));
+    }
+
+    [Fact]
     public void Name_ReturnsExpectedValue()
     {
         // arrange
