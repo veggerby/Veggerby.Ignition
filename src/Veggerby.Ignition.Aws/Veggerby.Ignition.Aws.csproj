@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Package Metadata -->
+  <PropertyGroup>
+    <PackageId>Veggerby.Ignition.Aws</PackageId>
+    <Description>AWS S3 readiness signals for Veggerby.Ignition - verify S3 bucket access during application startup.</Description>
+    <PackageTags>startup readiness ignition aws s3 storage healthcheck</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.S3" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Veggerby.Ignition/Veggerby.Ignition.csproj" />
+  </ItemGroup>
+
+</Project>
