@@ -65,7 +65,8 @@ public sealed class AzureBlobReadinessSignal : IIgnitionSignal
     {
         var activity = Activity.Current;
 
-        activity?.SetTag("azure.storage.account", _blobServiceClient.AccountName);
+        var accountName = TryGetAccountName();
+        activity?.SetTag("azure.storage.account", accountName);
         activity?.SetTag("azure.storage.type", "blob");
         activity?.SetTag("azure.blob.container", _options.ContainerName);
         activity?.SetTag("azure.blob.verify_exists", _options.VerifyContainerExists);
@@ -73,7 +74,7 @@ public sealed class AzureBlobReadinessSignal : IIgnitionSignal
 
         _logger.LogInformation(
             "Azure Blob Storage readiness check starting for account {AccountName}, container {ContainerName}",
-            _blobServiceClient.AccountName,
+            accountName ?? "(unknown)",
             _options.ContainerName ?? "(none)");
 
         try
@@ -120,6 +121,18 @@ public sealed class AzureBlobReadinessSignal : IIgnitionSignal
         else
         {
             _logger.LogDebug("Azure Blob container exists: {ContainerName}", _options.ContainerName);
+        }
+    }
+
+    private string? TryGetAccountName()
+    {
+        try
+        {
+            return _blobServiceClient.AccountName;
+        }
+        catch
+        {
+            return null;
         }
     }
 }

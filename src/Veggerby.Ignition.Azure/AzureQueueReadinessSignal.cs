@@ -65,7 +65,8 @@ public sealed class AzureQueueReadinessSignal : IIgnitionSignal
     {
         var activity = Activity.Current;
 
-        activity?.SetTag("azure.storage.account", _queueServiceClient.AccountName);
+        var accountName = TryGetAccountName();
+        activity?.SetTag("azure.storage.account", accountName);
         activity?.SetTag("azure.storage.type", "queue");
         activity?.SetTag("azure.queue.name", _options.QueueName);
         activity?.SetTag("azure.queue.verify_exists", _options.VerifyQueueExists);
@@ -73,7 +74,7 @@ public sealed class AzureQueueReadinessSignal : IIgnitionSignal
 
         _logger.LogInformation(
             "Azure Queue Storage readiness check starting for account {AccountName}, queue {QueueName}",
-            _queueServiceClient.AccountName,
+            accountName ?? "(unknown)",
             _options.QueueName ?? "(none)");
 
         try
@@ -120,6 +121,18 @@ public sealed class AzureQueueReadinessSignal : IIgnitionSignal
         else
         {
             _logger.LogDebug("Azure Queue exists: {QueueName}", _options.QueueName);
+        }
+    }
+
+    private string? TryGetAccountName()
+    {
+        try
+        {
+            return _queueServiceClient.AccountName;
+        }
+        catch
+        {
+            return null;
         }
     }
 }

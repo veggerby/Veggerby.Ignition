@@ -65,7 +65,8 @@ public sealed class AzureTableReadinessSignal : IIgnitionSignal
     {
         var activity = Activity.Current;
 
-        activity?.SetTag("azure.storage.account", _tableServiceClient.AccountName);
+        var accountName = TryGetAccountName();
+        activity?.SetTag("azure.storage.account", accountName);
         activity?.SetTag("azure.storage.type", "table");
         activity?.SetTag("azure.table.name", _options.TableName);
         activity?.SetTag("azure.table.verify_exists", _options.VerifyTableExists);
@@ -73,7 +74,7 @@ public sealed class AzureTableReadinessSignal : IIgnitionSignal
 
         _logger.LogInformation(
             "Azure Table Storage readiness check starting for account {AccountName}, table {TableName}",
-            _tableServiceClient.AccountName,
+            accountName ?? "(unknown)",
             _options.TableName ?? "(none)");
 
         try
@@ -139,6 +140,18 @@ public sealed class AzureTableReadinessSignal : IIgnitionSignal
         {
             throw new InvalidOperationException(
                 $"Failed to verify Azure Table '{_options.TableName}'", ex);
+        }
+    }
+
+    private string? TryGetAccountName()
+    {
+        try
+        {
+            return _tableServiceClient.AccountName;
+        }
+        catch
+        {
+            return null;
         }
     }
 }
