@@ -212,6 +212,51 @@ var app = builder.Build();
 await app.Services.GetRequiredService<IIgnitionCoordinator>().WaitAllAsync();
 ```
 
+### Cloud Storage
+
+- **[Veggerby.Ignition.Azure](src/Veggerby.Ignition.Azure/README.md)** - Azure Storage readiness (Blob, Queue, Table)
+  - Azure Blob Storage connection and container verification
+  - Azure Queue Storage connection and queue verification
+  - Azure Table Storage connection and table verification
+  - Optional auto-provisioning of missing resources
+  - Managed identity and connection string support
+  - ```dotnet add package Veggerby.Ignition.Azure```
+
+- **[Veggerby.Ignition.Aws](src/Veggerby.Ignition.Aws/README.md)** - AWS S3 bucket access verification
+  - S3 bucket existence and access verification
+  - IAM role and access key authentication
+  - Region configuration support
+  - ```dotnet add package Veggerby.Ignition.Aws```
+
+**Example:** Verify Azure and AWS storage readiness:
+
+```csharp
+builder.Services.AddIgnition();
+
+// Azure Storage
+builder.Services.AddAzureBlobReadiness(connectionString, options =>
+{
+    options.ContainerName = "config";
+    options.VerifyContainerExists = true;
+});
+
+builder.Services.AddAzureQueueReadiness(connectionString, options =>
+{
+    options.QueueName = "messages";
+});
+
+// AWS S3
+builder.Services.AddS3Readiness("my-bucket", options =>
+{
+    options.Region = "us-east-1";
+});
+
+var app = builder.Build();
+await app.Services.GetRequiredService<IIgnitionCoordinator>().WaitAllAsync();
+```
+
+📚 **[Cloud Sample](samples/Cloud/README.md)** demonstrates Azure and AWS storage readiness with emulator setup.
+
 ### HTTP & External Services
 
 - **[Veggerby.Ignition.Http](src/Veggerby.Ignition.Http/README.md)** - HTTP endpoint readiness verification
