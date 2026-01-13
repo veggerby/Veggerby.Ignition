@@ -14,10 +14,10 @@ Veggerby.Ignition is a lightweight .NET library for coordinating application sta
 **Architecture:**
 
 - Core library: `src/Veggerby.Ignition`
-- Integration packages: `src/Veggerby.Ignition.*` (Marten, MassTransit, MongoDb, Postgres, RabbitMq, SqlServer)
+- Integration packages: `src/Veggerby.Ignition.*` (Marten, MassTransit, MongoDb, Postgres, RabbitMq, SqlServer, Grpc, Http, Aws, Azure, Orleans, Redis, Memcached)
 - Tests: `test/` (unit and integration tests for each package)
 - Documentation: `docs/` with comprehensive guides
-- Samples: `samples/` with runnable examples
+- Samples: `samples/` with runnable examples (Simple, Advanced, DependencyGraph, Bundles, WebApi, Worker, Messaging, Cloud, TimeoutStrategies, TimelineExport, Replay, SimpleMode)
 - Benchmarks: `benchmarks/` for performance profiling
 
 ## Setup Commands
@@ -55,11 +55,30 @@ dotnet run --project samples/Simple/Simple.csproj
 # Advanced features
 dotnet run --project samples/Advanced/Advanced.csproj
 
-# Dependency graph coordination
+# Dependency graph coordination (DAG)
 dotnet run --project samples/DependencyGraph/DependencyGraph.csproj
+
+# Bundles (reusable signal packages)
+dotnet run --project samples/Bundles/Bundles.csproj
 
 # Web API with health checks
 dotnet run --project samples/WebApi/WebApi.csproj
+
+# Worker service integration
+dotnet run --project samples/Worker/Worker.csproj
+
+# Message bus integration
+dotnet run --project samples/Messaging/Messaging.csproj
+
+# Cloud provider integration
+dotnet run --project samples/Cloud/Cloud.csproj
+
+# Timeout strategies
+dotnet run --project samples/TimeoutStrategies/TimeoutStrategies.csproj
+
+# Timeline export/replay
+dotnet run --project samples/TimelineExport/TimelineExport.csproj
+dotnet run --project samples/Replay/Replay.csproj
 ```
 
 **Run Benchmarks:**
@@ -323,6 +342,8 @@ dotnet test Veggerby.Ignition.sln
 
 - `Parallel`: Execute all signals concurrently (respects `MaxDegreeOfParallelism`)
 - `Sequential`: Execute in registration order
+- `DependencyAware`: Execute signals based on dependency graph (DAG with topological sort)
+- `Staged`: Execute signals in sequential stages/phases with parallel execution within each stage
 
 **Timeout Semantics:**
 
@@ -364,11 +385,16 @@ dotnet test Veggerby.Ignition.sln
 
 ### Key Files and Their Roles
 
-- `src/Veggerby.Ignition/IIgnitionSignal.cs`: Core signal abstraction
-- `src/Veggerby.Ignition/IIgnitionCoordinator.cs`: Coordinator interface
-- `src/Veggerby.Ignition/IgnitionCoordinator.cs`: Main coordination logic
-- `src/Veggerby.Ignition/IgnitionOptions.cs`: Configuration options
-- `src/Veggerby.Ignition/IgnitionHealthCheck.cs`: Health check integration
+- `src/Veggerby.Ignition/Core/IIgnitionSignal.cs`: Core signal abstraction
+- `src/Veggerby.Ignition/Core/IIgnitionCoordinator.cs`: Coordinator interface
+- `src/Veggerby.Ignition/Core/IgnitionCoordinator.cs`: Main coordination logic
+- `src/Veggerby.Ignition/Core/IgnitionOptions.cs`: Configuration options
+- `src/Veggerby.Ignition/HealthChecks/IgnitionHealthCheck.cs`: Health check integration
+- `src/Veggerby.Ignition/Graph/IIgnitionGraph.cs`: Dependency graph abstraction for DAG execution
+- `src/Veggerby.Ignition/Graph/IgnitionGraphBuilder.cs`: Builder for dependency graphs
+- `src/Veggerby.Ignition/Extensions/IIgnitionBundle.cs`: Bundle abstraction for reusable signal packages
+- `src/Veggerby.Ignition/Extensions/IIgnitionTimeoutStrategy.cs`: Pluggable timeout strategy interface
+- `src/Veggerby.Ignition/Diagnostics/IgnitionTimeline.cs`: Timeline recording and replay
 - `.editorconfig`: Code formatting rules
 - `.github/copilot-instructions.md`: Detailed agent instructions (see attachments)
 
@@ -409,8 +435,10 @@ public async Task FailFast_Sequential_StopsOnFirstFailure()
 - Idempotency (multiple `WaitAllAsync` calls)
 - Edge cases (zero signals, single signal, mixed statuses)
 - Policy variations (FailFast, BestEffort, ContinueOnTimeout)
-- Execution mode variations (Parallel, Sequential)
+- Execution mode variations (Parallel, Sequential, DependencyAware, Staged)
 - Concurrency limiting
+- Dependency graph ordering (for DependencyAware mode)
+- Bundle registration and configuration
 
 ### Documentation Standards
 
@@ -434,6 +462,10 @@ public async Task FailFast_Sequential_StopsOnFirstFailure()
 - `docs/cookbook.md`: Common recipes
 - `docs/advanced-patterns.md`: Advanced scenarios
 - `docs/api-reference.md`: API documentation
+- `docs/dependency-aware-execution.md`: DAG execution guide
+- `docs/bundles.md`: Bundles guide
+- `docs/integration-recipes.md`: Integration package recipes
+- `docs/new-features.md`: Feature epics and roadmap
 
 ## Debugging and Troubleshooting
 
