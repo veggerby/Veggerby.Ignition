@@ -36,6 +36,7 @@ public class RedisIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task ConnectionOnly_Succeeds()
     {
         // arrange
@@ -51,6 +52,7 @@ public class RedisIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task Ping_Succeeds()
     {
         // arrange
@@ -66,6 +68,7 @@ public class RedisIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task PingAndTestKey_Succeeds()
     {
         // arrange
@@ -87,6 +90,7 @@ public class RedisIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task PingAndTestKey_TestKeyCleanedUp_EvenOnRepeatedCalls()
     {
         // arrange
@@ -110,6 +114,7 @@ public class RedisIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task DI_ConnectionString_CreatesSignal()
     {
         // arrange
@@ -134,6 +139,7 @@ public class RedisIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task DI_ExistingMultiplexer_CreatesSignal()
     {
         // arrange

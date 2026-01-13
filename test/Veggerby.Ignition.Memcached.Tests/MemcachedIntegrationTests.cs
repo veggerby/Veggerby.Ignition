@@ -34,6 +34,7 @@ public class MemcachedIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task ConnectionOnly_Succeeds()
     {
         // arrange
@@ -58,6 +59,7 @@ public class MemcachedIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task Stats_Succeeds()
     {
         // arrange
@@ -82,6 +84,7 @@ public class MemcachedIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task TestKey_Succeeds()
     {
         // arrange
@@ -107,6 +110,7 @@ public class MemcachedIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task TestKey_TestKeyCleanedUp()
     {
         // arrange
@@ -132,6 +136,7 @@ public class MemcachedIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task DI_ExistingClient_CreatesSignal()
     {
         // arrange

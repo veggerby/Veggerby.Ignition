@@ -159,9 +159,101 @@ dotnet test --filter "Category=Integration"
 - **xUnit** for test execution
 - **AwesomeAssertions** for fluent assertions (`.Should()` syntax)
 - **NSubstitute** for mocking dependencies
+- **Testcontainers** for integration tests requiring real infrastructure (Redis, PostgreSQL, RabbitMQ, etc.)
 - Test files use `// arrange`, `// act`, `// assert` comment structure
 - Tests must be deterministic (no flaky timing-dependent tests)
 - Use `TaskCompletionSource` for controlled async test scenarios
+
+**Integration Tests with Testcontainers:**
+
+Integration tests for packages requiring infrastructure (Redis, PostgreSQL, RabbitMQ, MongoDB, etc.) use **Testcontainers** to spin up real Docker containers during test execution.
+
+**Prerequisites:**
+
+```bash
+# Docker must be running
+docker --version
+
+# Docker daemon must be accessible
+docker ps
+```
+
+**Running Integration Tests:**
+
+Integration tests are tagged with `[Trait("Category", "Integration")]` and are **excluded by default**.
+
+```bash
+# Run ONLY integration tests (requires Docker)
+dotnet test Veggerby.Ignition.sln --filter "Category=Integration"
+
+# Run integration tests for specific package
+dotnet test test/Veggerby.Ignition.Redis.Tests/Veggerby.Ignition.Redis.Tests.csproj --filter "Category=Integration"
+dotnet test test/Veggerby.Ignition.Postgres.Tests/Veggerby.Ignition.Postgres.Tests.csproj --filter "Category=Integration"
+dotnet test test/Veggerby.Ignition.RabbitMq.Tests/Veggerby.Ignition.RabbitMq.Tests.csproj --filter "Category=Integration"
+
+# Run unit tests only (default - excludes integration tests)
+dotnet test Veggerby.Ignition.sln --filter "Category!=Integration"
+
+# Run ALL tests (both unit and integration tests - requires Docker)
+dotnet test Veggerby.Ignition.sln
+```
+
+**Testcontainers Pattern:**
+
+```csharp
+public class RedisIntegrationTests : IAsyncLifetime
+{
+    private readonly RedisContainer _redis = new RedisBuilder()
+        .WithImage("redis:7-alpine")
+        .Build();
+
+    public async Task InitializeAsync()
+    {
+        await _redis.StartAsync();
+    }
+
+    public async Task DisposeAsync()
+    {
+        await _redis.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task RedisSignal_ConnectsToRealRedis()
+    {
+        // arrange
+        var connectionString = _redis.GetConnectionString();
+        var signal = new RedisReadinessSignal(connectionString, options, logger);
+
+        // act
+        await signal.WaitAsync();
+
+        // assert
+        // Verify connection is established
+    }
+}
+```
+
+**Supported Testcontainers:**
+
+- **Redis**: `Testcontainers.Redis` - Redis cache/data store tests
+- **PostgreSQL**: `Testcontainers.PostgreSql` - PostgreSQL database tests
+- **RabbitMQ**: `Testcontainers.RabbitMq` - RabbitMQ message broker tests
+- **MongoDB**: `Testcontainers.MongoDb` - MongoDB document store tests
+- **SQL Server**: `Testcontainers.MsSql` - SQL Server database tests
+
+**Container Lifecycle:**
+
+- Containers start in `InitializeAsync()` (before each test class)
+- Containers stop in `DisposeAsync()` (after each test class)
+- Each test class gets a fresh container instance
+- Containers are automatically cleaned up after tests complete
+
+**Performance Considerations:**
+
+- Container startup adds ~2-10 seconds per test class
+- Use `[Collection]` attribute to share containers across multiple test classes when appropriate
+- Consider running integration tests separately from unit tests in CI/CD
+- Local development: keep Docker Desktop running for faster test execution
 
 **Testing Requirements:**
 
@@ -170,6 +262,7 @@ dotnet test --filter "Category=Integration"
 - Cover edge cases: zero signals, single signal, mixed success/failure/timeout states
 - Test idempotency (multiple coordinator waits return cached results)
 - Preserve existing test coverage when refactoring
+- **Integration tests**: Use Testcontainers for real infrastructure; avoid mocking external services when testing integration packages
 
 ## Code Style Guidelines
 
@@ -482,8 +575,22 @@ public async Task FailFast_Sequential_StopsOnFirstFailure()
    - Verify no unused usings or variables
 
 3. **Integration test failures:**
-   - Verify external dependencies (databases, message brokers) are available
-   - Check test project configuration matches requirements
+   - **Docker not running**: Ensure Docker Desktop/daemon is running (`docker ps` should succeed)
+   - **Testcontainers connection errors**: Check Docker socket permissions and network connectivity
+   - **Container startup timeout**: Increase timeout or check Docker resource allocation (CPU/memory)
+   - **Port conflicts**: Ensure no other services are using the same ports
+   - **Image pull failures**: Check network connectivity and Docker Hub access
+   - To skip integration tests when Docker unavailable: `dotnet test --filter "Category!=Integration"`
+
+4. **Redis integration tests failing:**
+   - Verify Docker is running: `docker ps`
+   - Check Redis container starts: Container logs available in test output on failure
+   - Ensure sufficient Docker resources allocated
+
+5. **RabbitMQ/PostgreSQL/MongoDB tests failing:**
+   - Same Docker requirements as Redis
+   - Check container-specific environment variables are set correctly
+   - Verify test project has correct Testcontainers package references
    - Review test setup/teardown for proper isolation
 
 **Logging:**
@@ -521,9 +628,10 @@ A change is complete when ALL of the following hold:
 
 **Dependencies:**
 
-- Core: Zero external dependencies beyond BCL + Microsoft.Extensions.*
-- Tests: xUnit, AwesomeAssertions, NSubstitute only
-- Keep minimal dependency surface
+- **Core library**: Zero external dependencies beyond BCL + Microsoft.Extensions.*
+- **Unit tests**: xUnit, AwesomeAssertions, NSubstitute only
+- **Integration tests**: Add Testcontainers.* packages as needed (Redis, PostgreSql, RabbitMq, MongoDb, MsSql)
+- Keep minimal dependency surface in production code
 
 **Version Information:**
 
