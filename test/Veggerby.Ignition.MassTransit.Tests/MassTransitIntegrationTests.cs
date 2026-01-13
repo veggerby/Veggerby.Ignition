@@ -24,7 +24,11 @@ public class MassTransitIntegrationTests : IAsyncLifetime
 
         var services = new ServiceCollection();
         
-        services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
+        // Suppress MassTransit connection warnings during initialization (expected while RabbitMQ starts)
+        services.AddLogging(builder => builder
+            .AddConsole()
+            .SetMinimumLevel(LogLevel.Warning)
+            .AddFilter("MassTransit", LogLevel.Error));
         
         services.AddMassTransit(x =>
         {
