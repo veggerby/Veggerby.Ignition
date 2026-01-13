@@ -150,24 +150,13 @@ public static class RedisIgnitionExtensions
     {
         ArgumentNullException.ThrowIfNull(connectionStringFactory);
 
-        if (stage < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(stage), "Stage number cannot be negative.");
-        }
+        var options = new RedisReadinessOptions();
+        configure?.Invoke(options);
 
-        services.AddIgnitionSignalFromFactoryWithStage(
-            "redis-readiness",
-            sp =>
-            {
-                var connectionString = connectionStringFactory(sp);
-                var multiplexer = ConnectionMultiplexer.Connect(connectionString);
-                var options = new RedisReadinessOptions();
-                configure?.Invoke(options);
+        var innerFactory = new RedisReadinessSignalFactory(connectionStringFactory, options);
+        var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, stage);
 
-                var logger = sp.GetRequiredService<ILogger<RedisReadinessSignal>>();
-                return new RedisReadinessSignal(multiplexer, options, logger);
-            },
-            stage);
+        services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
 
         return services;
     }

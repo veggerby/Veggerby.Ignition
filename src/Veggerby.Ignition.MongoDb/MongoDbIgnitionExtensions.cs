@@ -141,24 +141,13 @@ public static class MongoDbIgnitionExtensions
     {
         ArgumentNullException.ThrowIfNull(connectionStringFactory);
 
-        if (stage < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(stage), "Stage number cannot be negative.");
-        }
+        var options = new MongoDbReadinessOptions();
+        configure?.Invoke(options);
 
-        services.AddIgnitionSignalFromFactoryWithStage(
-            "mongodb-readiness",
-            sp =>
-            {
-                var connectionString = connectionStringFactory(sp);
-                var client = new MongoClient(connectionString);
-                var options = new MongoDbReadinessOptions();
-                configure?.Invoke(options);
+        var innerFactory = new MongoDbReadinessSignalFactory(connectionStringFactory, options);
+        var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, stage);
 
-                var logger = sp.GetRequiredService<ILogger<MongoDbReadinessSignal>>();
-                return new MongoDbReadinessSignal(client, options, logger);
-            },
-            stage);
+        services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
 
         return services;
     }

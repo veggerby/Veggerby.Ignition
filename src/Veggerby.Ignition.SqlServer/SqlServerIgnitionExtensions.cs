@@ -137,23 +137,13 @@ public static class SqlServerIgnitionExtensions
     {
         ArgumentNullException.ThrowIfNull(connectionStringFactory);
 
-        if (stage < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(stage), "Stage number cannot be negative.");
-        }
+        var options = new SqlServerReadinessOptions();
+        configure?.Invoke(options);
 
-        services.AddIgnitionSignalFromFactoryWithStage(
-            "sqlserver-readiness",
-            sp =>
-            {
-                var connectionString = connectionStringFactory(sp);
-                var options = new SqlServerReadinessOptions();
-                configure?.Invoke(options);
+        var innerFactory = new SqlServerReadinessSignalFactory(connectionStringFactory, options);
+        var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, stage);
 
-                var logger = sp.GetRequiredService<ILogger<SqlServerReadinessSignal>>();
-                return new SqlServerReadinessSignal(connectionString, options, logger);
-            },
-            stage);
+        services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
 
         return services;
     }

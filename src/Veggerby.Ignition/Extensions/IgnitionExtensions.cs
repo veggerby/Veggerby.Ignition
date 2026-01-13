@@ -1004,13 +1004,11 @@ public static class IgnitionExtensions
     {
         ArgumentNullException.ThrowIfNull(signal);
 
-        if (stage < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(stage), "Stage number cannot be negative.");
-        }
-
-        var stagedSignal = signal is IStagedIgnitionSignal ? signal : new StagedSignalWrapper(signal, stage);
-        services.AddSingleton<IIgnitionSignal>(stagedSignal);
+        // Wrap the signal in a factory
+        var innerFactory = new DelegateIgnitionSignalFactory(signal.Name, _ => signal, signal.Timeout);
+        var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, stage);
+        
+        services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
         return services;
     }
 
@@ -1033,14 +1031,13 @@ public static class IgnitionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(taskFactory);
 
-        if (stage < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(stage), "Stage number cannot be negative.");
-        }
-
-        var signal = IgnitionSignal.FromTaskFactory(name, taskFactory, timeout);
-        var stagedSignal = new StagedSignalWrapper(signal, stage);
-        services.AddSingleton<IIgnitionSignal>(stagedSignal);
+        var innerFactory = new DelegateIgnitionSignalFactory(
+            name,
+            _ => IgnitionSignal.FromTaskFactory(name, taskFactory, timeout),
+            timeout);
+        var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, stage);
+        
+        services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
         return services;
     }
 
@@ -1063,14 +1060,13 @@ public static class IgnitionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(readyTask);
 
-        if (stage < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(stage), "Stage number cannot be negative.");
-        }
-
-        var signal = IgnitionSignal.FromTask(name, readyTask, timeout);
-        var stagedSignal = new StagedSignalWrapper(signal, stage);
-        services.AddSingleton<IIgnitionSignal>(stagedSignal);
+        var innerFactory = new DelegateIgnitionSignalFactory(
+            name,
+            _ => IgnitionSignal.FromTask(name, readyTask, timeout),
+            timeout);
+        var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, stage);
+        
+        services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
         return services;
     }
 
@@ -1108,44 +1104,12 @@ public static class IgnitionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(signalFactory);
 
-        if (stage < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(stage), "Stage number cannot be negative.");
-        }
-
-        var factory = new DelegateIgnitionSignalFactory(
-            name,
-            sp =>
-            {
-                var signal = signalFactory(sp);
-                return new StagedSignalWrapper(signal, stage);
-            },
-            timeout);
-
-        services.AddSingleton<IIgnitionSignalFactory>(factory);
+        var innerFactory = new DelegateIgnitionSignalFactory(name, signalFactory, timeout);
+        var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, stage);
+        
+        services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
 
         return services;
-    }
-
-    /// <summary>
-    /// Wrapper that adds stage/phase support to an existing signal.
-    /// </summary>
-    private sealed class StagedSignalWrapper : IStagedIgnitionSignal
-    {
-        private readonly IIgnitionSignal _inner;
-
-        public StagedSignalWrapper(IIgnitionSignal inner, int stage)
-        {
-            _inner = inner;
-            Stage = stage;
-        }
-
-        public string Name => _inner.Name;
-        public TimeSpan? Timeout => _inner.Timeout;
-        public int Stage { get; }
-
-        public Task WaitAsync(CancellationToken cancellationToken = default)
-            => _inner.WaitAsync(cancellationToken);
     }
 
     /// <summary>

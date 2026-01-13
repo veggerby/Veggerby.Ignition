@@ -189,24 +189,13 @@ public static class RabbitMqIgnitionExtensions
     {
         ArgumentNullException.ThrowIfNull(connectionStringFactory);
 
-        if (stage < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(stage), "Stage number cannot be negative.");
-        }
+        var options = new RabbitMqReadinessOptions();
+        configure?.Invoke(options);
 
-        services.AddIgnitionSignalFromFactoryWithStage(
-            "rabbitmq-readiness",
-            sp =>
-            {
-                var connectionString = connectionStringFactory(sp);
-                var factory = new ConnectionFactory { Uri = new Uri(connectionString) };
-                var options = new RabbitMqReadinessOptions();
-                configure?.Invoke(options);
+        var innerFactory = new RabbitMqReadinessSignalFactory(connectionStringFactory, options);
+        var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, stage);
 
-                var logger = sp.GetRequiredService<ILogger<RabbitMqReadinessSignal>>();
-                return new RabbitMqReadinessSignal(factory, options, logger);
-            },
-            stage);
+        services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
 
         return services;
     }

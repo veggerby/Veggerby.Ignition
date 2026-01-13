@@ -153,23 +153,13 @@ public static class PostgresIgnitionExtensions
     {
         ArgumentNullException.ThrowIfNull(connectionStringFactory);
 
-        if (stage < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(stage), "Stage number cannot be negative.");
-        }
+        var options = new PostgresReadinessOptions();
+        configure?.Invoke(options);
 
-        services.AddIgnitionSignalFromFactoryWithStage(
-            "postgres-readiness",
-            sp =>
-            {
-                var connectionString = connectionStringFactory(sp);
-                var options = new PostgresReadinessOptions();
-                configure?.Invoke(options);
+        var innerFactory = new PostgresReadinessSignalFactory(connectionStringFactory, options);
+        var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, stage);
 
-                var logger = sp.GetRequiredService<ILogger<PostgresReadinessSignal>>();
-                return new PostgresReadinessSignal(connectionString, options, logger);
-            },
-            stage);
+        services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
 
         return services;
     }
