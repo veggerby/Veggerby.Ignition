@@ -22,9 +22,8 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
     private const string ActivitySourceName = "Veggerby.Ignition.IgnitionCoordinator";
 
     private static readonly ActivitySource ActivitySource = new(ActivitySourceName);
-    private readonly IReadOnlyList<IIgnitionSignal> _directSignals;
     private readonly IReadOnlyList<IIgnitionSignalFactory> _factories;
-    private readonly IServiceProvider? _serviceProvider;
+    private readonly IServiceProvider _serviceProvider;
     private readonly Lazy<IReadOnlyList<IIgnitionSignal>> _handles;
     private readonly IIgnitionGraph? _graph;
     private readonly IgnitionOptions _options;
@@ -36,49 +35,39 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
     /// <summary>
     /// Creates a new coordinator instance.
     /// </summary>
-    /// <param name="handles">The collection of ignition signals to evaluate.</param>
+    /// <param name="factories">The collection of ignition signal factories for creating signals.</param>
+    /// <param name="serviceProvider">Service provider for resolving dependencies when creating signals from factories.</param>
     /// <param name="options">Configured ignition options.</param>
     /// <param name="logger">Logger used for diagnostic output.</param>
-    public IgnitionCoordinator(IEnumerable<IIgnitionSignal> handles, IOptions<IgnitionOptions> options, ILogger<IgnitionCoordinator> logger)
-        : this(handles, Enumerable.Empty<IIgnitionSignalFactory>(), serviceProvider: null, graph: null, options, logger)
+    public IgnitionCoordinator(
+        IEnumerable<IIgnitionSignalFactory> factories,
+        IServiceProvider serviceProvider,
+        IOptions<IgnitionOptions> options,
+        ILogger<IgnitionCoordinator> logger)
+        : this(factories, serviceProvider, graph: null, options, logger)
     {
     }
 
     /// <summary>
     /// Creates a new coordinator instance with optional dependency graph.
     /// </summary>
-    /// <param name="handles">The collection of ignition signals to evaluate.</param>
-    /// <param name="graph">Optional dependency graph for dependency-aware execution.</param>
-    /// <param name="options">Configured ignition options.</param>
-    /// <param name="logger">Logger used for diagnostic output.</param>
-    public IgnitionCoordinator(IEnumerable<IIgnitionSignal> handles, IIgnitionGraph? graph, IOptions<IgnitionOptions> options, ILogger<IgnitionCoordinator> logger)
-        : this(handles, Enumerable.Empty<IIgnitionSignalFactory>(), serviceProvider: null, graph, options, logger)
-    {
-    }
-
-    /// <summary>
-    /// Creates a new coordinator instance with signal factories and optional dependency graph.
-    /// </summary>
-    /// <param name="handles">The collection of ignition signals to evaluate.</param>
-    /// <param name="factories">The collection of ignition signal factories for lazy signal creation.</param>
+    /// <param name="factories">The collection of ignition signal factories for creating signals.</param>
     /// <param name="serviceProvider">Service provider for resolving dependencies when creating signals from factories.</param>
     /// <param name="graph">Optional dependency graph for dependency-aware execution.</param>
     /// <param name="options">Configured ignition options.</param>
     /// <param name="logger">Logger used for diagnostic output.</param>
     public IgnitionCoordinator(
-        IEnumerable<IIgnitionSignal> handles,
         IEnumerable<IIgnitionSignalFactory> factories,
-        IServiceProvider? serviceProvider,
+        IServiceProvider serviceProvider,
         IIgnitionGraph? graph,
         IOptions<IgnitionOptions> options,
         ILogger<IgnitionCoordinator> logger)
     {
-        ArgumentNullException.ThrowIfNull(handles);
         ArgumentNullException.ThrowIfNull(factories);
+        ArgumentNullException.ThrowIfNull(serviceProvider);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(logger);
 
-        _directSignals = handles.ToList();
         _factories = factories.ToList();
         _serviceProvider = serviceProvider;
         _graph = graph;
@@ -89,24 +78,16 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
     }
 
     /// <summary>
-    /// Creates all ignition signals, combining direct signals and factory-created signals.
+    /// Creates all ignition signals from factories.
     /// </summary>
     private IReadOnlyList<IIgnitionSignal> CreateAllSignals()
     {
-        var signals = new List<IIgnitionSignal>(_directSignals);
+        var signals = new List<IIgnitionSignal>(_factories.Count);
 
-        if (_factories.Count > 0)
+        foreach (var factory in _factories)
         {
-            if (_serviceProvider == null)
-            {
-                throw new InvalidOperationException("Cannot create signals from factories without a service provider.");
-            }
-
-            foreach (var factory in _factories)
-            {
-                var signal = factory.CreateSignal(_serviceProvider);
-                signals.Add(signal);
-            }
+            var signal = factory.CreateSignal(_serviceProvider);
+            signals.Add(signal);
         }
 
         return signals;

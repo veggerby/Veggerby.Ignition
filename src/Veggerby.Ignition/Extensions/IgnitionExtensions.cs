@@ -50,12 +50,11 @@ public static class IgnitionExtensions
 
         services.TryAddSingleton<IIgnitionCoordinator>(sp =>
         {
-            var signals = sp.GetServices<IIgnitionSignal>();
             var factories = sp.GetServices<IIgnitionSignalFactory>();
             var graph = sp.GetService<IIgnitionGraph>();
             var options = sp.GetRequiredService<IOptions<IgnitionOptions>>();
             var logger = sp.GetRequiredService<ILogger<IgnitionCoordinator>>();
-            return new IgnitionCoordinator(signals, factories, sp, graph, options, logger);
+            return new IgnitionCoordinator(factories, sp, graph, options, logger);
         });
 
         if (addHealthCheck)
@@ -221,7 +220,11 @@ public static class IgnitionExtensions
         this IServiceCollection services,
         IIgnitionSignal signal)
     {
-        services.AddSingleton(signal);
+        ArgumentNullException.ThrowIfNull(signal);
+        
+        // Wrap signal in a factory for consistent handling
+        var factory = new DelegateIgnitionSignalFactory(signal.Name, _ => signal, signal.Timeout);
+        services.AddSingleton<IIgnitionSignalFactory>(factory);
         return services;
     }
 
@@ -234,7 +237,12 @@ public static class IgnitionExtensions
     public static IServiceCollection AddIgnitionSignal<TSignal>(
         this IServiceCollection services) where TSignal : class, IIgnitionSignal
     {
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IIgnitionSignal, TSignal>());
+        // Register as factory instead of direct signal
+        services.AddSingleton<IIgnitionSignalFactory>(sp =>
+        {
+            var signal = ActivatorUtilities.CreateInstance<TSignal>(sp);
+            return new DelegateIgnitionSignalFactory(signal.Name, _ => signal, signal.Timeout);
+        });
         return services;
     }
 
@@ -248,9 +256,11 @@ public static class IgnitionExtensions
         this IServiceCollection services,
         IEnumerable<IIgnitionSignal> signals)
     {
+        ArgumentNullException.ThrowIfNull(signals);
+        
         foreach (var s in signals)
         {
-            services.AddSingleton(s);
+            AddIgnitionSignal(services, s);
         }
 
         return services;
@@ -337,10 +347,14 @@ public static class IgnitionExtensions
             ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
         }
 
-        services.AddSingleton<IIgnitionSignal>(sp => new ServiceReadySignal<TService>(
-            sp,
-            name ?? typeof(TService).Name,
-            (svc, _) => taskSelector(svc),
+        var signalName = name ?? typeof(TService).Name;
+        services.AddSingleton<IIgnitionSignalFactory>(sp => new DelegateIgnitionSignalFactory(
+            signalName,
+            sp2 => new ServiceReadySignal<TService>(
+                sp2,
+                signalName,
+                (svc, _) => taskSelector(svc),
+                timeout),
             timeout));
 
         return services;
