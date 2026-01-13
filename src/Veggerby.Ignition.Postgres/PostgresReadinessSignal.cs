@@ -24,7 +24,8 @@ namespace Veggerby.Ignition.Postgres;
 /// </remarks>
 public sealed class PostgresReadinessSignal : IIgnitionSignal
 {
-    private readonly NpgsqlDataSource _dataSource;
+    private readonly NpgsqlDataSource? _dataSource;
+    private readonly Func<NpgsqlDataSource>? _dataSourceFactory;
     private readonly bool _ownsDataSource;
     private readonly PostgresReadinessOptions _options;
     private readonly ILogger<PostgresReadinessSignal> _logger;
@@ -48,6 +49,31 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
         ILogger<PostgresReadinessSignal> logger)
     {
         _dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
+        _dataSourceFactory = null;
+        _ownsDataSource = false;
+        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PostgresReadinessSignal"/> class
+    /// using a factory function for lazy <see cref="NpgsqlDataSource"/> creation.
+    /// </summary>
+    /// <param name="dataSourceFactory">Factory function that creates a PostgreSQL data source when invoked.</param>
+    /// <param name="options">Configuration options for readiness verification.</param>
+    /// <param name="logger">Logger for diagnostic output.</param>
+    /// <remarks>
+    /// This constructor defers data source creation until the signal executes, enabling scenarios
+    /// where connection strings are not available at registration time (e.g., Testcontainers).
+    /// The factory will be invoked once during signal execution.
+    /// </remarks>
+    public PostgresReadinessSignal(
+        Func<NpgsqlDataSource> dataSourceFactory,
+        PostgresReadinessOptions options,
+        ILogger<PostgresReadinessSignal> logger)
+    {
+        _dataSource = null;
+        _dataSourceFactory = dataSourceFactory ?? throw new ArgumentNullException(nameof(dataSourceFactory));
         _ownsDataSource = false;
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -72,6 +98,7 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString, nameof(connectionString));
         _dataSource = NpgsqlDataSource.Create(connectionString);
+        _dataSourceFactory = null;
         _ownsDataSource = true;
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -103,7 +130,10 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
     {
         var activity = Activity.Current;
 
-        var builder = new NpgsqlConnectionStringBuilder(_dataSource.ConnectionString);
+        // Resolve data source from factory if needed
+        var dataSource = _dataSource ?? _dataSourceFactory!();
+
+        var builder = new NpgsqlConnectionStringBuilder(dataSource.ConnectionString);
         var serverName = builder.Host;
         var databaseName = builder.Database;
 
@@ -117,7 +147,7 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
 
         try
         {
-            using var connection = await OpenConnectionWithRetryAsync(cancellationToken);
+            using var connection = await OpenConnectionWithRetryAsync(dataSource, cancellationToken);
 
             _logger.LogDebug("PostgreSQL connection established");
 
@@ -137,14 +167,14 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
         finally
         {
             // Dispose data source if we own it (created from connection string)
-            if (_ownsDataSource)
+            if (_ownsDataSource && _dataSource != null)
             {
                 await _dataSource.DisposeAsync();
             }
         }
     }
 
-    private async Task<NpgsqlConnection> OpenConnectionWithRetryAsync(CancellationToken cancellationToken)
+    private async Task<NpgsqlConnection> OpenConnectionWithRetryAsync(NpgsqlDataSource dataSource, CancellationToken cancellationToken)
     {
         const int initialDelayMs = 100;
         const double multiplier = 1.5;
@@ -159,7 +189,7 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
             NpgsqlConnection? connection = null;
             try
             {
-                connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+                connection = await dataSource.OpenConnectionAsync(cancellationToken);
                 return connection;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)

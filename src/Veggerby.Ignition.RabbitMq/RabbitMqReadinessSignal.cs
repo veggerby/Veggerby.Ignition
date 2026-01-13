@@ -17,7 +17,8 @@ namespace Veggerby.Ignition.RabbitMq;
 /// </summary>
 public sealed class RabbitMqReadinessSignal : IIgnitionSignal
 {
-    private readonly IConnectionFactory _connectionFactory;
+    private readonly IConnectionFactory? _connectionFactory;
+    private readonly Func<IConnectionFactory>? _connectionFactoryFactory;
     private readonly RabbitMqReadinessOptions _options;
     private readonly ILogger<RabbitMqReadinessSignal> _logger;
     private readonly object _sync = new();
@@ -35,6 +36,25 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
         ILogger<RabbitMqReadinessSignal> logger)
     {
         _connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
+        _connectionFactoryFactory = null;
+        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RabbitMqReadinessSignal"/> class
+    /// using a factory function for lazy connection factory creation.
+    /// </summary>
+    /// <param name="connectionFactoryFactory">Factory function that creates a connection factory when invoked.</param>
+    /// <param name="options">Configuration options for readiness verification.</param>
+    /// <param name="logger">Logger for diagnostic output.</param>
+    public RabbitMqReadinessSignal(
+        Func<IConnectionFactory> connectionFactoryFactory,
+        RabbitMqReadinessOptions options,
+        ILogger<RabbitMqReadinessSignal> logger)
+    {
+        _connectionFactory = null;
+        _connectionFactoryFactory = connectionFactoryFactory ?? throw new ArgumentNullException(nameof(connectionFactoryFactory));
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -63,11 +83,14 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
 
     private async Task ExecuteAsync(CancellationToken cancellationToken)
     {
+        // Resolve connection factory from factory if provided, otherwise use direct reference
+        var connectionFactory = _connectionFactory ?? _connectionFactoryFactory!();
+
         var activity = Activity.Current;
         
         // Note: IConnectionFactory endpoint properties vary by implementation
         // Only log what we can safely access
-        if (_connectionFactory is ConnectionFactory factory)
+        if (connectionFactory is ConnectionFactory factory)
         {
             activity?.SetTag("rabbitmq.host", factory.HostName);
             activity?.SetTag("rabbitmq.port", factory.Port);
@@ -89,7 +112,7 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
 
         try
         {
-            connection = await CreateConnectionWithRetryAsync(cancellationToken);
+            connection = await CreateConnectionWithRetryAsync(connectionFactory, cancellationToken);
             _logger.LogDebug("RabbitMQ connection established");
 
             channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
@@ -232,7 +255,9 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
         }
     }
 
-    private async Task<IConnection> CreateConnectionWithRetryAsync(CancellationToken cancellationToken)
+    private async Task<IConnection> CreateConnectionWithRetryAsync(
+        IConnectionFactory connectionFactory,
+        CancellationToken cancellationToken)
     {
         var delay = TimeSpan.FromMilliseconds(100);
         const int maxDelay = 5000;
@@ -242,7 +267,7 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
         {
             try
             {
-                return await _connectionFactory.CreateConnectionAsync(cancellationToken);
+                return await connectionFactory.CreateConnectionAsync(cancellationToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

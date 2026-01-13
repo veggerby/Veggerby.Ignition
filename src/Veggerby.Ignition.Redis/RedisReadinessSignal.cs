@@ -16,7 +16,8 @@ namespace Veggerby.Ignition.Redis;
 /// </summary>
 public sealed class RedisReadinessSignal : IIgnitionSignal
 {
-    private readonly IConnectionMultiplexer _connectionMultiplexer;
+    private readonly IConnectionMultiplexer? _connectionMultiplexer;
+    private readonly Func<IConnectionMultiplexer>? _connectionMultiplexerFactory;
     private readonly RedisReadinessOptions _options;
     private readonly ILogger<RedisReadinessSignal> _logger;
     private readonly object _sync = new();
@@ -35,6 +36,25 @@ public sealed class RedisReadinessSignal : IIgnitionSignal
         ILogger<RedisReadinessSignal> logger)
     {
         _connectionMultiplexer = connectionMultiplexer ?? throw new ArgumentNullException(nameof(connectionMultiplexer));
+        _connectionMultiplexerFactory = null;
+        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RedisReadinessSignal"/> class
+    /// using a factory function for lazy multiplexer creation.
+    /// </summary>
+    /// <param name="connectionMultiplexerFactory">Factory function that creates a connection multiplexer when invoked.</param>
+    /// <param name="options">Configuration options for readiness verification.</param>
+    /// <param name="logger">Logger for diagnostic output.</param>
+    public RedisReadinessSignal(
+        Func<IConnectionMultiplexer> connectionMultiplexerFactory,
+        RedisReadinessOptions options,
+        ILogger<RedisReadinessSignal> logger)
+    {
+        _connectionMultiplexer = null;
+        _connectionMultiplexerFactory = connectionMultiplexerFactory ?? throw new ArgumentNullException(nameof(connectionMultiplexerFactory));
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -65,7 +85,10 @@ public sealed class RedisReadinessSignal : IIgnitionSignal
     {
         var activity = Activity.Current;
 
-        var endpoints = string.Join(", ", _connectionMultiplexer.GetEndPoints().Select(ep => ep.ToString()));
+        // Resolve multiplexer from factory if needed
+        var multiplexer = _connectionMultiplexer ?? _connectionMultiplexerFactory!();
+
+        var endpoints = string.Join(", ", multiplexer.GetEndPoints().Select(ep => ep.ToString()));
         activity?.SetTag("redis.endpoints", endpoints);
         activity?.SetTag("redis.verification_strategy", _options.VerificationStrategy.ToString());
 
@@ -76,7 +99,7 @@ public sealed class RedisReadinessSignal : IIgnitionSignal
 
         try
         {
-            if (!_connectionMultiplexer.IsConnected)
+            if (!multiplexer.IsConnected)
             {
                 throw new InvalidOperationException("Redis connection multiplexer is not connected");
             }
@@ -86,12 +109,12 @@ public sealed class RedisReadinessSignal : IIgnitionSignal
             if (_options.VerificationStrategy == RedisVerificationStrategy.Ping ||
                 _options.VerificationStrategy == RedisVerificationStrategy.PingAndTestKey)
             {
-                await ExecutePingAsync(cancellationToken);
+                await ExecutePingAsync(multiplexer, cancellationToken);
             }
 
             if (_options.VerificationStrategy == RedisVerificationStrategy.PingAndTestKey)
             {
-                await ExecuteTestKeyRoundTripAsync(cancellationToken);
+                await ExecuteTestKeyRoundTripAsync(multiplexer, cancellationToken);
             }
 
             _logger.LogInformation("Redis readiness check completed successfully");
@@ -103,24 +126,24 @@ public sealed class RedisReadinessSignal : IIgnitionSignal
         }
     }
 
-    private async Task ExecutePingAsync(CancellationToken cancellationToken)
+    private async Task ExecutePingAsync(IConnectionMultiplexer multiplexer, CancellationToken cancellationToken)
     {
         _logger.LogDebug("Executing Redis PING command");
 
-        var db = _connectionMultiplexer.GetDatabase();
+        var db = multiplexer.GetDatabase();
         var pingResult = await db.PingAsync();
 
         _logger.LogDebug("Redis PING completed in {Duration}ms", pingResult.TotalMilliseconds);
     }
 
-    private async Task ExecuteTestKeyRoundTripAsync(CancellationToken cancellationToken)
+    private async Task ExecuteTestKeyRoundTripAsync(IConnectionMultiplexer multiplexer, CancellationToken cancellationToken)
     {
         var testKey = $"{_options.TestKeyPrefix}{Guid.NewGuid():N}";
         var testValue = Guid.NewGuid().ToString("N");
 
         _logger.LogDebug("Executing Redis test key round-trip for key {TestKey}", testKey);
 
-        var db = _connectionMultiplexer.GetDatabase();
+        var db = multiplexer.GetDatabase();
 
         try
         {

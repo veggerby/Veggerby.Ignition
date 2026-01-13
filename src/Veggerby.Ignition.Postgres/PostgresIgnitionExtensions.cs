@@ -54,18 +54,11 @@ public static class PostgresIgnitionExtensions
 
             var logger = sp.GetRequiredService<ILogger<PostgresReadinessSignal>>();
             
-            // Prefer NpgsqlDataSource from DI (recommended approach)
-            var dataSource = sp.GetService<NpgsqlDataSource>();
-            if (dataSource != null)
-            {
-                return new PostgresReadinessSignal(dataSource, options, logger);
-            }
-
-            // Fallback: try to get connection string from configuration
-            throw new InvalidOperationException(
-                "No NpgsqlDataSource registered in DI container. " +
-                "Register NpgsqlDataSource using services.AddSingleton<NpgsqlDataSource>() or use the " +
-                "AddPostgresReadiness(connectionString, configure) overload.");
+            // Use factory pattern to defer data source resolution until signal executes
+            return new PostgresReadinessSignal(
+                () => sp.GetRequiredService<NpgsqlDataSource>(),
+                options,
+                logger);
         });
 
         return services;

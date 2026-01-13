@@ -93,9 +93,12 @@ public static class RedisIgnitionExtensions
             var options = new RedisReadinessOptions();
             configure?.Invoke(options);
 
-            var multiplexer = sp.GetRequiredService<IConnectionMultiplexer>();
             var logger = sp.GetRequiredService<ILogger<RedisReadinessSignal>>();
-            return new RedisReadinessSignal(multiplexer, options, logger);
+            // Use factory pattern to defer multiplexer resolution until signal executes
+            return new RedisReadinessSignal(
+                () => sp.GetRequiredService<IConnectionMultiplexer>(),
+                options,
+                logger);
         });
 
         return services;

@@ -1,0 +1,413 @@
+using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using MongoDB.Driver;
+using Npgsql;
+using RabbitMQ.Client;
+using StackExchange.Redis;
+using Testcontainers.MongoDb;
+using Testcontainers.MsSql;
+using Testcontainers.PostgreSql;
+using Testcontainers.RabbitMq;
+using Testcontainers.Redis;
+using Veggerby.Ignition;
+using Veggerby.Ignition.Http;
+using Veggerby.Ignition.MongoDb;
+using Veggerby.Ignition.Postgres;
+using Veggerby.Ignition.RabbitMq;
+using Veggerby.Ignition.Redis;
+using Veggerby.Ignition.SqlServer;
+
+namespace TestcontainersDemo;
+
+/// <summary>
+/// Comprehensive Testcontainers sample demonstrating:
+/// - Multi-stage ignition (container startup → databases → caches → message queues → application services)
+/// - Sequential and parallel execution modes
+/// - All major integration packages
+/// - Real infrastructure via Testcontainers orchestrated by Ignition
+/// - Health check integration
+/// - Full observability (tracing, logging, metrics)
+/// </summary>
+public class Program
+{
+    public static async Task Main(string[] args)
+    {
+        Console.WriteLine("╔════════════════════════════════════════════════════════════════════════════╗");
+        Console.WriteLine("║  Veggerby.Ignition - Testcontainers Multi-Service Demo                     ║");
+        Console.WriteLine("║                                                                            ║");
+        Console.WriteLine("║  Demonstrates:                                                             ║");
+        Console.WriteLine("║    • Multi-stage execution (5 stages)                                      ║");
+        Console.WriteLine("║    • Ignition orchestrating container startup itself!                      ║");
+        Console.WriteLine("║    • PostgreSQL, Redis, RabbitMQ, MongoDB, SQL Server                      ║");
+        Console.WriteLine("║    • Sequential & parallel execution                                       ║");
+        Console.WriteLine("║    • Full observability                                                    ║");
+        Console.WriteLine("╚════════════════════════════════════════════════════════════════════════════╝");
+        Console.WriteLine();
+
+        // Build and run the application
+        var builder = Host.CreateApplicationBuilder(args);
+        
+        // Create infrastructure manager (containers not started yet!)
+        var infrastructure = new InfrastructureManager();
+        builder.Services.AddSingleton(infrastructure);
+
+        // Configure logging
+        builder.Logging.ClearProviders();
+        builder.Logging.AddConsole();
+        builder.Logging.SetMinimumLevel(LogLevel.Information);
+
+        // Configure Ignition with staged execution
+        builder.Services.AddIgnition(options =>
+        {
+            options.ExecutionMode = IgnitionExecutionMode.Staged;
+            options.Policy = IgnitionPolicy.FailFast;
+            options.GlobalTimeout = TimeSpan.FromSeconds(120);
+            options.CancelOnGlobalTimeout = true;
+            options.EnableTracing = true;
+            options.SlowHandleLogCount = 5;
+        });
+
+        // Stage 0: Start Infrastructure Containers (parallel within stage)
+        Console.WriteLine("📋 Registering Stage 0: Infrastructure Startup (Testcontainers)");
+        builder.Services.AddIgnitionFromTaskWithStage(
+            "postgres-container",
+            async ct => await infrastructure.StartPostgresAsync(),
+            stage: 0);
+        builder.Services.AddIgnitionFromTaskWithStage(
+            "redis-container",
+            async ct => await infrastructure.StartRedisAsync(),
+            stage: 0);
+        builder.Services.AddIgnitionFromTaskWithStage(
+            "rabbitmq-container",
+            async ct => await infrastructure.StartRabbitMqAsync(),
+            stage: 0);
+        builder.Services.AddIgnitionFromTaskWithStage(
+            "mongodb-container",
+            async ct => await infrastructure.StartMongoDbAsync(),
+            stage: 0);
+        builder.Services.AddIgnitionFromTaskWithStage(
+            "sqlserver-container",
+            async ct => await infrastructure.StartSqlServerAsync(),
+            stage: 0);
+
+        // Stage 1: Databases (parallel within stage)
+        // Construct signals at execution time to avoid Service Locator pattern
+        Console.WriteLine("📋 Registering Stage 1: Databases (PostgreSQL, SQL Server, MongoDB)");
+        builder.Services.AddIgnitionFromTaskWithStage(
+            "postgres-readiness",
+            async ct =>
+            {
+                var loggerFactory = builder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
+                var signal = new PostgresReadinessSignal(
+                    infrastructure.PostgresConnectionString,
+                    new PostgresReadinessOptions { ValidationQuery = "SELECT 1", Timeout = TimeSpan.FromSeconds(30) },
+                    loggerFactory.CreateLogger<PostgresReadinessSignal>());
+                await signal.WaitAsync(ct);
+            },
+            stage: 1);
+
+        builder.Services.AddIgnitionFromTaskWithStage(
+            "sqlserver-readiness",
+            async ct =>
+            {
+                var loggerFactory = builder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
+                var signal = new SqlServerReadinessSignal(
+                    infrastructure.SqlServerConnectionString,
+                    new SqlServerReadinessOptions { ValidationQuery = "SELECT 1", Timeout = TimeSpan.FromSeconds(30) },
+                    loggerFactory.CreateLogger<SqlServerReadinessSignal>());
+                await signal.WaitAsync(ct);
+            },
+            stage: 1);
+
+        builder.Services.AddIgnitionFromTaskWithStage(
+            "mongodb-readiness",
+            async ct =>
+            {
+                var loggerFactory = builder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
+                var client = new MongoClient(infrastructure.MongoDbConnectionString);
+                var signal = new MongoDbReadinessSignal(
+                    client,
+                    new MongoDbReadinessOptions { DatabaseName = "testdb", Timeout = TimeSpan.FromSeconds(30) },
+                    loggerFactory.CreateLogger<MongoDbReadinessSignal>());
+                await signal.WaitAsync(ct);
+            },
+            stage: 1);
+
+        // Stage 2: Caches (Redis)
+        Console.WriteLine("📋 Registering Stage 2: Caches (Redis)");
+        builder.Services.AddIgnitionFromTaskWithStage(
+            "redis-readiness",
+            async ct =>
+            {
+                var loggerFactory = builder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
+                var multiplexer = ConnectionMultiplexer.Connect(infrastructure.RedisConnectionString);
+                var signal = new RedisReadinessSignal(
+                    multiplexer,
+                    new RedisReadinessOptions { VerificationStrategy = RedisVerificationStrategy.Ping, Timeout = TimeSpan.FromSeconds(30) },
+                    loggerFactory.CreateLogger<RedisReadinessSignal>());
+                await signal.WaitAsync(ct);
+            },
+            stage: 2);
+
+        // Stage 3: Message Queues (RabbitMQ)
+        Console.WriteLine("📋 Registering Stage 3: Message Queues (RabbitMQ)");
+        builder.Services.AddIgnitionFromTaskWithStage(
+            "rabbitmq-readiness",
+            async ct =>
+            {
+                var loggerFactory = builder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
+                var connectionFactory = new ConnectionFactory { Uri = new Uri(infrastructure.RabbitMqConnectionString) };
+                var signal = new RabbitMqReadinessSignal(
+                    connectionFactory,
+                    new RabbitMqReadinessOptions { Timeout = TimeSpan.FromSeconds(30) },
+                    loggerFactory.CreateLogger<RabbitMqReadinessSignal>());
+                await signal.WaitAsync(ct);
+            },
+            stage: 3);
+
+        // Stage 4: Application Services (simulated)
+        Console.WriteLine("📋 Registering Stage 4: Application Services");
+        builder.Services.AddIgnitionFromTaskWithStage(
+            "app-initialization",
+            async ct =>
+            {
+                Console.WriteLine("   🚀 Initializing application components...");
+                await Task.Delay(500, ct);
+                Console.WriteLine("   ✅ Application components ready");
+            },
+            stage: 4);
+
+        builder.Services.AddIgnitionFromTaskWithStage(
+            "cache-warmup",
+            async ct =>
+            {
+                Console.WriteLine("   🔥 Warming up caches...");
+                await Task.Delay(800, ct);
+                Console.WriteLine("   ✅ Caches warmed");
+            },
+            stage: 4);
+
+        builder.Services.AddIgnitionFromTaskWithStage(
+            "background-services",
+            async ct =>
+            {
+                Console.WriteLine("   ⚙️  Starting background services...");
+                await Task.Delay(300, ct);
+                Console.WriteLine("   ✅ Background services started");
+            },
+            stage: 4);
+
+        var app = builder.Build();
+
+        try
+        {
+            Console.WriteLine();
+            Console.WriteLine("═══════════════════════════════════════════════════════════════════════════");
+            Console.WriteLine("  STARTING IGNITION SEQUENCE");
+            Console.WriteLine("═══════════════════════════════════════════════════════════════════════════");
+            Console.WriteLine();
+
+            var coordinator = app.Services.GetRequiredService<IIgnitionCoordinator>();
+            
+            var startTime = DateTime.UtcNow;
+            await coordinator.WaitAllAsync();
+            var duration = DateTime.UtcNow - startTime;
+
+            var result = await coordinator.GetResultAsync();
+
+            Console.WriteLine();
+            Console.WriteLine("═══════════════════════════════════════════════════════════════════════════");
+            Console.WriteLine("  IGNITION RESULTS");
+            Console.WriteLine("═══════════════════════════════════════════════════════════════════════════");
+            Console.WriteLine();
+            Console.WriteLine($"  Total Duration:      {result.TotalDuration.TotalMilliseconds:F0}ms");
+            Console.WriteLine($"  Timed Out:           {(result.TimedOut ? "YES ⚠️" : "NO ✅")}");
+            Console.WriteLine();
+
+            // Group results by stage
+            var groupedByStage = result.Results
+                .GroupBy(r => GetStageNumber(r.Name))
+                .OrderBy(g => g.Key);
+
+            foreach (var stageGroup in groupedByStage)
+            {
+                var stageName = stageGroup.Key switch
+                {
+                    0 => "Stage 0: Infrastructure Startup",
+                    1 => "Stage 1: Databases",
+                    2 => "Stage 2: Caches",
+                    3 => "Stage 3: Message Queues",
+                    4 => "Stage 4: Application Services",
+                    _ => "Other"
+                };
+
+                Console.WriteLine($"  {stageName}:");
+                foreach (var signal in stageGroup.OrderBy(s => s.Name))
+                {
+                    var statusIcon = signal.Status switch
+                    {
+                        IgnitionSignalStatus.Succeeded => "✅",
+                        IgnitionSignalStatus.Failed => "❌",
+                        IgnitionSignalStatus.TimedOut => "⏱️",
+                        _ => "❓"
+                    };
+
+                    Console.WriteLine($"    {statusIcon} {signal.Name,-30} {signal.Duration.TotalMilliseconds,6:F0}ms");
+                }
+                Console.WriteLine();
+            }
+
+            var succeeded = result.Results.Count(r => r.Status == IgnitionSignalStatus.Succeeded);
+            var failed = result.Results.Count(r => r.Status == IgnitionSignalStatus.Failed);
+            var timedOut = result.Results.Count(r => r.Status == IgnitionSignalStatus.TimedOut);
+
+            Console.WriteLine("  Summary:");
+            Console.WriteLine($"    Total Signals:       {result.Results.Count}");
+            Console.WriteLine($"    ✅ Succeeded:        {succeeded}");
+            Console.WriteLine($"    ❌ Failed:           {failed}");
+            Console.WriteLine($"    ⏱️  Timed Out:        {timedOut}");
+            Console.WriteLine();
+            Console.WriteLine("═══════════════════════════════════════════════════════════════════════════");
+
+            if (result.TimedOut || result.Results.Any(r => r.Status == IgnitionSignalStatus.Failed))
+            {
+                Console.WriteLine();
+                Console.WriteLine("⚠️  Some signals failed or timed out. Check logs for details.");
+                Environment.ExitCode = 1;
+            }
+        }
+        finally
+        {
+            Console.WriteLine();
+            Console.WriteLine("🧹 Cleaning up Testcontainers...");
+            await infrastructure.StopAsync();
+            Console.WriteLine("✅ Cleanup complete!");
+        }
+    }
+
+    private static int GetStageNumber(string signalName)
+    {
+        return signalName switch
+        {
+            var name when name.EndsWith("-container") => 0,
+            var name when name.Contains("postgres") => 1,
+            var name when name.Contains("sqlserver") => 1,
+            var name when name.Contains("mongodb") => 1,
+            var name when name.Contains("redis") => 2,
+            var name when name.Contains("rabbitmq") => 3,
+            _ => 4
+        };
+    }
+}
+
+/// <summary>
+/// Manages Testcontainers lifecycle for all infrastructure services.
+/// </summary>
+public class InfrastructureManager
+{
+    private PostgreSqlContainer? _postgres;
+    private RedisContainer? _redis;
+    private RabbitMqContainer? _rabbitMq;
+    private MongoDbContainer? _mongoDb;
+    private MsSqlContainer? _sqlServer;
+
+    public string PostgresConnectionString { get; private set; } = string.Empty;
+    public string RedisConnectionString { get; private set; } = string.Empty;
+    public string RabbitMqConnectionString { get; private set; } = string.Empty;
+    public string MongoDbConnectionString { get; private set; } = string.Empty;
+    public string SqlServerConnectionString { get; private set; } = string.Empty;
+
+    public async Task StartPostgresAsync()
+    {
+        Console.WriteLine("  🐘 Starting PostgreSQL...");
+        _postgres = new PostgreSqlBuilder()
+            .WithImage("postgres:17-alpine")
+            .Build();
+        await _postgres.StartAsync();
+        PostgresConnectionString = _postgres.GetConnectionString();
+        Console.WriteLine($"  ✅ PostgreSQL ready at {_postgres.Hostname}:{_postgres.GetMappedPublicPort(5432)}");
+    }
+
+    public async Task StartRedisAsync()
+    {
+        Console.WriteLine("  🔴 Starting Redis...");
+        _redis = new RedisBuilder()
+            .WithImage("redis:7-alpine")
+            .Build();
+        await _redis.StartAsync();
+        RedisConnectionString = _redis.GetConnectionString();
+        Console.WriteLine($"  ✅ Redis ready at {_redis.Hostname}:{_redis.GetMappedPublicPort(6379)}");
+    }
+
+    public async Task StartRabbitMqAsync()
+    {
+        Console.WriteLine("  🐰 Starting RabbitMQ...");
+        _rabbitMq = new RabbitMqBuilder()
+            .WithImage("rabbitmq:4.0-alpine")
+            .Build();
+        await _rabbitMq.StartAsync();
+        RabbitMqConnectionString = _rabbitMq.GetConnectionString();
+        Console.WriteLine($"  ✅ RabbitMQ ready at {_rabbitMq.Hostname}:{_rabbitMq.GetMappedPublicPort(5672)}");
+    }
+
+    public async Task StartMongoDbAsync()
+    {
+        Console.WriteLine("  🍃 Starting MongoDB...");
+        _mongoDb = new MongoDbBuilder()
+            .WithImage("mongo:8")
+            .Build();
+        await _mongoDb.StartAsync();
+        MongoDbConnectionString = _mongoDb.GetConnectionString();
+        Console.WriteLine($"  ✅ MongoDB ready at {_mongoDb.Hostname}:{_mongoDb.GetMappedPublicPort(27017)}");
+    }
+
+    public async Task StartSqlServerAsync()
+    {
+        Console.WriteLine("  🗄️  Starting SQL Server...");
+        _sqlServer = new MsSqlBuilder()
+            .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
+            .Build();
+        await _sqlServer.StartAsync();
+        SqlServerConnectionString = _sqlServer.GetConnectionString();
+        Console.WriteLine($"  ✅ SQL Server ready at {_sqlServer.Hostname}:{_sqlServer.GetMappedPublicPort(1433)}");
+    }
+
+    public async Task StopAsync()
+    {
+        var tasks = new List<Task>();
+
+        if (_postgres != null)
+        {
+            Console.WriteLine("  🐘 Stopping PostgreSQL...");
+            tasks.Add(_postgres.DisposeAsync().AsTask());
+        }
+
+        if (_redis != null)
+        {
+            Console.WriteLine("  🔴 Stopping Redis...");
+            tasks.Add(_redis.DisposeAsync().AsTask());
+        }
+
+        if (_rabbitMq != null)
+        {
+            Console.WriteLine("  🐰 Stopping RabbitMQ...");
+            tasks.Add(_rabbitMq.DisposeAsync().AsTask());
+        }
+
+        if (_mongoDb != null)
+        {
+            Console.WriteLine("  🍃 Stopping MongoDB...");
+            tasks.Add(_mongoDb.DisposeAsync().AsTask());
+        }
+
+        if (_sqlServer != null)
+        {
+            Console.WriteLine("  🗄️  Stopping SQL Server...");
+            tasks.Add(_sqlServer.DisposeAsync().AsTask());
+        }
+
+        await Task.WhenAll(tasks);
+    }
+}

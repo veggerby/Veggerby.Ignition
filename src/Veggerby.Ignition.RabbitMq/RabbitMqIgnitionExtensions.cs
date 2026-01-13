@@ -94,4 +94,53 @@ public static class RabbitMqIgnitionExtensions
 
         return services;
     }
+
+    /// <summary>
+    /// Registers a RabbitMQ readiness signal using a connection factory resolved from dependency injection.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="configure">Optional configuration delegate for readiness options.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    /// <remarks>
+    /// Use this overload when you have an existing <see cref="IConnectionFactory"/> registered in DI.
+    /// The signal will resolve the factory from the service provider.
+    /// This is the recommended approach for modern .NET applications using dependency injection.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// services.AddSingleton&lt;IConnectionFactory&gt;(sp =&gt;
+    /// {
+    ///     var factory = new ConnectionFactory
+    ///     {
+    ///         Uri = new Uri("amqp://localhost:5672")
+    ///     };
+    ///     return factory;
+    /// });
+    /// 
+    /// services.AddRabbitMqReadiness(options =>
+    /// {
+    ///     options.PerformRoundTripTest = true;
+    ///     options.Timeout = TimeSpan.FromSeconds(10);
+    /// });
+    /// </code>
+    /// </example>
+    public static IServiceCollection AddRabbitMqReadiness(
+        this IServiceCollection services,
+        Action<RabbitMqReadinessOptions>? configure = null)
+    {
+        services.AddSingleton<IIgnitionSignal>(sp =>
+        {
+            var options = new RabbitMqReadinessOptions();
+            configure?.Invoke(options);
+
+            var logger = sp.GetRequiredService<ILogger<RabbitMqReadinessSignal>>();
+            // Use factory pattern to defer connection factory resolution until signal executes
+            return new RabbitMqReadinessSignal(
+                () => sp.GetRequiredService<IConnectionFactory>(),
+                options,
+                logger);
+        });
+
+        return services;
+    }
 }

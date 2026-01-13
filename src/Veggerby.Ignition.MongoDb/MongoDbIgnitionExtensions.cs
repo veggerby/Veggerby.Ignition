@@ -84,9 +84,12 @@ public static class MongoDbIgnitionExtensions
             var options = new MongoDbReadinessOptions();
             configure?.Invoke(options);
 
-            var client = sp.GetRequiredService<IMongoClient>();
             var logger = sp.GetRequiredService<ILogger<MongoDbReadinessSignal>>();
-            return new MongoDbReadinessSignal(client, options, logger);
+            // Use factory pattern to defer client resolution until signal executes
+            return new MongoDbReadinessSignal(
+                () => sp.GetRequiredService<IMongoClient>(),
+                options,
+                logger);
         });
 
         return services;

@@ -19,6 +19,26 @@ Demonstrates:
 
 Perfect for getting started with Ignition and understanding core concepts.
 
+### [Testcontainers Multi-Service Demo](./TestcontainersDemo/)
+
+**Complexity**: Advanced
+**Type**: Console Application  
+**Focus**: Real infrastructure with Testcontainers
+
+Demonstrates:
+
+- Multi-stage execution (4 stages: Databases → Caches → Message Queues → Application)
+- Parallel container startup for faster initialization
+- All major integration packages (PostgreSQL, Redis, RabbitMQ, MongoDB, SQL Server)
+- Modern DI patterns (NpgsqlDataSource, Func<SqlConnection>, IConnectionMultiplexer, IConnectionFactory)
+- Sequential stage progression with parallel execution within stages
+- Full observability (tracing, slow signal detection, structured logging)
+- Automatic container cleanup
+
+Perfect for understanding production-ready multi-service orchestration with real infrastructure dependencies.
+
+**Prerequisites**: Docker Desktop running
+
 ### [Bundles Console Application](./Bundles/)
 
 **Complexity**: Intermediate

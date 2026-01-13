@@ -36,16 +36,16 @@ public static class SqlServerIgnitionExtensions
     {
         services.AddSingleton<IIgnitionSignal>(sp =>
         {
-            var connectionFactory = sp.GetService<Func<SqlConnection>>()
-                ?? throw new InvalidOperationException(
-                    "Func<SqlConnection> is not registered in DI. " +
-                    "Register a connection factory or use AddSqlServerReadiness(connectionString) overload.");
-
             var options = new SqlServerReadinessOptions();
             configure?.Invoke(options);
 
             var logger = sp.GetRequiredService<ILogger<SqlServerReadinessSignal>>();
-            return new SqlServerReadinessSignal(connectionFactory, options, logger);
+            
+            // Use nested factory to defer both factory retrieval and connection creation
+            return new SqlServerReadinessSignal(
+                () => sp.GetRequiredService<Func<SqlConnection>>()(),
+                options,
+                logger);
         });
 
         return services;
