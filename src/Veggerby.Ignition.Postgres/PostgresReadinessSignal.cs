@@ -76,11 +76,10 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
             serverName,
             databaseName);
 
-        using var connection = new NpgsqlConnection(_connectionString);
+        using var connection = await OpenConnectionWithRetryAsync(cancellationToken);
 
         try
         {
-            await connection.OpenAsync(cancellationToken);
             _logger.LogDebug("PostgreSQL connection established");
 
             if (!string.IsNullOrWhiteSpace(_options.ValidationQuery))
@@ -95,6 +94,39 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
         {
             _logger.LogError(ex, "PostgreSQL readiness check failed");
             throw;
+        }
+    }
+
+    private async Task<NpgsqlConnection> OpenConnectionWithRetryAsync(CancellationToken cancellationToken)
+    {
+        const int initialDelayMs = 100;
+        const double multiplier = 1.5;
+        const int maxDelayMs = 5000;
+
+        var delay = initialDelayMs;
+
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var connection = new NpgsqlConnection(_connectionString);
+            try
+            {
+                await connection.OpenAsync(cancellationToken);
+                return connection;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                await connection.DisposeAsync();
+
+                _logger.LogDebug(
+                    ex,
+                    "PostgreSQL connection attempt failed, retrying in {DelayMs}ms",
+                    delay);
+
+                await Task.Delay(delay, cancellationToken);
+                delay = Math.Min((int)(delay * multiplier), maxDelayMs);
+            }
         }
     }
 

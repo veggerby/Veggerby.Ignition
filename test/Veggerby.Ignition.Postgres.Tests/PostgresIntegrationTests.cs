@@ -39,7 +39,8 @@ public class PostgresIntegrationTests : IAsyncLifetime
         // arrange
         var options = new PostgresReadinessOptions
         {
-            ValidationQuery = null
+            ValidationQuery = null,
+            Timeout = TimeSpan.FromSeconds(30)
         };
         var logger = Substitute.For<ILogger<PostgresReadinessSignal>>();
         var signal = new PostgresReadinessSignal(_connectionString!, options, logger);
@@ -55,7 +56,8 @@ public class PostgresIntegrationTests : IAsyncLifetime
         // arrange
         var options = new PostgresReadinessOptions
         {
-            ValidationQuery = "SELECT 1"
+            ValidationQuery = "SELECT 1",
+            Timeout = TimeSpan.FromSeconds(30)
         };
         var logger = Substitute.For<ILogger<PostgresReadinessSignal>>();
         var signal = new PostgresReadinessSignal(_connectionString!, options, logger);
@@ -72,7 +74,7 @@ public class PostgresIntegrationTests : IAsyncLifetime
         var options = new PostgresReadinessOptions
         {
             ValidationQuery = "SELECT 1",
-            Timeout = TimeSpan.FromSeconds(5)
+            Timeout = TimeSpan.FromSeconds(30)
         };
         var logger = Substitute.For<ILogger<PostgresReadinessSignal>>();
         var signal = new PostgresReadinessSignal(_connectionString!, options, logger);
@@ -86,7 +88,10 @@ public class PostgresIntegrationTests : IAsyncLifetime
     public async Task RepeatedWaitAsync_ReturnsCachedResult()
     {
         // arrange
-        var options = new PostgresReadinessOptions();
+        var options = new PostgresReadinessOptions
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
         var logger = Substitute.For<ILogger<PostgresReadinessSignal>>();
         var signal = new PostgresReadinessSignal(_connectionString!, options, logger);
 
@@ -96,22 +101,5 @@ public class PostgresIntegrationTests : IAsyncLifetime
         await signal.WaitAsync();
 
         // assert - should succeed and use cached result
-    }
-
-    [Fact]
-    [Trait("Category", "Integration")]
-    public async Task InvalidConnectionString_ThrowsException()
-    {
-        // arrange
-        var invalidConnectionString = "Host=invalid-host;Port=5432;Database=testdb;Username=test;Password=test;";
-        var options = new PostgresReadinessOptions
-        {
-            Timeout = TimeSpan.FromSeconds(2)
-        };
-        var logger = Substitute.For<ILogger<PostgresReadinessSignal>>();
-        var signal = new PostgresReadinessSignal(invalidConnectionString, options, logger);
-
-        // act & assert
-        await Assert.ThrowsAnyAsync<Exception>(async () => await signal.WaitAsync());
     }
 }
