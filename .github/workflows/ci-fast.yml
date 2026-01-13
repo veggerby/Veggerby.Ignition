@@ -22,5 +22,5 @@ jobs:
         run: dotnet restore Veggerby.Ignition.sln
       - name: Build (FastBuild analyzers off)
         run: dotnet build Veggerby.Ignition.sln -p:FastBuild=true --configuration Debug --no-restore
-      - name: Test (unit tests)
-        run: dotnet test Veggerby.Ignition.sln --configuration Debug --no-build
+      - name: Test (unit tests only)
+        run: dotnet test Veggerby.Ignition.sln --configuration Debug --no-build --filter "Category!=Integration"

@@ -375,13 +375,23 @@ dotnet pack Veggerby.Ignition.sln --configuration Release
 
 **CI/CD Pipeline:**
 
-- `.github/workflows/ci-fast.yml`: Fast build and test on pull requests
+- `.github/workflows/ci-fast.yml`: Fast build and unit tests on all pull requests (draft or ready)
+- `.github/workflows/ci-integration.yml`: Integration tests on non-draft pull requests (required for merge)
 - `.github/workflows/ci-release.yml`: Full release pipeline with packaging
+
+**CI Integration Test Requirements:**
+
+- Integration tests run automatically when PR is marked ready for review
+- Integration tests are **required** to pass before merge
+- Draft PRs skip integration tests for faster iteration
+- Integration tests use Docker containers via Testcontainers
+- Environment variable `TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal` set in CI
 
 **Environment Variables:**
 
 - `DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1`: Skip first-run experience
 - `DOTNET_NOLOGO=true`: Suppress .NET logo output
+- `TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal`: Required for Testcontainers in CI/dev containers
 
 ## Pull Request Guidelines
 
@@ -419,10 +429,17 @@ dotnet test Veggerby.Ignition.sln
 
 **Required Checks:**
 
-- All tests pass
+- All unit tests pass (fast build workflow)
+- All integration tests pass when PR is ready for review (not draft)
 - No build warnings
 - Code follows style guidelines
 - Public APIs documented
+
+**CI Workflow:**
+
+1. **Draft PR**: Only fast build and unit tests run (quick feedback)
+2. **Ready for Review**: Integration tests automatically run (required for merge)
+3. **All checks must pass** before merge is allowed
 
 ## Project-Specific Context
 
