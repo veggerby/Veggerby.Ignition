@@ -716,18 +716,19 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
     {
         _logger.LogDebug("Starting execution for {Count} factory(ies).", _factories.Count);
 
-        var factoriesByStage = GroupFactoriesByStage();
-        var sortedStages = factoriesByStage.Keys.OrderBy(s => s).ToList();
+        // Build stages from factories
+        var stages = BuildStagesFromFactories();
 
         // For non-staged execution modes (Sequential, Parallel, DependencyAware), 
-        // all factories should be in stage 0, so execute as a single stage using the appropriate mode
-        if (_options.ExecutionMode != IgnitionExecutionMode.Staged && sortedStages.Count == 1 && sortedStages[0] == 0)
+        // all factories should be in a single stage 0 using the global execution mode
+        if (_options.ExecutionMode != IgnitionExecutionMode.Staged && stages.Count == 1)
         {
+            var stage = stages[0];
             // Create all signals for the single stage
-            var signals = CreateSignalsForStage(factoriesByStage[0]);
+            var signals = CreateSignalsForStage(stage.Factories);
             
-            // Execute using the appropriate execution mode
-            var (signalTasks, globalTimedOut) = _options.ExecutionMode switch
+            // Execute using the stage's execution mode (which is the global mode)
+            var (signalTasks, globalTimedOut) = stage.ExecutionMode switch
             {
                 IgnitionExecutionMode.Sequential => await RunSequentialAsync(signals, globalCts, globalTimeoutTask, swGlobal),
                 IgnitionExecutionMode.DependencyAware => await RunDependencyAwareAsync(signals, globalCts, globalTimeoutTask, swGlobal),
@@ -749,19 +750,20 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
 
         try
         {
-            foreach (var stageNumber in sortedStages)
+            foreach (var stage in stages)
             {
                 if (context.ShouldStop)
                 {
-                    MarkStageFactoriesAsSkipped(factoriesByStage[stageNumber], stageNumber, context);
+                    MarkStageAsSkipped(stage, context);
                     continue;
                 }
 
                 // Create signals for this stage only when the stage is about to execute
-                _logger.LogDebug("Creating signals for stage {Stage}.", stageNumber);
-                var signalsForStage = CreateSignalsForStage(factoriesByStage[stageNumber]);
+                _logger.LogDebug("Creating signals for stage {StageNumber}: {StageName}.", stage.StageNumber, stage.Name);
+                var signalsForStage = CreateSignalsForStage(stage.Factories);
 
-                await ExecuteStageAsync(signalsForStage, stageNumber, globalCts, globalTimeoutTask, swGlobal, gate, context);
+                // Execute the stage using its specific execution mode
+                await ExecuteStageAsync(stage, signalsForStage, globalCts, globalTimeoutTask, swGlobal, gate, context);
             }
         }
         finally
@@ -772,29 +774,50 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         return BuildStagedResult(context, swGlobal);
     }
 
-    private Dictionary<int, List<IIgnitionSignalFactory>> GroupFactoriesByStage()
+    private List<IgnitionStage> BuildStagesFromFactories()
     {
+        // Group factories by stage number
         var factoriesByStage = new Dictionary<int, List<IIgnitionSignalFactory>>();
         
         foreach (var factory in _factories)
         {
-            int stage = factory.Stage ?? 0; // Default to stage 0 if not specified
+            int stageNumber = factory.Stage ?? 0; // Default to stage 0 if not specified
             
-            if (!factoriesByStage.TryGetValue(stage, out var list))
+            if (!factoriesByStage.TryGetValue(stageNumber, out var list))
             {
                 list = new List<IIgnitionSignalFactory>();
-                factoriesByStage[stage] = list;
+                factoriesByStage[stageNumber] = list;
             }
             list.Add(factory);
         }
         
-        return factoriesByStage;
+        // Build IgnitionStage objects
+        var stages = new List<IgnitionStage>();
+        foreach (var kvp in factoriesByStage.OrderBy(x => x.Key))
+        {
+            // For non-staged mode, use the global execution mode
+            // For staged mode, each stage executes in parallel by default (can be overridden in future)
+            var executionMode = _options.ExecutionMode != IgnitionExecutionMode.Staged 
+                ? _options.ExecutionMode 
+                : IgnitionExecutionMode.Parallel;
+                
+            var stage = new IgnitionStage(kvp.Key, executionMode: executionMode);
+            
+            foreach (var factory in kvp.Value)
+            {
+                stage.AddFactory(factory);
+            }
+            
+            stages.Add(stage);
+        }
+        
+        return stages;
     }
 
-    private void MarkStageFactoriesAsSkipped(List<IIgnitionSignalFactory> factories, int stageNumber, StagedExecutionContext context)
+    private void MarkStageAsSkipped(IgnitionStage stage, StagedExecutionContext context)
     {
         var skippedResults = new List<IgnitionSignalResult>();
-        foreach (var factory in factories)
+        foreach (var factory in stage.Factories)
         {
             var skipResult = new IgnitionSignalResult(factory.Name, IgnitionSignalStatus.Skipped, TimeSpan.Zero);
             skippedResults.Add(skipResult);
@@ -802,31 +825,67 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         }
         context.AllResults.AddRange(skippedResults);
         context.StageResults.Add(new IgnitionStageResult(
-            stageNumber, TimeSpan.Zero, skippedResults,
+            stage.StageNumber, TimeSpan.Zero, skippedResults,
             SucceededCount: 0, FailedCount: 0, TimedOutCount: 0, Completed: false));
     }
 
     private async Task ExecuteStageAsync(
+        IgnitionStage stage,
         List<IIgnitionSignal> signalsInStage,
-        int stageNumber,
         CancellationTokenSource globalCts,
         Task globalTimeoutTask,
         Stopwatch swGlobal,
         SemaphoreSlim? gate,
         StagedExecutionContext context)
     {
-        _logger.LogDebug("Starting stage {Stage} with {Count} signal(s).", stageNumber, signalsInStage.Count);
+        _logger.LogDebug("Starting stage {Stage} ({Name}) with {Count} signal(s) using {Mode} mode.", 
+            stage.StageNumber, stage.Name, signalsInStage.Count, stage.ExecutionMode);
 
         var swStage = Stopwatch.StartNew();
-        var stageTasks = await StartStageSignalsAsync(signalsInStage, globalCts, gate, swGlobal);
+        
+        // Execute based on the stage's execution mode
+        List<Task<IgnitionSignalResult>> stageTasks;
+        
+        switch (stage.ExecutionMode)
+        {
+            case IgnitionExecutionMode.Sequential:
+                // Sequential execution within this stage
+                var (seqTasks, _) = await RunSequentialAsync(signalsInStage, globalCts, globalTimeoutTask, swGlobal);
+                stageTasks = seqTasks;
+                break;
+                
+            case IgnitionExecutionMode.DependencyAware:
+                // Dependency-aware execution within this stage
+                var (depTasks, _) = await RunDependencyAwareAsync(signalsInStage, globalCts, globalTimeoutTask, swGlobal);
+                stageTasks = depTasks;
+                break;
+                
+            case IgnitionExecutionMode.Staged:
+                // Nested staged execution - execute child stages
+                if (stage.HasChildStages)
+                {
+                    _logger.LogDebug("Stage {Stage} has {ChildCount} child stages - executing nested stages.", 
+                        stage.StageNumber, stage.ChildStages.Count);
+                    // For now, we'll treat nested stages similar to parallel execution
+                    // Future enhancement: recursive stage execution
+                }
+                stageTasks = await StartStageSignalsAsync(signalsInStage, globalCts, gate, swGlobal);
+                break;
+                
+            case IgnitionExecutionMode.Parallel:
+            default:
+                // Parallel execution within this stage (default behavior)
+                stageTasks = await StartStageSignalsAsync(signalsInStage, globalCts, gate, swGlobal);
+                break;
+        }
 
         var stageExecution = _options.StagePolicy == IgnitionStagePolicy.EarlyPromotion
-            ? await ExecuteStageWithEarlyPromotionAsync(stageTasks, signalsInStage, stageNumber, globalCts, globalTimeoutTask, swGlobal, context)
-            : await ExecuteStageStandardAsync(stageTasks, signalsInStage, stageNumber, globalCts, globalTimeoutTask, swGlobal, context);
+            ? await ExecuteStageWithEarlyPromotionAsync(stageTasks, signalsInStage, stage.StageNumber, globalCts, globalTimeoutTask, swGlobal, context)
+            : await ExecuteStageStandardAsync(stageTasks, signalsInStage, stage.StageNumber, globalCts, globalTimeoutTask, swGlobal, context);
 
         swStage.Stop();
 
-        var stageResult = BuildStageResult(stageNumber, swStage.Elapsed, stageExecution, signalsInStage.Count);
+        var stageResult = BuildStageResult(stage.StageNumber, swStage.Elapsed, stageExecution, signalsInStage.Count);
 
         if (stageResult.TimedOutCount > 0)
         {
@@ -837,12 +896,12 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         context.AllResults.AddRange(stageExecution.Results);
 
         _logger.LogDebug(
-            "Stage {Stage} completed in {Duration:F0} ms (succeeded: {Succeeded}, failed: {Failed}, timed out: {TimedOut}).",
-            stageNumber, swStage.Elapsed.TotalMilliseconds, stageResult.SucceededCount, stageResult.FailedCount, stageResult.TimedOutCount);
+            "Stage {Stage} ({Name}) completed in {Duration:F0} ms (succeeded: {Succeeded}, failed: {Failed}, timed out: {TimedOut}).",
+            stage.StageNumber, stage.Name, swStage.Elapsed.TotalMilliseconds, stageResult.SucceededCount, stageResult.FailedCount, stageResult.TimedOutCount);
 
         if (!context.ShouldStop)
         {
-            context.ShouldStop = ShouldStopAfterStage(stageResult, stageExecution.Promoted, signalsInStage.Count, stageNumber);
+            context.ShouldStop = ShouldStopAfterStage(stageResult, stageExecution.Promoted, signalsInStage.Count, stage.StageNumber);
         }
     }
 
