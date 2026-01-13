@@ -1,5 +1,6 @@
 using DotNet.Testcontainers.Builders;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 using Testcontainers.PostgreSql;
 using Veggerby.Ignition.Postgres;
 
@@ -9,23 +10,32 @@ public class PostgresIntegrationTests : IAsyncLifetime
 {
     private PostgreSqlContainer? _postgresContainer;
     private string? _connectionString;
+    private NpgsqlDataSource? _dataSource;
 
     public async Task InitializeAsync()
     {
-        // Create container with minimal wait - just wait for container to start, not for PostgreSQL to be ready
-        // This lets the Ignition signal handle the actual readiness verification
+        // Using PostgreSqlBuilder with default wait strategy
+        // The pg_isready check is appropriate infrastructure-level readiness verification
+        // Ignition signal then provides application-level readiness (connection pools, query execution)
         _postgresContainer = new PostgreSqlBuilder()
             .WithImage("postgres:17-alpine")
-            .WithWaitStrategy(Wait.ForUnixContainer())
             .Build();
 
         await _postgresContainer.StartAsync();
 
         _connectionString = _postgresContainer.GetConnectionString();
+        
+        // Create NpgsqlDataSource for modern DI-friendly approach
+        _dataSource = NpgsqlDataSource.Create(_connectionString);
     }
 
     public async Task DisposeAsync()
     {
+        if (_dataSource != null)
+        {
+            await _dataSource.DisposeAsync();
+        }
+        
         if (_postgresContainer != null)
         {
             await _postgresContainer.DisposeAsync();
@@ -43,7 +53,7 @@ public class PostgresIntegrationTests : IAsyncLifetime
             Timeout = TimeSpan.FromSeconds(30)
         };
         var logger = Substitute.For<ILogger<PostgresReadinessSignal>>();
-        var signal = new PostgresReadinessSignal(_connectionString!, options, logger);
+        var signal = new PostgresReadinessSignal(_dataSource!, options, logger);
 
         // act & assert
         await signal.WaitAsync();
@@ -60,7 +70,7 @@ public class PostgresIntegrationTests : IAsyncLifetime
             Timeout = TimeSpan.FromSeconds(30)
         };
         var logger = Substitute.For<ILogger<PostgresReadinessSignal>>();
-        var signal = new PostgresReadinessSignal(_connectionString!, options, logger);
+        var signal = new PostgresReadinessSignal(_dataSource!, options, logger);
 
         // act & assert
         await signal.WaitAsync();
@@ -77,7 +87,7 @@ public class PostgresIntegrationTests : IAsyncLifetime
             Timeout = TimeSpan.FromSeconds(30)
         };
         var logger = Substitute.For<ILogger<PostgresReadinessSignal>>();
-        var signal = new PostgresReadinessSignal(_connectionString!, options, logger);
+        var signal = new PostgresReadinessSignal(_dataSource!, options, logger);
 
         // act & assert
         await signal.WaitAsync();
@@ -93,7 +103,7 @@ public class PostgresIntegrationTests : IAsyncLifetime
             Timeout = TimeSpan.FromSeconds(30)
         };
         var logger = Substitute.For<ILogger<PostgresReadinessSignal>>();
-        var signal = new PostgresReadinessSignal(_connectionString!, options, logger);
+        var signal = new PostgresReadinessSignal(_dataSource!, options, logger);
 
         // act
         await signal.WaitAsync();
@@ -101,5 +111,21 @@ public class PostgresIntegrationTests : IAsyncLifetime
         await signal.WaitAsync();
 
         // assert - should succeed and use cached result
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task ConnectionString_Constructor_Succeeds()
+    {
+        // arrange - test fallback connection string constructor
+        var options = new PostgresReadinessOptions
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
+        var logger = Substitute.For<ILogger<PostgresReadinessSignal>>();
+        var signal = new PostgresReadinessSignal(_connectionString!, options, logger);
+
+        // act & assert
+        await signal.WaitAsync();
     }
 }

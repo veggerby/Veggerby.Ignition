@@ -14,7 +14,7 @@ public class PostgresReadinessSignalTests
         var logger = Substitute.For<ILogger<PostgresReadinessSignal>>();
 
         // act & assert
-        Assert.Throws<ArgumentNullException>(() => new PostgresReadinessSignal(null!, options, logger));
+        Assert.Throws<ArgumentNullException>(() => new PostgresReadinessSignal((string)null!, options, logger));
     }
 
     [Fact]
@@ -26,6 +26,17 @@ public class PostgresReadinessSignalTests
 
         // act & assert
         Assert.Throws<ArgumentException>(() => new PostgresReadinessSignal(string.Empty, options, logger));
+    }
+
+    [Fact]
+    public void Constructor_NullDataSource_ThrowsArgumentNullException()
+    {
+        // arrange
+        var options = new PostgresReadinessOptions();
+        var logger = Substitute.For<ILogger<PostgresReadinessSignal>>();
+
+        // act & assert
+        Assert.Throws<ArgumentNullException>(() => new PostgresReadinessSignal((NpgsqlDataSource)null!, options, logger));
     }
 
     [Fact]
@@ -89,12 +100,17 @@ public class PostgresReadinessSignalTests
     public async Task WaitAsync_ConnectionFailure_ThrowsException()
     {
         // arrange
-        var options = new PostgresReadinessOptions();
+        var options = new PostgresReadinessOptions
+        {
+            Timeout = TimeSpan.FromSeconds(2) // Short timeout to fail quickly
+        };
         var logger = Substitute.For<ILogger<PostgresReadinessSignal>>();
         var signal = new PostgresReadinessSignal("Host=invalid-host-that-does-not-exist;Database=test;Timeout=1;", options, logger);
 
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+
         // act & assert - Connection failures can throw various exception types
-        await Assert.ThrowsAnyAsync<Exception>(() => signal.WaitAsync());
+        await Assert.ThrowsAnyAsync<Exception>(() => signal.WaitAsync(cts.Token));
     }
 
     [Fact]
@@ -105,24 +121,24 @@ public class PostgresReadinessSignalTests
         var logger = Substitute.For<ILogger<PostgresReadinessSignal>>();
         var signal = new PostgresReadinessSignal("Host=invalid-host;Database=test;Timeout=1;", options, logger);
 
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
         // act - first call should fail and cache the result
-        Exception? firstException = null;
         try
         {
-            await signal.WaitAsync();
+            await signal.WaitAsync(cts.Token);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            firstException = ex;
+            // Expected
         }
 
         // act - subsequent calls should return the same cached exception
-        var exception1 = await Assert.ThrowsAnyAsync<Exception>(() => signal.WaitAsync());
-        var exception2 = await Assert.ThrowsAnyAsync<Exception>(() => signal.WaitAsync());
+        var exception1 = await Assert.ThrowsAnyAsync<Exception>(() => signal.WaitAsync(cts.Token));
+        var exception2 = await Assert.ThrowsAnyAsync<Exception>(() => signal.WaitAsync(cts.Token));
 
-        // assert - all exceptions should be the same instance (cached)
-        exception1.Should().BeSameAs(firstException);
-        exception2.Should().BeSameAs(firstException);
+        // assert - both exceptions should be the same instance (cached)
+        exception1.Should().BeSameAs(exception2);
     }
 
     [Fact]

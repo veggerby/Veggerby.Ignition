@@ -13,27 +13,66 @@ namespace Veggerby.Ignition.Postgres;
 /// Ignition signal for verifying PostgreSQL database readiness.
 /// Validates connection establishment and optionally executes a validation query.
 /// </summary>
+/// <remarks>
+/// <para>
+/// This signal supports two approaches:
+/// <list type="bullet">
+/// <item><description>Recommended: Use <see cref="NpgsqlDataSource"/> from DI for connection pooling and modern best practices.</description></item>
+/// <item><description>Alternative: Use connection string for simpler scenarios.</description></item>
+/// </list>
+/// </para>
+/// </remarks>
 public sealed class PostgresReadinessSignal : IIgnitionSignal
 {
-    private readonly string _connectionString;
+    private readonly NpgsqlDataSource _dataSource;
+    private readonly bool _ownsDataSource;
     private readonly PostgresReadinessOptions _options;
     private readonly ILogger<PostgresReadinessSignal> _logger;
     private readonly object _sync = new();
     private Task? _cachedTask;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="PostgresReadinessSignal"/> class.
+    /// Initializes a new instance of the <see cref="PostgresReadinessSignal"/> class
+    /// using an existing <see cref="NpgsqlDataSource"/>.
+    /// </summary>
+    /// <param name="dataSource">PostgreSQL data source for creating connections.</param>
+    /// <param name="options">Configuration options for readiness verification.</param>
+    /// <param name="logger">Logger for diagnostic output.</param>
+    /// <remarks>
+    /// This is the recommended approach as it leverages connection pooling and integrates
+    /// with DI container lifecycle management.
+    /// </remarks>
+    public PostgresReadinessSignal(
+        NpgsqlDataSource dataSource,
+        PostgresReadinessOptions options,
+        ILogger<PostgresReadinessSignal> logger)
+    {
+        _dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
+        _ownsDataSource = false;
+        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PostgresReadinessSignal"/> class
+    /// using a connection string.
     /// </summary>
     /// <param name="connectionString">PostgreSQL connection string.</param>
     /// <param name="options">Configuration options for readiness verification.</param>
     /// <param name="logger">Logger for diagnostic output.</param>
+    /// <remarks>
+    /// This constructor creates an internal <see cref="NpgsqlDataSource"/> that will be
+    /// disposed when the signal completes. For production scenarios with connection pooling,
+    /// prefer using the constructor that accepts <see cref="NpgsqlDataSource"/>.
+    /// </remarks>
     public PostgresReadinessSignal(
         string connectionString,
         PostgresReadinessOptions options,
         ILogger<PostgresReadinessSignal> logger)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString, nameof(connectionString));
-        _connectionString = connectionString;
+        _dataSource = NpgsqlDataSource.Create(connectionString);
+        _ownsDataSource = true;
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -64,7 +103,7 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
     {
         var activity = Activity.Current;
 
-        var builder = new NpgsqlConnectionStringBuilder(_connectionString);
+        var builder = new NpgsqlConnectionStringBuilder(_dataSource.ConnectionString);
         var serverName = builder.Host;
         var databaseName = builder.Database;
 
@@ -76,10 +115,10 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
             serverName,
             databaseName);
 
-        using var connection = await OpenConnectionWithRetryAsync(cancellationToken);
-
         try
         {
+            using var connection = await OpenConnectionWithRetryAsync(cancellationToken);
+
             _logger.LogDebug("PostgreSQL connection established");
 
             if (!string.IsNullOrWhiteSpace(_options.ValidationQuery))
@@ -95,6 +134,14 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
             _logger.LogError(ex, "PostgreSQL readiness check failed");
             throw;
         }
+        finally
+        {
+            // Dispose data source if we own it (created from connection string)
+            if (_ownsDataSource)
+            {
+                await _dataSource.DisposeAsync();
+            }
+        }
     }
 
     private async Task<NpgsqlConnection> OpenConnectionWithRetryAsync(CancellationToken cancellationToken)
@@ -109,15 +156,18 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var connection = new NpgsqlConnection(_connectionString);
+            NpgsqlConnection? connection = null;
             try
             {
-                await connection.OpenAsync(cancellationToken);
+                connection = await _dataSource.OpenConnectionAsync(cancellationToken);
                 return connection;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                await connection.DisposeAsync();
+                if (connection != null)
+                {
+                    await connection.DisposeAsync();
+                }
 
                 _logger.LogDebug(
                     ex,
