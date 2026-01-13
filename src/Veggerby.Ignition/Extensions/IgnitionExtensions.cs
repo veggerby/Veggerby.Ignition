@@ -48,14 +48,7 @@ public static class IgnitionExtensions
             services.Configure(configure);
         }
 
-        services.TryAddSingleton<IIgnitionCoordinator>(sp =>
-        {
-            var factories = sp.GetServices<IIgnitionSignalFactory>();
-            var graph = sp.GetService<IIgnitionGraph>();
-            var options = sp.GetRequiredService<IOptions<IgnitionOptions>>();
-            var logger = sp.GetRequiredService<ILogger<IgnitionCoordinator>>();
-            return new IgnitionCoordinator(factories, sp, graph, options, logger);
-        });
+        services.TryAddSingleton<IIgnitionCoordinator, IgnitionCoordinator>();
 
         if (addHealthCheck)
         {
