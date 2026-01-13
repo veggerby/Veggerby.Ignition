@@ -161,27 +161,19 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         // Do not attach cancellation token; we want pure elapsed-time behavior independent of later cancellation.
         var globalTimeoutTask = Task.Delay(_options.GlobalTimeout);
 
-        // Staged execution has its own execution path with per-stage signal creation
-        if (_options.ExecutionMode == IgnitionExecutionMode.Staged)
-        {
-            var stagedResult = await RunStagedAsync(globalCts, globalTimeoutTask, swGlobal);
-            TransitionToFinalState(stagedResult);
-            return stagedResult;
-        }
+        // All execution modes now go through staged execution path
+        // Non-staged modes are treated as single-stage execution (stage 0)
+        var result = await RunStagedAsync(globalCts, globalTimeoutTask, swGlobal);
+        TransitionToFinalState(result);
+        return result;
+    }
 
-        // For non-staged modes, create all signals upfront
-        var handles = CreateAllSignals();
-
-        var (signalTasks, globalTimedOut) = _options.ExecutionMode switch
-        {
-            IgnitionExecutionMode.Sequential => await RunSequentialAsync(handles, globalCts, globalTimeoutTask, swGlobal),
-            IgnitionExecutionMode.DependencyAware => await RunDependencyAwareAsync(handles, globalCts, globalTimeoutTask, swGlobal),
-            _ => await RunParallelAsync(handles, globalCts, globalTimeoutTask, swGlobal)
-        };
-
-        // Cancel timeout delay if completed
-        globalCts.Cancel();
-
+    private async Task<IgnitionResult> BuildNonStagedResultAsync(
+        List<Task<IgnitionSignalResult>> signalTasks,
+        List<IIgnitionSignal> handles,
+        bool globalTimedOut,
+        Stopwatch swGlobal)
+    {
         // Build results snapshot. Unfinished tasks appear as placeholder results when a hard global cancellation occurred.
         List<IgnitionSignalResult> results;
         if (globalTimedOut && _options.CancelOnGlobalTimeout)
@@ -228,9 +220,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
             if (_options.CancelOnGlobalTimeout)
             {
                 // Hard global timeout => always classify as timed out.
-                var timeoutResult = IgnitionResult.FromTimeout(results, swGlobal.Elapsed);
-                TransitionToFinalState(timeoutResult);
-                return timeoutResult;
+                return IgnitionResult.FromTimeout(results, swGlobal.Elapsed);
             }
 
             // Soft timeout: only classify if any per-signal timed out.
@@ -246,14 +236,11 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
 
             if (hasTimedOut)
             {
-                var timeoutResult = IgnitionResult.FromTimeout(results, swGlobal.Elapsed);
-                TransitionToFinalState(timeoutResult);
-                return timeoutResult;
+                return IgnitionResult.FromTimeout(results, swGlobal.Elapsed);
             }
+            
             _logger.LogWarning("Global timeout elapsed (soft) with no per-signal timeouts; treating as success per Option B semantics.");
-            var softTimeoutResult = IgnitionResult.FromResults(results, swGlobal.Elapsed);
-            TransitionToFinalState(softTimeoutResult);
-            return softTimeoutResult;
+            return IgnitionResult.FromResults(results, swGlobal.Elapsed);
         }
 
         // Collect failed results with explicit loop
@@ -285,10 +272,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                     }
                 }
 
-                // Transition to final state and raise CoordinatorCompleted before throwing.
-                // This allows observers to receive the complete result even when FailFast causes an exception.
-                var failedResult = IgnitionResult.FromResults(results, swGlobal.Elapsed);
-                TransitionToFinalState(failedResult);
+                // Throw AggregateException for FailFast
                 throw new AggregateException(exceptions);
             }
         }
@@ -302,9 +286,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         }
 
         _logger.LogDebug("Startup readiness finished in {Ms} ms (failures: {Failures}).", swGlobal.Elapsed.TotalMilliseconds, failed.Count);
-        var finalResult = IgnitionResult.FromResults(results, swGlobal.Elapsed);
-        TransitionToFinalState(finalResult);
-        return finalResult;
+        return IgnitionResult.FromResults(results, swGlobal.Elapsed);
     }
 
     private async Task<(List<Task<IgnitionSignalResult>> Tasks, bool TimedOut)> RunSequentialAsync(List<IIgnitionSignal> handles, CancellationTokenSource globalCts, Task globalTimeoutTask, Stopwatch swGlobal)
@@ -732,11 +714,31 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
 
     private async Task<IgnitionResult> RunStagedAsync(CancellationTokenSource globalCts, Task globalTimeoutTask, Stopwatch swGlobal)
     {
-        _logger.LogDebug("Starting staged execution for {Count} factory(ies).", _factories.Count);
+        _logger.LogDebug("Starting execution for {Count} factory(ies).", _factories.Count);
 
         var factoriesByStage = GroupFactoriesByStage();
         var sortedStages = factoriesByStage.Keys.OrderBy(s => s).ToList();
 
+        // For non-staged execution modes (Sequential, Parallel, DependencyAware), 
+        // all factories should be in stage 0, so execute as a single stage using the appropriate mode
+        if (_options.ExecutionMode != IgnitionExecutionMode.Staged && sortedStages.Count == 1 && sortedStages[0] == 0)
+        {
+            // Create all signals for the single stage
+            var signals = CreateSignalsForStage(factoriesByStage[0]);
+            
+            // Execute using the appropriate execution mode
+            var (signalTasks, globalTimedOut) = _options.ExecutionMode switch
+            {
+                IgnitionExecutionMode.Sequential => await RunSequentialAsync(signals, globalCts, globalTimeoutTask, swGlobal),
+                IgnitionExecutionMode.DependencyAware => await RunDependencyAwareAsync(signals, globalCts, globalTimeoutTask, swGlobal),
+                _ => await RunParallelAsync(signals, globalCts, globalTimeoutTask, swGlobal)
+            };
+            
+            // Build result from the non-staged execution
+            return await BuildNonStagedResultAsync(signalTasks, signals, globalTimedOut, swGlobal);
+        }
+
+        // For true staged execution, execute each stage in sequence
         var context = new StagedExecutionContext();
 
         SemaphoreSlim? gate = null;
