@@ -35,6 +35,9 @@ public sealed class SqlServerReadinessSignalFactory : IIgnitionSignalFactory
     public TimeSpan? Timeout => _options.Timeout;
 
     /// <inheritdoc/>
+    public int? Stage => null;
+
+    /// <inheritdoc/>
     public IIgnitionSignal CreateSignal(IServiceProvider serviceProvider)
     {
         var connectionString = _connectionStringFactory(serviceProvider);

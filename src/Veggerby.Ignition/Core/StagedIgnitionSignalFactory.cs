@@ -38,6 +38,9 @@ public sealed class StagedIgnitionSignalFactory : IIgnitionSignalFactory
     public TimeSpan? Timeout => _innerFactory.Timeout;
 
     /// <inheritdoc/>
+    public int? Stage => _stage;
+
+    /// <inheritdoc/>
     public IIgnitionSignal CreateSignal(IServiceProvider serviceProvider)
     {
         var signal = _innerFactory.CreateSignal(serviceProvider);

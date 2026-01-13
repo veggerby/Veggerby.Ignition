@@ -34,6 +34,11 @@ public interface IIgnitionSignalFactory
     TimeSpan? Timeout { get; }
 
     /// <summary>
+    /// Optional stage number for staged execution. If <c>null</c>, the signal belongs to stage 0 (default).
+    /// </summary>
+    int? Stage { get; }
+
+    /// <summary>
     /// Creates the ignition signal using the provided service provider.
     /// </summary>
     /// <param name="serviceProvider">Service provider for resolving dependencies.</param>

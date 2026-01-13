@@ -23,6 +23,7 @@ internal sealed class DelegateIgnitionSignalFactory : IIgnitionSignalFactory
 
     public string Name { get; }
     public TimeSpan? Timeout { get; }
+    public int? Stage => null; // Non-staged factory
 
     public IIgnitionSignal CreateSignal(IServiceProvider serviceProvider)
     {
