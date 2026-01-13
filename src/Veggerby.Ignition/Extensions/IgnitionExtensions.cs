@@ -51,10 +51,11 @@ public static class IgnitionExtensions
         services.TryAddSingleton<IIgnitionCoordinator>(sp =>
         {
             var signals = sp.GetServices<IIgnitionSignal>();
+            var factories = sp.GetServices<IIgnitionSignalFactory>();
             var graph = sp.GetService<IIgnitionGraph>();
             var options = sp.GetRequiredService<IOptions<IgnitionOptions>>();
             var logger = sp.GetRequiredService<ILogger<IgnitionCoordinator>>();
-            return new IgnitionCoordinator(signals, graph, options, logger);
+            return new IgnitionCoordinator(signals, factories, sp, graph, options, logger);
         });
 
         if (addHealthCheck)
@@ -1063,6 +1064,59 @@ public static class IgnitionExtensions
         var signal = IgnitionSignal.FromTask(name, readyTask, timeout);
         var stagedSignal = new StagedSignalWrapper(signal, stage);
         services.AddSingleton<IIgnitionSignal>(stagedSignal);
+        return services;
+    }
+
+    /// <summary>
+    /// Registers an ignition signal created from a factory delegate with a specific stage/phase number for staged execution.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="name">Name for the signal.</param>
+    /// <param name="signalFactory">Factory that creates the signal using the service provider. Invoked lazily when the signal is first accessed.</param>
+    /// <param name="stage">The stage/phase number (0 = infrastructure, 1 = services, 2 = workers, etc.).</param>
+    /// <param name="timeout">Optional per-signal timeout.</param>
+    /// <returns>The same service collection for chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// This method enables proper dependency injection for signals in staged execution by deferring signal
+    /// instantiation until the signal is actually needed (when its stage is reached).
+    /// </para>
+    /// <para>
+    /// This is particularly useful in scenarios where earlier stages produce resources (e.g., connection strings
+    /// from Testcontainers) that later stages need to consume. The factory receives the fully built service provider,
+    /// allowing it to resolve all dependencies including those registered or modified by earlier stages.
+    /// </para>
+    /// <para>
+    /// Example: Stage 0 starts containers and makes connection strings available, Stage 1 uses those connection
+    /// strings to create database readiness signals.
+    /// </para>
+    /// </remarks>
+    public static IServiceCollection AddIgnitionSignalFromFactoryWithStage(
+        this IServiceCollection services,
+        string name,
+        Func<IServiceProvider, IIgnitionSignal> signalFactory,
+        int stage,
+        TimeSpan? timeout = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(signalFactory);
+
+        if (stage < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(stage), "Stage number cannot be negative.");
+        }
+
+        var factory = new DelegateIgnitionSignalFactory(
+            name,
+            sp =>
+            {
+                var signal = signalFactory(sp);
+                return new StagedSignalWrapper(signal, stage);
+            },
+            timeout);
+
+        services.AddSingleton<IIgnitionSignalFactory>(factory);
+
         return services;
     }
 

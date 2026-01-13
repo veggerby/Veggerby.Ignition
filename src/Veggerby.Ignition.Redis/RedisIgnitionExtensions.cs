@@ -103,4 +103,72 @@ public static class RedisIgnitionExtensions
 
         return services;
     }
+
+    /// <summary>
+    /// Registers a Redis readiness signal using a connection string factory with a specific stage/phase number for staged execution.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="connectionStringFactory">Factory that produces the Redis connection string using the service provider.</param>
+    /// <param name="stage">The stage/phase number (0 = infrastructure, 1 = services, 2 = workers, etc.).</param>
+    /// <param name="configure">Optional configuration delegate for readiness options.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// This method enables proper dependency injection for Redis readiness signals in staged execution.
+    /// The connection string factory is invoked when the signal is created (when its stage is reached),
+    /// allowing it to access resources that were created or modified by earlier stages.
+    /// </para>
+    /// <para>
+    /// This is particularly useful with Testcontainers scenarios where Stage 0 starts containers
+    /// and makes connection strings available for Stage 1+ to consume.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// // Stage 0: Start container and store connection string
+    /// var infrastructure = new InfrastructureManager();
+    /// services.AddSingleton(infrastructure);
+    /// services.AddIgnitionFromTaskWithStage("redis-container",
+    ///     async ct => await infrastructure.StartRedisAsync(), stage: 0);
+    /// 
+    /// // Stage 2: Use connection string from infrastructure
+    /// services.AddRedisReadinessWithStage(
+    ///     sp => sp.GetRequiredService&lt;InfrastructureManager&gt;().RedisConnectionString,
+    ///     stage: 2,
+    ///     options =>
+    ///     {
+    ///         options.VerificationStrategy = RedisVerificationStrategy.Ping;
+    ///         options.Timeout = TimeSpan.FromSeconds(30);
+    ///     });
+    /// </code>
+    /// </example>
+    public static IServiceCollection AddRedisReadinessWithStage(
+        this IServiceCollection services,
+        Func<IServiceProvider, string> connectionStringFactory,
+        int stage,
+        Action<RedisReadinessOptions>? configure = null)
+    {
+        ArgumentNullException.ThrowIfNull(connectionStringFactory);
+
+        if (stage < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(stage), "Stage number cannot be negative.");
+        }
+
+        services.AddIgnitionSignalFromFactoryWithStage(
+            "redis-readiness",
+            sp =>
+            {
+                var connectionString = connectionStringFactory(sp);
+                var multiplexer = ConnectionMultiplexer.Connect(connectionString);
+                var options = new RedisReadinessOptions();
+                configure?.Invoke(options);
+
+                var logger = sp.GetRequiredService<ILogger<RedisReadinessSignal>>();
+                return new RedisReadinessSignal(multiplexer, options, logger);
+            },
+            stage);
+
+        return services;
+    }
 }

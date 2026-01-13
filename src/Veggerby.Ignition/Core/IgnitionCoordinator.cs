@@ -22,7 +22,10 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
     private const string ActivitySourceName = "Veggerby.Ignition.IgnitionCoordinator";
 
     private static readonly ActivitySource ActivitySource = new(ActivitySourceName);
-    private readonly IReadOnlyList<IIgnitionSignal> _handles;
+    private readonly IReadOnlyList<IIgnitionSignal> _directSignals;
+    private readonly IReadOnlyList<IIgnitionSignalFactory> _factories;
+    private readonly IServiceProvider? _serviceProvider;
+    private readonly Lazy<IReadOnlyList<IIgnitionSignal>> _handles;
     private readonly IIgnitionGraph? _graph;
     private readonly IgnitionOptions _options;
     private readonly ILogger<IgnitionCoordinator> _logger;
@@ -37,7 +40,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
     /// <param name="options">Configured ignition options.</param>
     /// <param name="logger">Logger used for diagnostic output.</param>
     public IgnitionCoordinator(IEnumerable<IIgnitionSignal> handles, IOptions<IgnitionOptions> options, ILogger<IgnitionCoordinator> logger)
-        : this(handles, graph: null, options, logger)
+        : this(handles, Enumerable.Empty<IIgnitionSignalFactory>(), serviceProvider: null, graph: null, options, logger)
     {
     }
 
@@ -49,16 +52,64 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
     /// <param name="options">Configured ignition options.</param>
     /// <param name="logger">Logger used for diagnostic output.</param>
     public IgnitionCoordinator(IEnumerable<IIgnitionSignal> handles, IIgnitionGraph? graph, IOptions<IgnitionOptions> options, ILogger<IgnitionCoordinator> logger)
+        : this(handles, Enumerable.Empty<IIgnitionSignalFactory>(), serviceProvider: null, graph, options, logger)
+    {
+    }
+
+    /// <summary>
+    /// Creates a new coordinator instance with signal factories and optional dependency graph.
+    /// </summary>
+    /// <param name="handles">The collection of ignition signals to evaluate.</param>
+    /// <param name="factories">The collection of ignition signal factories for lazy signal creation.</param>
+    /// <param name="serviceProvider">Service provider for resolving dependencies when creating signals from factories.</param>
+    /// <param name="graph">Optional dependency graph for dependency-aware execution.</param>
+    /// <param name="options">Configured ignition options.</param>
+    /// <param name="logger">Logger used for diagnostic output.</param>
+    public IgnitionCoordinator(
+        IEnumerable<IIgnitionSignal> handles,
+        IEnumerable<IIgnitionSignalFactory> factories,
+        IServiceProvider? serviceProvider,
+        IIgnitionGraph? graph,
+        IOptions<IgnitionOptions> options,
+        ILogger<IgnitionCoordinator> logger)
     {
         ArgumentNullException.ThrowIfNull(handles);
+        ArgumentNullException.ThrowIfNull(factories);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(logger);
 
-        _handles = handles.ToList();
+        _directSignals = handles.ToList();
+        _factories = factories.ToList();
+        _serviceProvider = serviceProvider;
         _graph = graph;
         _options = options.Value;
         _logger = logger;
+        _handles = new Lazy<IReadOnlyList<IIgnitionSignal>>(CreateAllSignals, isThreadSafe: true);
         _lazyRun = new Lazy<Task<IgnitionResult>>(ExecuteAsync, isThreadSafe: true);
+    }
+
+    /// <summary>
+    /// Creates all ignition signals, combining direct signals and factory-created signals.
+    /// </summary>
+    private IReadOnlyList<IIgnitionSignal> CreateAllSignals()
+    {
+        var signals = new List<IIgnitionSignal>(_directSignals);
+
+        if (_factories.Count > 0)
+        {
+            if (_serviceProvider == null)
+            {
+                throw new InvalidOperationException("Cannot create signals from factories without a service provider.");
+            }
+
+            foreach (var factory in _factories)
+            {
+                var signal = factory.CreateSignal(_serviceProvider);
+                signals.Add(signal);
+            }
+        }
+
+        return signals;
     }
 
     /// <inheritdoc/>
@@ -98,7 +149,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
     {
         TransitionToState(IgnitionState.Running);
 
-        if (_handles.Count == 0)
+        if (_handles.Value.Count == 0)
         {
             _logger.LogDebug("No startup wait handles registered; continuing immediately.");
             var emptyResult = IgnitionResult.EmptySuccess;
@@ -108,7 +159,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
 
         using var activity = _options.EnableTracing ? ActivitySource.StartActivity("Ignition.WaitAll") : null;
 
-        _logger.LogDebug("Awaiting readiness of {Count} startup handle(s) using mode {Mode}.", _handles.Count, _options.ExecutionMode);
+        _logger.LogDebug("Awaiting readiness of {Count} startup handle(s) using mode {Mode}.", _handles.Value.Count, _options.ExecutionMode);
         var swGlobal = Stopwatch.StartNew();
 
         using var globalCts = new CancellationTokenSource();
@@ -143,7 +194,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
             for (int i = 0; i < signalTasks.Count; i++)
             {
                 var task = signalTasks[i];
-                var handleName = _handles[i].Name;
+                var handleName = _handles.Value[i].Name;
                 if (task.IsCompletedSuccessfully)
                 {
                     results.Add(task.Result);
@@ -264,7 +315,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         var list = new List<Task<IgnitionSignalResult>>();
         bool globalTimeoutRaised = false;
 
-        foreach (var h in _handles)
+        foreach (var h in _handles.Value)
         {
             RaiseSignalStarted(h.Name);
             var t = WaitOneAsync(h, globalCts.Token, swGlobal);
@@ -275,7 +326,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                 if (!globalTimeoutRaised)
                 {
                     globalTimeoutRaised = true;
-                    RaiseGlobalTimeout(swGlobal.Elapsed, GetPendingSignalNames(list, _handles));
+                    RaiseGlobalTimeout(swGlobal.Elapsed, GetPendingSignalNames(list, _handles.Value));
                 }
 
                 if (_options.CancelOnGlobalTimeout)
@@ -321,7 +372,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
             gate = new SemaphoreSlim(_options.MaxDegreeOfParallelism.Value);
         }
 
-        foreach (var h in _handles)
+        foreach (var h in _handles.Value)
         {
             if (gate is not null)
             {
@@ -350,7 +401,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         var completed = await Task.WhenAny(allTask, globalTimeoutTask);
         if (completed == globalTimeoutTask)
         {
-            RaiseGlobalTimeout(swGlobal.Elapsed, GetPendingSignalNames(list, _handles));
+            RaiseGlobalTimeout(swGlobal.Elapsed, GetPendingSignalNames(list, _handles.Value));
 
             if (_options.CancelOnGlobalTimeout)
             {
@@ -684,7 +735,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
 
     private async Task<IgnitionResult> RunStagedAsync(CancellationTokenSource globalCts, Task globalTimeoutTask, Stopwatch swGlobal)
     {
-        _logger.LogDebug("Starting staged execution for {Count} signal(s).", _handles.Count);
+        _logger.LogDebug("Starting staged execution for {Count} signal(s).", _handles.Value.Count);
 
         var signalsByStage = GroupSignalsByStage();
         var sortedStages = signalsByStage.Keys.OrderBy(s => s).ToList();
@@ -721,7 +772,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
     private Dictionary<int, List<IIgnitionSignal>> GroupSignalsByStage()
     {
         var signalsByStage = new Dictionary<int, List<IIgnitionSignal>>();
-        foreach (var signal in _handles)
+        foreach (var signal in _handles.Value)
         {
             int stage = signal is IStagedIgnitionSignal staged ? staged.Stage : 0;
             if (!signalsByStage.TryGetValue(stage, out var list))

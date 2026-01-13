@@ -93,79 +93,55 @@ public class Program
             stage: 0);
 
         // Stage 1: Databases (parallel within stage)
-        // Construct signals at execution time to avoid Service Locator pattern
+        // Use factory-based extensions for proper DI - signals instantiated when stage executes
         Console.WriteLine("📋 Registering Stage 1: Databases (PostgreSQL, SQL Server, MongoDB)");
-        builder.Services.AddIgnitionFromTaskWithStage(
-            "postgres-readiness",
-            async ct =>
+        builder.Services.AddPostgresReadinessWithStage(
+            sp => sp.GetRequiredService<InfrastructureManager>().PostgresConnectionString,
+            stage: 1,
+            options =>
             {
-                var loggerFactory = builder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
-                var signal = new PostgresReadinessSignal(
-                    infrastructure.PostgresConnectionString,
-                    new PostgresReadinessOptions { ValidationQuery = "SELECT 1", Timeout = TimeSpan.FromSeconds(30) },
-                    loggerFactory.CreateLogger<PostgresReadinessSignal>());
-                await signal.WaitAsync(ct);
-            },
-            stage: 1);
+                options.ValidationQuery = "SELECT 1";
+                options.Timeout = TimeSpan.FromSeconds(30);
+            });
 
-        builder.Services.AddIgnitionFromTaskWithStage(
-            "sqlserver-readiness",
-            async ct =>
+        builder.Services.AddSqlServerReadinessWithStage(
+            sp => sp.GetRequiredService<InfrastructureManager>().SqlServerConnectionString,
+            stage: 1,
+            options =>
             {
-                var loggerFactory = builder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
-                var signal = new SqlServerReadinessSignal(
-                    infrastructure.SqlServerConnectionString,
-                    new SqlServerReadinessOptions { ValidationQuery = "SELECT 1", Timeout = TimeSpan.FromSeconds(30) },
-                    loggerFactory.CreateLogger<SqlServerReadinessSignal>());
-                await signal.WaitAsync(ct);
-            },
-            stage: 1);
+                options.ValidationQuery = "SELECT 1";
+                options.Timeout = TimeSpan.FromSeconds(30);
+            });
 
-        builder.Services.AddIgnitionFromTaskWithStage(
-            "mongodb-readiness",
-            async ct =>
+        builder.Services.AddMongoDbReadinessWithStage(
+            sp => sp.GetRequiredService<InfrastructureManager>().MongoDbConnectionString,
+            stage: 1,
+            options =>
             {
-                var loggerFactory = builder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
-                var client = new MongoClient(infrastructure.MongoDbConnectionString);
-                var signal = new MongoDbReadinessSignal(
-                    client,
-                    new MongoDbReadinessOptions { DatabaseName = "testdb", Timeout = TimeSpan.FromSeconds(30) },
-                    loggerFactory.CreateLogger<MongoDbReadinessSignal>());
-                await signal.WaitAsync(ct);
-            },
-            stage: 1);
+                options.DatabaseName = "testdb";
+                options.Timeout = TimeSpan.FromSeconds(30);
+            });
 
         // Stage 2: Caches (Redis)
         Console.WriteLine("📋 Registering Stage 2: Caches (Redis)");
-        builder.Services.AddIgnitionFromTaskWithStage(
-            "redis-readiness",
-            async ct =>
+        builder.Services.AddRedisReadinessWithStage(
+            sp => sp.GetRequiredService<InfrastructureManager>().RedisConnectionString,
+            stage: 2,
+            options =>
             {
-                var loggerFactory = builder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
-                var multiplexer = ConnectionMultiplexer.Connect(infrastructure.RedisConnectionString);
-                var signal = new RedisReadinessSignal(
-                    multiplexer,
-                    new RedisReadinessOptions { VerificationStrategy = RedisVerificationStrategy.Ping, Timeout = TimeSpan.FromSeconds(30) },
-                    loggerFactory.CreateLogger<RedisReadinessSignal>());
-                await signal.WaitAsync(ct);
-            },
-            stage: 2);
+                options.VerificationStrategy = RedisVerificationStrategy.Ping;
+                options.Timeout = TimeSpan.FromSeconds(30);
+            });
 
         // Stage 3: Message Queues (RabbitMQ)
         Console.WriteLine("📋 Registering Stage 3: Message Queues (RabbitMQ)");
-        builder.Services.AddIgnitionFromTaskWithStage(
-            "rabbitmq-readiness",
-            async ct =>
+        builder.Services.AddRabbitMqReadinessWithStage(
+            sp => sp.GetRequiredService<InfrastructureManager>().RabbitMqConnectionString,
+            stage: 3,
+            options =>
             {
-                var loggerFactory = builder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
-                var connectionFactory = new ConnectionFactory { Uri = new Uri(infrastructure.RabbitMqConnectionString) };
-                var signal = new RabbitMqReadinessSignal(
-                    connectionFactory,
-                    new RabbitMqReadinessOptions { Timeout = TimeSpan.FromSeconds(30) },
-                    loggerFactory.CreateLogger<RabbitMqReadinessSignal>());
-                await signal.WaitAsync(ct);
-            },
-            stage: 3);
+                options.Timeout = TimeSpan.FromSeconds(30);
+            });
 
         // Stage 4: Application Services (simulated)
         Console.WriteLine("📋 Registering Stage 4: Application Services");

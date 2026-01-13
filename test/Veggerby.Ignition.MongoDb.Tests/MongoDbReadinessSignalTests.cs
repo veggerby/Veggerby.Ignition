@@ -15,7 +15,7 @@ public class MongoDbReadinessSignalTests
         var logger = Substitute.For<ILogger<MongoDbReadinessSignal>>();
 
         // act & assert
-        Assert.Throws<ArgumentNullException>(() => new MongoDbReadinessSignal(null!, options, logger));
+        Assert.Throws<ArgumentNullException>(() => new MongoDbReadinessSignal((IMongoClient)null!, options, logger));
     }
 
     [Fact]
