@@ -148,6 +148,25 @@ public static class RedisIgnitionExtensions
         int stage,
         Action<RedisReadinessOptions>? configure = null)
     {
+        return AddRedisReadinessWithStage(services, connectionStringFactory, stage, IgnitionExecutionMode.Parallel, configure);
+    }
+
+    /// <summary>
+    /// Registers a Redis readiness signal using a connection string factory with a specific stage/phase number and execution mode.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="connectionStringFactory">Factory that produces the Redis connection string using the service provider.</param>
+    /// <param name="stage">The stage/phase number (0 = infrastructure, 1 = services, 2 = workers, etc.).</param>
+    /// <param name="executionMode">Execution mode for this stage (Sequential, Parallel, DependencyAware).</param>
+    /// <param name="configure">Optional configuration delegate for readiness options.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    public static IServiceCollection AddRedisReadinessWithStage(
+        this IServiceCollection services,
+        Func<IServiceProvider, string> connectionStringFactory,
+        int stage,
+        IgnitionExecutionMode executionMode,
+        Action<RedisReadinessOptions>? configure = null)
+    {
         ArgumentNullException.ThrowIfNull(connectionStringFactory);
 
         var options = new RedisReadinessOptions();
@@ -157,6 +176,12 @@ public static class RedisIgnitionExtensions
         var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, stage);
 
         services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
+
+        // Configure the stage's execution mode
+        services.Configure<IgnitionStageConfiguration>(config =>
+        {
+            config.EnsureStage(stage, executionMode);
+        });
 
         return services;
     }

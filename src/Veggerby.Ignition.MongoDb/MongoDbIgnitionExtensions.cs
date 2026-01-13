@@ -139,6 +139,25 @@ public static class MongoDbIgnitionExtensions
         int stage,
         Action<MongoDbReadinessOptions>? configure = null)
     {
+        return AddMongoDbReadinessWithStage(services, connectionStringFactory, stage, IgnitionExecutionMode.Parallel, configure);
+    }
+
+    /// <summary>
+    /// Registers a MongoDB readiness signal using a connection string factory with a specific stage/phase number and execution mode.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="connectionStringFactory">Factory that produces the MongoDB connection string using the service provider.</param>
+    /// <param name="stage">The stage/phase number (0 = infrastructure, 1 = services, 2 = workers, etc.).</param>
+    /// <param name="executionMode">Execution mode for this stage (Sequential, Parallel, DependencyAware).</param>
+    /// <param name="configure">Optional configuration delegate for readiness options.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    public static IServiceCollection AddMongoDbReadinessWithStage(
+        this IServiceCollection services,
+        Func<IServiceProvider, string> connectionStringFactory,
+        int stage,
+        IgnitionExecutionMode executionMode,
+        Action<MongoDbReadinessOptions>? configure = null)
+    {
         ArgumentNullException.ThrowIfNull(connectionStringFactory);
 
         var options = new MongoDbReadinessOptions();
@@ -148,6 +167,12 @@ public static class MongoDbIgnitionExtensions
         var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, stage);
 
         services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
+
+        // Configure the stage's execution mode
+        services.Configure<IgnitionStageConfiguration>(config =>
+        {
+            config.EnsureStage(stage, executionMode);
+        });
 
         return services;
     }

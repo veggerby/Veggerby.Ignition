@@ -151,6 +151,31 @@ public static class PostgresIgnitionExtensions
         int stage,
         Action<PostgresReadinessOptions>? configure = null)
     {
+        return AddPostgresReadinessWithStage(services, connectionStringFactory, stage, IgnitionExecutionMode.Parallel, configure);
+    }
+
+    /// <summary>
+    /// Registers a PostgreSQL readiness signal using a connection string factory with a specific stage/phase number and execution mode.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="connectionStringFactory">Factory that produces the PostgreSQL connection string using the service provider.</param>
+    /// <param name="stage">The stage/phase number (0 = infrastructure, 1 = services, 2 = workers, etc.).</param>
+    /// <param name="executionMode">Execution mode for this stage (Sequential, Parallel, DependencyAware).</param>
+    /// <param name="configure">Optional configuration delegate for readiness options.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// This overload allows specifying the execution mode for the stage. If multiple signals are registered
+    /// to the same stage number, the first registered execution mode is used for the entire stage.
+    /// </para>
+    /// </remarks>
+    public static IServiceCollection AddPostgresReadinessWithStage(
+        this IServiceCollection services,
+        Func<IServiceProvider, string> connectionStringFactory,
+        int stage,
+        IgnitionExecutionMode executionMode,
+        Action<PostgresReadinessOptions>? configure = null)
+    {
         ArgumentNullException.ThrowIfNull(connectionStringFactory);
 
         var options = new PostgresReadinessOptions();
@@ -160,6 +185,12 @@ public static class PostgresIgnitionExtensions
         var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, stage);
 
         services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
+
+        // Configure the stage's execution mode
+        services.Configure<IgnitionStageConfiguration>(config =>
+        {
+            config.EnsureStage(stage, executionMode);
+        });
 
         return services;
     }

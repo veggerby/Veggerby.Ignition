@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -776,6 +777,9 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
 
     private List<IgnitionStage> BuildStagesFromFactories()
     {
+        // Try to get explicit stage configuration from DI
+        var stageConfig = _serviceProvider.GetService<IOptions<IgnitionStageConfiguration>>()?.Value;
+        
         // Group factories by stage number
         var factoriesByStage = new Dictionary<int, List<IIgnitionSignalFactory>>();
         
@@ -795,13 +799,31 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         var stages = new List<IgnitionStage>();
         foreach (var kvp in factoriesByStage.OrderBy(x => x.Key))
         {
-            // For non-staged mode, use the global execution mode
-            // For staged mode, each stage executes in parallel by default (can be overridden in future)
-            var executionMode = _options.ExecutionMode != IgnitionExecutionMode.Staged 
-                ? _options.ExecutionMode 
-                : IgnitionExecutionMode.Parallel;
+            int stageNumber = kvp.Key;
+            
+            // Determine execution mode for this stage:
+            // 1. Use explicitly configured mode from stage configuration (if available)
+            // 2. For non-staged global mode, use the global execution mode
+            // 3. For staged mode without explicit configuration, default to Parallel
+            IgnitionExecutionMode executionMode;
+            
+            if (stageConfig?.GetExecutionMode(stageNumber) is IgnitionExecutionMode configuredMode)
+            {
+                // Use explicitly configured mode
+                executionMode = configuredMode;
+            }
+            else if (_options.ExecutionMode != IgnitionExecutionMode.Staged)
+            {
+                // Non-staged mode: use global execution mode
+                executionMode = _options.ExecutionMode;
+            }
+            else
+            {
+                // Staged mode without explicit configuration: default to Parallel
+                executionMode = IgnitionExecutionMode.Parallel;
+            }
                 
-            var stage = new IgnitionStage(kvp.Key, executionMode: executionMode);
+            var stage = new IgnitionStage(stageNumber, executionMode: executionMode);
             
             foreach (var factory in kvp.Value)
             {
