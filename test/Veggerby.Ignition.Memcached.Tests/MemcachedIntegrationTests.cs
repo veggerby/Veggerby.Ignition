@@ -16,7 +16,7 @@ public class MemcachedIntegrationTests : IAsyncLifetime
         _memcachedContainer = new ContainerBuilder()
             .WithImage("memcached:1.6-alpine")
             .WithPortBinding(11211, true)
-            .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(11211))
+            .WithWaitStrategy(Wait.ForUnixContainer())
             .Build();
 
         await _memcachedContainer.StartAsync();

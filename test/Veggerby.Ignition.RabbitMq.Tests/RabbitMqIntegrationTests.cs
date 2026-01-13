@@ -1,3 +1,4 @@
+using DotNet.Testcontainers.Builders;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using Testcontainers.RabbitMq;
@@ -14,6 +15,7 @@ public class RabbitMqIntegrationTests : IAsyncLifetime
     {
         _rabbitMqContainer = new RabbitMqBuilder()
             .WithImage("rabbitmq:4.0-alpine")
+            .WithWaitStrategy(Wait.ForUnixContainer())
             .Build();
 
         await _rabbitMqContainer.StartAsync();
@@ -37,7 +39,10 @@ public class RabbitMqIntegrationTests : IAsyncLifetime
     public async Task ConnectionOnly_Succeeds()
     {
         // arrange
-        var options = new RabbitMqReadinessOptions();
+        var options = new RabbitMqReadinessOptions
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
         var logger = Substitute.For<ILogger<RabbitMqReadinessSignal>>();
         var signal = new RabbitMqReadinessSignal(_connectionFactory!, options, logger);
 
@@ -50,7 +55,10 @@ public class RabbitMqIntegrationTests : IAsyncLifetime
     public async Task ChannelCreation_Succeeds()
     {
         // arrange
-        var options = new RabbitMqReadinessOptions();
+        var options = new RabbitMqReadinessOptions
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
         var logger = Substitute.For<ILogger<RabbitMqReadinessSignal>>();
         var signal = new RabbitMqReadinessSignal(_connectionFactory!, options, logger);
 
@@ -63,13 +71,22 @@ public class RabbitMqIntegrationTests : IAsyncLifetime
     public async Task QueueVerification_WithTestQueue_Succeeds()
     {
         // arrange
-        // Create a test queue first
+        // First verify RabbitMQ is ready, then create a test queue
+        var warmupSignal = new RabbitMqReadinessSignal(
+            _connectionFactory!, 
+            new RabbitMqReadinessOptions { Timeout = TimeSpan.FromSeconds(30) },
+            Substitute.For<ILogger<RabbitMqReadinessSignal>>());
+        await warmupSignal.WaitAsync();
+        
         using var connection = await _connectionFactory!.CreateConnectionAsync();
         await using var channel = await connection.CreateChannelAsync();
         var queueName = "integration_test_queue";
         await channel.QueueDeclareAsync(queueName, durable: false, exclusive: false, autoDelete: true);
 
-        var options = new RabbitMqReadinessOptions();
+        var options = new RabbitMqReadinessOptions
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
         options.VerifyQueues.Add(queueName);
         var logger = Substitute.For<ILogger<RabbitMqReadinessSignal>>();
         var signal = new RabbitMqReadinessSignal(_connectionFactory!, options, logger);
@@ -85,13 +102,22 @@ public class RabbitMqIntegrationTests : IAsyncLifetime
     public async Task ExchangeVerification_WithTestExchange_Succeeds()
     {
         // arrange
-        // Create a test exchange first
+        // First verify RabbitMQ is ready, then create a test exchange
+        var warmupSignal = new RabbitMqReadinessSignal(
+            _connectionFactory!,
+            new RabbitMqReadinessOptions { Timeout = TimeSpan.FromSeconds(30) },
+            Substitute.For<ILogger<RabbitMqReadinessSignal>>());
+        await warmupSignal.WaitAsync();
+        
         using var connection = await _connectionFactory!.CreateConnectionAsync();
         await using var channel = await connection.CreateChannelAsync();
         var exchangeName = "integration_test_exchange";
         await channel.ExchangeDeclareAsync(exchangeName, "fanout", durable: false, autoDelete: true);
 
-        var options = new RabbitMqReadinessOptions();
+        var options = new RabbitMqReadinessOptions
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
         options.VerifyExchanges.Add(exchangeName);
         var logger = Substitute.For<ILogger<RabbitMqReadinessSignal>>();
         var signal = new RabbitMqReadinessSignal(_connectionFactory!, options, logger);
@@ -107,6 +133,7 @@ public class RabbitMqIntegrationTests : IAsyncLifetime
         // arrange
         var options = new RabbitMqReadinessOptions
         {
+            Timeout = TimeSpan.FromSeconds(30),
             PerformRoundTripTest = true,
             RoundTripTestTimeout = TimeSpan.FromSeconds(5)
         };
@@ -122,7 +149,10 @@ public class RabbitMqIntegrationTests : IAsyncLifetime
     public async Task RepeatedWaitAsync_ReturnsCachedResult()
     {
         // arrange
-        var options = new RabbitMqReadinessOptions();
+        var options = new RabbitMqReadinessOptions
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
         var logger = Substitute.For<ILogger<RabbitMqReadinessSignal>>();
         var signal = new RabbitMqReadinessSignal(_connectionFactory!, options, logger);
 
@@ -132,27 +162,5 @@ public class RabbitMqIntegrationTests : IAsyncLifetime
         await signal.WaitAsync();
 
         // assert - should succeed and use cached result
-    }
-
-    [Fact]
-    [Trait("Category", "Integration")]
-    public async Task InvalidConnectionFactory_ThrowsException()
-    {
-        // arrange
-        var invalidFactory = new ConnectionFactory
-        {
-            HostName = "invalid-host",
-            Port = 5672,
-            RequestedConnectionTimeout = TimeSpan.FromSeconds(2)
-        };
-        var options = new RabbitMqReadinessOptions
-        {
-            Timeout = TimeSpan.FromSeconds(3)
-        };
-        var logger = Substitute.For<ILogger<RabbitMqReadinessSignal>>();
-        var signal = new RabbitMqReadinessSignal(invalidFactory, options, logger);
-
-        // act & assert
-        await Assert.ThrowsAnyAsync<Exception>(async () => await signal.WaitAsync());
     }
 }

@@ -1,3 +1,4 @@
+using DotNet.Testcontainers.Builders;
 using MassTransit;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -16,6 +17,7 @@ public class MassTransitIntegrationTests : IAsyncLifetime
     {
         _rabbitMqContainer = new RabbitMqBuilder()
             .WithImage("rabbitmq:4.0-alpine")
+            .WithWaitStrategy(Wait.ForUnixContainer())
             .Build();
 
         await _rabbitMqContainer.StartAsync();

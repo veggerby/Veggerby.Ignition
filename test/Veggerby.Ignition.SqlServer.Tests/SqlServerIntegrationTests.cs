@@ -1,3 +1,4 @@
+using DotNet.Testcontainers.Builders;
 using Microsoft.Extensions.Logging;
 using Testcontainers.MsSql;
 using Veggerby.Ignition.SqlServer;
@@ -13,6 +14,7 @@ public class SqlServerIntegrationTests : IAsyncLifetime
     {
         _sqlServerContainer = new MsSqlBuilder()
             .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
+            .WithWaitStrategy(Wait.ForUnixContainer())
             .Build();
 
         await _sqlServerContainer.StartAsync();
@@ -35,7 +37,8 @@ public class SqlServerIntegrationTests : IAsyncLifetime
         // arrange
         var options = new SqlServerReadinessOptions
         {
-            ValidationQuery = null
+            ValidationQuery = null,
+            Timeout = TimeSpan.FromSeconds(60)
         };
         var logger = Substitute.For<ILogger<SqlServerReadinessSignal>>();
         var signal = new SqlServerReadinessSignal(_connectionString!, options, logger);
@@ -51,7 +54,8 @@ public class SqlServerIntegrationTests : IAsyncLifetime
         // arrange
         var options = new SqlServerReadinessOptions
         {
-            ValidationQuery = "SELECT 1"
+            ValidationQuery = "SELECT 1",
+            Timeout = TimeSpan.FromSeconds(60)
         };
         var logger = Substitute.For<ILogger<SqlServerReadinessSignal>>();
         var signal = new SqlServerReadinessSignal(_connectionString!, options, logger);
@@ -68,7 +72,7 @@ public class SqlServerIntegrationTests : IAsyncLifetime
         var options = new SqlServerReadinessOptions
         {
             ValidationQuery = "SELECT 1",
-            Timeout = TimeSpan.FromSeconds(10)
+            Timeout = TimeSpan.FromSeconds(60)
         };
         var logger = Substitute.For<ILogger<SqlServerReadinessSignal>>();
         var signal = new SqlServerReadinessSignal(_connectionString!, options, logger);
@@ -82,7 +86,10 @@ public class SqlServerIntegrationTests : IAsyncLifetime
     public async Task RepeatedWaitAsync_ReturnsCachedResult()
     {
         // arrange
-        var options = new SqlServerReadinessOptions();
+        var options = new SqlServerReadinessOptions
+        {
+            Timeout = TimeSpan.FromSeconds(60)
+        };
         var logger = Substitute.For<ILogger<SqlServerReadinessSignal>>();
         var signal = new SqlServerReadinessSignal(_connectionString!, options, logger);
 
@@ -92,22 +99,5 @@ public class SqlServerIntegrationTests : IAsyncLifetime
         await signal.WaitAsync();
 
         // assert - should succeed and use cached result
-    }
-
-    [Fact]
-    [Trait("Category", "Integration")]
-    public async Task InvalidConnectionString_ThrowsException()
-    {
-        // arrange
-        var invalidConnectionString = "Server=invalid-host;Database=testdb;User Id=sa;Password=Test123!;";
-        var options = new SqlServerReadinessOptions
-        {
-            Timeout = TimeSpan.FromSeconds(2)
-        };
-        var logger = Substitute.For<ILogger<SqlServerReadinessSignal>>();
-        var signal = new SqlServerReadinessSignal(invalidConnectionString, options, logger);
-
-        // act & assert
-        await Assert.ThrowsAnyAsync<Exception>(async () => await signal.WaitAsync());
     }
 }

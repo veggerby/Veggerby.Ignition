@@ -76,11 +76,9 @@ public sealed class SqlServerReadinessSignal : IIgnitionSignal
             serverName,
             databaseName);
 
-        using var connection = new SqlConnection(_connectionString);
-
         try
         {
-            await connection.OpenAsync(cancellationToken);
+            using var connection = await OpenConnectionWithRetryAsync(_connectionString, cancellationToken);
             _logger.LogDebug("SQL Server connection established");
 
             if (!string.IsNullOrWhiteSpace(_options.ValidationQuery))
@@ -96,6 +94,36 @@ public sealed class SqlServerReadinessSignal : IIgnitionSignal
             _logger.LogError(ex, "SQL Server readiness check failed");
             throw;
         }
+    }
+
+    private async Task<SqlConnection> OpenConnectionWithRetryAsync(string connectionString, CancellationToken cancellationToken)
+    {
+        var delay = TimeSpan.FromMilliseconds(100);
+        const int maxDelay = 5000;
+        const double multiplier = 1.5;
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var connection = new SqlConnection(connectionString);
+            try
+            {
+                await connection.OpenAsync(cancellationToken);
+                return connection;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                await connection.DisposeAsync();
+                
+                _logger.LogDebug(ex, "SQL Server connection attempt failed, retrying after {Delay}ms", delay.TotalMilliseconds);
+                
+                await Task.Delay(delay, cancellationToken);
+                
+                // Exponential backoff
+                delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds * multiplier, maxDelay));
+            }
+        }
+
+        throw new OperationCanceledException("Connection attempt cancelled", cancellationToken);
     }
 
     private async Task ExecuteValidationQueryAsync(SqlConnection connection, CancellationToken cancellationToken)

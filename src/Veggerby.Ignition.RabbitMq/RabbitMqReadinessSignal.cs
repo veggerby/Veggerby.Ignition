@@ -89,7 +89,7 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
 
         try
         {
-            connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
+            connection = await CreateConnectionWithRetryAsync(cancellationToken);
             _logger.LogDebug("RabbitMQ connection established");
 
             channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
@@ -230,5 +230,31 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
         {
             throw new TimeoutException($"Round-trip test timed out after {_options.RoundTripTestTimeout}");
         }
+    }
+
+    private async Task<IConnection> CreateConnectionWithRetryAsync(CancellationToken cancellationToken)
+    {
+        var delay = TimeSpan.FromMilliseconds(100);
+        const int maxDelay = 5000;
+        const double multiplier = 1.5;
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                return await _connectionFactory.CreateConnectionAsync(cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogDebug(ex, "RabbitMQ connection attempt failed, retrying after {Delay}ms", delay.TotalMilliseconds);
+                
+                await Task.Delay(delay, cancellationToken);
+                
+                // Exponential backoff
+                delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds * multiplier, maxDelay));
+            }
+        }
+
+        throw new OperationCanceledException("Connection attempt cancelled", cancellationToken);
     }
 }

@@ -182,19 +182,37 @@ docker ps
 
 Integration tests are tagged with `[Trait("Category", "Integration")]` and are **excluded by default**.
 
+**Dev Container Environment:**
+
+When running integration tests in a dev container environment (like VS Code dev containers), you must set the `TESTCONTAINERS_HOST_OVERRIDE` environment variable so that Testcontainers can properly connect to containers started within Docker-in-Docker:
+
+```bash
+export TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal
+```
+
+**Running Tests:**
+
 ```bash
 # Run ONLY integration tests (requires Docker)
+# In dev container:
+export TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal && dotnet test Veggerby.Ignition.sln --filter "Category=Integration"
+
+# On host machine (no environment variable needed):
 dotnet test Veggerby.Ignition.sln --filter "Category=Integration"
 
-# Run integration tests for specific package
-dotnet test test/Veggerby.Ignition.Redis.Tests/Veggerby.Ignition.Redis.Tests.csproj --filter "Category=Integration"
-dotnet test test/Veggerby.Ignition.Postgres.Tests/Veggerby.Ignition.Postgres.Tests.csproj --filter "Category=Integration"
-dotnet test test/Veggerby.Ignition.RabbitMq.Tests/Veggerby.Ignition.RabbitMq.Tests.csproj --filter "Category=Integration"
+# Run integration tests for specific package (dev container):
+export TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal && dotnet test test/Veggerby.Ignition.Redis.Tests/Veggerby.Ignition.Redis.Tests.csproj --filter "Category=Integration"
+export TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal && dotnet test test/Veggerby.Ignition.Postgres.Tests/Veggerby.Ignition.Postgres.Tests.csproj --filter "Category=Integration"
+export TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal && dotnet test test/Veggerby.Ignition.RabbitMq.Tests/Veggerby.Ignition.RabbitMq.Tests.csproj --filter "Category=Integration"
 
 # Run unit tests only (default - excludes integration tests)
 dotnet test Veggerby.Ignition.sln --filter "Category!=Integration"
 
 # Run ALL tests (both unit and integration tests - requires Docker)
+# In dev container:
+export TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal && dotnet test Veggerby.Ignition.sln
+
+# On host machine:
 dotnet test Veggerby.Ignition.sln
 ```
 

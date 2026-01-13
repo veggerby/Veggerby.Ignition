@@ -1,3 +1,4 @@
+using DotNet.Testcontainers.Builders;
 using Microsoft.Extensions.Logging;
 using Testcontainers.PostgreSql;
 using Veggerby.Ignition.Postgres;
@@ -11,8 +12,11 @@ public class PostgresIntegrationTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        // Create container with minimal wait - just wait for container to start, not for PostgreSQL to be ready
+        // This lets the Ignition signal handle the actual readiness verification
         _postgresContainer = new PostgreSqlBuilder()
             .WithImage("postgres:17-alpine")
+            .WithWaitStrategy(Wait.ForUnixContainer())
             .Build();
 
         await _postgresContainer.StartAsync();

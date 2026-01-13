@@ -1,3 +1,4 @@
+using DotNet.Testcontainers.Builders;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using Testcontainers.MongoDb;
@@ -14,6 +15,7 @@ public class MongoDbIntegrationTests : IAsyncLifetime
     {
         _mongoDbContainer = new MongoDbBuilder()
             .WithImage("mongo:8")
+            .WithWaitStrategy(Wait.ForUnixContainer())
             .Build();
 
         await _mongoDbContainer.StartAsync();

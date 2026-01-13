@@ -72,7 +72,8 @@
     "remoteEnv": {
         "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}",
         "PNPM_HOME": "/home/vscode/.local/share/pnpm",
-        "PATH": "/home/vscode/.local/share/pnpm:${containerEnv:PATH}"
+        "PATH": "/home/vscode/.local/share/pnpm:${containerEnv:PATH}",
+        "TESTCONTAINERS_HOST_OVERRIDE": "host.docker.internal"
     },
 
 	"postCreateCommand": {
