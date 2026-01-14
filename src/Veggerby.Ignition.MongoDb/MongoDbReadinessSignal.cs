@@ -16,7 +16,8 @@ namespace Veggerby.Ignition.MongoDb;
 /// </summary>
 public sealed class MongoDbReadinessSignal : IIgnitionSignal
 {
-    private readonly IMongoClient _client;
+    private readonly IMongoClient? _client;
+    private readonly Func<IMongoClient>? _clientFactory;
     private readonly MongoDbReadinessOptions _options;
     private readonly ILogger<MongoDbReadinessSignal> _logger;
     private readonly object _sync = new();
@@ -34,6 +35,30 @@ public sealed class MongoDbReadinessSignal : IIgnitionSignal
         ILogger<MongoDbReadinessSignal> logger)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
+        _clientFactory = null;
+        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+        if (!string.IsNullOrWhiteSpace(_options.VerifyCollection) && string.IsNullOrWhiteSpace(_options.DatabaseName))
+        {
+            throw new InvalidOperationException("DatabaseName must be specified when VerifyCollection is set.");
+        }
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MongoDbReadinessSignal"/> class
+    /// using a factory function for lazy client creation.
+    /// </summary>
+    /// <param name="clientFactory">Factory function that creates a MongoDB client when invoked.</param>
+    /// <param name="options">Configuration options for readiness verification.</param>
+    /// <param name="logger">Logger for diagnostic output.</param>
+    public MongoDbReadinessSignal(
+        Func<IMongoClient> clientFactory,
+        MongoDbReadinessOptions options,
+        ILogger<MongoDbReadinessSignal> logger)
+    {
+        _client = null;
+        _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -76,8 +101,11 @@ public sealed class MongoDbReadinessSignal : IIgnitionSignal
 
         try
         {
+            // Resolve client from factory if needed
+            var client = _client ?? _clientFactory!();
+
             // Ping the cluster to verify connectivity
-            var database = _client.GetDatabase("admin");
+            var database = client.GetDatabase("admin");
             var command = new BsonDocument("ping", 1);
             await database.RunCommandAsync<BsonDocument>(command, cancellationToken: cancellationToken);
             
@@ -86,7 +114,7 @@ public sealed class MongoDbReadinessSignal : IIgnitionSignal
             // Verify collection if specified
             if (!string.IsNullOrWhiteSpace(_options.DatabaseName) && !string.IsNullOrWhiteSpace(_options.VerifyCollection))
             {
-                await VerifyCollectionAsync(cancellationToken);
+                await VerifyCollectionAsync(client, cancellationToken);
             }
 
             _logger.LogInformation("MongoDB readiness check completed successfully");
@@ -98,20 +126,20 @@ public sealed class MongoDbReadinessSignal : IIgnitionSignal
         }
     }
 
-    private async Task VerifyCollectionAsync(CancellationToken cancellationToken)
+    private async Task VerifyCollectionAsync(IMongoClient client, CancellationToken cancellationToken)
     {
         _logger.LogDebug(
             "Verifying collection {Database}/{Collection}",
             _options.DatabaseName,
             _options.VerifyCollection);
 
-        var database = _client.GetDatabase(_options.DatabaseName);
+        var database = client.GetDatabase(_options.DatabaseName);
         var filter = new BsonDocument("name", _options.VerifyCollection);
         var collections = await database.ListCollectionNamesAsync(
             new ListCollectionNamesOptions { Filter = filter },
             cancellationToken);
 
-        var collectionExists = await collections.AnyAsync(cancellationToken);
+        var collectionExists = await collections.AnyAsync(cancellationToken).ConfigureAwait(false);
 
         if (!collectionExists)
         {

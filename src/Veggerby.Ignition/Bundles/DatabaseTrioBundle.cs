@@ -37,8 +37,8 @@ public sealed class DatabaseTrioBundle : IIgnitionBundle
         Func<CancellationToken, Task>? warmupFactory = null,
         TimeSpan? defaultTimeout = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(databaseName);
-        ArgumentNullException.ThrowIfNull(connectFactory);
+        ArgumentException.ThrowIfNullOrWhiteSpace(databaseName, nameof(databaseName));
+        ArgumentNullException.ThrowIfNull(connectFactory, nameof(connectFactory));
 
         _databaseName = databaseName;
         _connectFactory = connectFactory;

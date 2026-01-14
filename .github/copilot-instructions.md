@@ -120,6 +120,7 @@ public async Task FailFast_Sequential_StopsOnFirstFailure()
 * LINQ usage permissible for non-hot aggregation steps (final result projection) but justify any LINQ introduced inside tight loops; prefer explicit loops if uncertain.
 * No blocking waits (`Task.Result` / `.Wait()`)—use async throughout.
 * Cancellation tokens should not allocate unbounded registrations; only register when necessary (e.g., in test helper signals) and avoid repeated registrations per await where possible.
+* **Always include `nameof` parameter** in all `Argument*Exception.ThrowIf*()` calls (e.g., `ArgumentNullException.ThrowIfNull(param, nameof(param))`, `ArgumentException.ThrowIfNullOrWhiteSpace(str, nameof(str))`) for improved exception diagnostics and easier error triaging.
 
 ## Documentation Expectations
 

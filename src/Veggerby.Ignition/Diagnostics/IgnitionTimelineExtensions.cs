@@ -42,7 +42,7 @@ public static class IgnitionTimelineExtensions
         DateTimeOffset? startedAt = null,
         DateTimeOffset? completedAt = null)
     {
-        ArgumentNullException.ThrowIfNull(result);
+        ArgumentNullException.ThrowIfNull(result, nameof(result));
 
         var events = BuildTimelineEvents(result.Results);
         var boundaries = BuildBoundaries(globalTimeout, result.TotalDuration, result.TimedOut);
@@ -374,7 +374,7 @@ public static class IgnitionTimelineExtensions
     /// </remarks>
     public static string ToConsoleString(this IgnitionTimeline timeline, int width = 50)
     {
-        ArgumentNullException.ThrowIfNull(timeline);
+        ArgumentNullException.ThrowIfNull(timeline, nameof(timeline));
 
         var sb = new System.Text.StringBuilder();
         var totalMs = timeline.TotalDurationMs;

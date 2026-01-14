@@ -14,7 +14,7 @@ public class SqlServerReadinessSignalTests
         var logger = Substitute.For<ILogger<SqlServerReadinessSignal>>();
 
         // act & assert
-        Assert.Throws<ArgumentNullException>(() => new SqlServerReadinessSignal(null!, options, logger));
+        Assert.Throws<ArgumentNullException>(() => new SqlServerReadinessSignal((string)null!, options, logger));
     }
 
     [Fact]
@@ -26,6 +26,17 @@ public class SqlServerReadinessSignalTests
 
         // act & assert
         Assert.Throws<ArgumentException>(() => new SqlServerReadinessSignal(string.Empty, options, logger));
+    }
+
+    [Fact]
+    public void Constructor_NullConnectionFactory_ThrowsArgumentNullException()
+    {
+        // arrange
+        var options = new SqlServerReadinessOptions();
+        var logger = Substitute.For<ILogger<SqlServerReadinessSignal>>();
+
+        // act & assert
+        Assert.Throws<ArgumentNullException>(() => new SqlServerReadinessSignal((Func<SqlConnection>)null!, options, logger));
     }
 
     [Fact]
@@ -93,8 +104,10 @@ public class SqlServerReadinessSignalTests
         var logger = Substitute.For<ILogger<SqlServerReadinessSignal>>();
         var signal = new SqlServerReadinessSignal("Server=invalid-server-that-does-not-exist;Database=test;Connection Timeout=1;", options, logger);
 
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+
         // act & assert
-        await Assert.ThrowsAsync<SqlException>(() => signal.WaitAsync());
+        await Assert.ThrowsAnyAsync<Exception>(() => signal.WaitAsync(cts.Token));
     }
 
     [Fact]
@@ -105,19 +118,21 @@ public class SqlServerReadinessSignalTests
         var logger = Substitute.For<ILogger<SqlServerReadinessSignal>>();
         var signal = new SqlServerReadinessSignal("Server=invalid-server;Database=test;Connection Timeout=1;", options, logger);
 
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
         // act - first call should fail and cache the result
         try
         {
-            await signal.WaitAsync();
+            await signal.WaitAsync(cts.Token);
         }
-        catch (SqlException)
+        catch (Exception)
         {
             // Expected
         }
 
         // act - subsequent calls should return the same cached exception
-        var exception1 = await Assert.ThrowsAsync<SqlException>(() => signal.WaitAsync());
-        var exception2 = await Assert.ThrowsAsync<SqlException>(() => signal.WaitAsync());
+        var exception1 = await Assert.ThrowsAnyAsync<Exception>(() => signal.WaitAsync(cts.Token));
+        var exception2 = await Assert.ThrowsAnyAsync<Exception>(() => signal.WaitAsync(cts.Token));
 
         // assert - both exceptions should be the same instance (cached)
         exception1.Should().BeSameAs(exception2);

@@ -22,7 +22,7 @@ public sealed class IgnitionGraphBuilder
     /// <returns>This builder instance for fluent chaining.</returns>
     public IgnitionGraphBuilder AddSignal(IIgnitionSignal signal)
     {
-        ArgumentNullException.ThrowIfNull(signal);
+        ArgumentNullException.ThrowIfNull(signal, nameof(signal));
         if (!_signals.Contains(signal))
         {
             _signals.Add(signal);
@@ -39,7 +39,7 @@ public sealed class IgnitionGraphBuilder
     /// <returns>This builder instance for fluent chaining.</returns>
     public IgnitionGraphBuilder AddSignals(IEnumerable<IIgnitionSignal> signals)
     {
-        ArgumentNullException.ThrowIfNull(signals);
+        ArgumentNullException.ThrowIfNull(signals, nameof(signals));
         foreach (var signal in signals)
         {
             AddSignal(signal);
@@ -56,8 +56,8 @@ public sealed class IgnitionGraphBuilder
     /// <returns>This builder instance for fluent chaining.</returns>
     public IgnitionGraphBuilder DependsOn(IIgnitionSignal dependent, params IIgnitionSignal[] dependencies)
     {
-        ArgumentNullException.ThrowIfNull(dependent);
-        ArgumentNullException.ThrowIfNull(dependencies);
+        ArgumentNullException.ThrowIfNull(dependent, nameof(dependent));
+        ArgumentNullException.ThrowIfNull(dependencies, nameof(dependencies));
 
         AddSignal(dependent);
 
@@ -283,13 +283,13 @@ public sealed class IgnitionGraphBuilder
 
         public IReadOnlySet<IIgnitionSignal> GetDependencies(IIgnitionSignal signal)
         {
-            ArgumentNullException.ThrowIfNull(signal);
+            ArgumentNullException.ThrowIfNull(signal, nameof(signal));
             return _dependencies.TryGetValue(signal, out var deps) ? deps : EmptySet;
         }
 
         public IReadOnlySet<IIgnitionSignal> GetDependents(IIgnitionSignal signal)
         {
-            ArgumentNullException.ThrowIfNull(signal);
+            ArgumentNullException.ThrowIfNull(signal, nameof(signal));
             return _dependents.TryGetValue(signal, out var deps) ? deps : EmptySet;
         }
 

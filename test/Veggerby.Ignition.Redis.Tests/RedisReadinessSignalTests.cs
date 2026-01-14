@@ -14,7 +14,7 @@ public class RedisReadinessSignalTests
         var logger = Substitute.For<ILogger<RedisReadinessSignal>>();
 
         // act & assert
-        Assert.Throws<ArgumentNullException>(() => new RedisReadinessSignal(null!, options, logger));
+        Assert.Throws<ArgumentNullException>(() => new RedisReadinessSignal((IConnectionMultiplexer)null!, options, logger));
     }
 
     [Fact]
@@ -25,7 +25,7 @@ public class RedisReadinessSignalTests
         var logger = Substitute.For<ILogger<RedisReadinessSignal>>();
 
         // act & assert
-        Assert.Throws<ArgumentNullException>(() => new RedisReadinessSignal(multiplexer, null!, logger));
+        Assert.Throws<ArgumentNullException>(() => new RedisReadinessSignal((IConnectionMultiplexer)multiplexer, null!, logger));
     }
 
     [Fact]
@@ -36,7 +36,7 @@ public class RedisReadinessSignalTests
         var options = new RedisReadinessOptions();
 
         // act & assert
-        Assert.Throws<ArgumentNullException>(() => new RedisReadinessSignal(multiplexer, options, null!));
+        Assert.Throws<ArgumentNullException>(() => new RedisReadinessSignal((IConnectionMultiplexer)multiplexer, options, null!));
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public class RedisReadinessSignalTests
         var multiplexer = Substitute.For<IConnectionMultiplexer>();
         var options = new RedisReadinessOptions();
         var logger = Substitute.For<ILogger<RedisReadinessSignal>>();
-        var signal = new RedisReadinessSignal(multiplexer, options, logger);
+        var signal = new RedisReadinessSignal((IConnectionMultiplexer)multiplexer, options, logger);
 
         // act & assert
         signal.Name.Should().Be("redis-readiness");
@@ -60,7 +60,7 @@ public class RedisReadinessSignalTests
         var multiplexer = Substitute.For<IConnectionMultiplexer>();
         var options = new RedisReadinessOptions { Timeout = timeout };
         var logger = Substitute.For<ILogger<RedisReadinessSignal>>();
-        var signal = new RedisReadinessSignal(multiplexer, options, logger);
+        var signal = new RedisReadinessSignal((IConnectionMultiplexer)multiplexer, options, logger);
 
         // act & assert
         signal.Timeout.Should().Be(timeout);
@@ -73,7 +73,7 @@ public class RedisReadinessSignalTests
         var multiplexer = Substitute.For<IConnectionMultiplexer>();
         var options = new RedisReadinessOptions { Timeout = null };
         var logger = Substitute.For<ILogger<RedisReadinessSignal>>();
-        var signal = new RedisReadinessSignal(multiplexer, options, logger);
+        var signal = new RedisReadinessSignal((IConnectionMultiplexer)multiplexer, options, logger);
 
         // act & assert
         signal.Timeout.Should().BeNull();
@@ -87,7 +87,7 @@ public class RedisReadinessSignalTests
         multiplexer.IsConnected.Returns(false);
         var options = new RedisReadinessOptions();
         var logger = Substitute.For<ILogger<RedisReadinessSignal>>();
-        var signal = new RedisReadinessSignal(multiplexer, options, logger);
+        var signal = new RedisReadinessSignal((IConnectionMultiplexer)multiplexer, options, logger);
 
         // act & assert
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => signal.WaitAsync());
@@ -107,7 +107,7 @@ public class RedisReadinessSignalTests
             VerificationStrategy = RedisVerificationStrategy.ConnectionOnly
         };
         var logger = Substitute.For<ILogger<RedisReadinessSignal>>();
-        var signal = new RedisReadinessSignal(multiplexer, options, logger);
+        var signal = new RedisReadinessSignal((IConnectionMultiplexer)multiplexer, options, logger);
 
         // act
         await signal.WaitAsync();
@@ -132,7 +132,7 @@ public class RedisReadinessSignalTests
             VerificationStrategy = RedisVerificationStrategy.Ping
         };
         var logger = Substitute.For<ILogger<RedisReadinessSignal>>();
-        var signal = new RedisReadinessSignal(multiplexer, options, logger);
+        var signal = new RedisReadinessSignal((IConnectionMultiplexer)multiplexer, options, logger);
 
         // act
         await signal.WaitAsync();
@@ -169,7 +169,7 @@ public class RedisReadinessSignalTests
             TestKeyPrefix = "ignition:test:"
         };
         var logger = Substitute.For<ILogger<RedisReadinessSignal>>();
-        var signal = new RedisReadinessSignal(multiplexer, options, logger);
+        var signal = new RedisReadinessSignal((IConnectionMultiplexer)multiplexer, options, logger);
 
         // act
         await signal.WaitAsync();
@@ -191,7 +191,7 @@ public class RedisReadinessSignalTests
 
         var options = new RedisReadinessOptions();
         var logger = Substitute.For<ILogger<RedisReadinessSignal>>();
-        var signal = new RedisReadinessSignal(multiplexer, options, logger);
+        var signal = new RedisReadinessSignal((IConnectionMultiplexer)multiplexer, options, logger);
 
         // act
         await signal.WaitAsync();

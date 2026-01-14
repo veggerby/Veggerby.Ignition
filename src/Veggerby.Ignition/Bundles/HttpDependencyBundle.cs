@@ -26,7 +26,7 @@ public sealed class HttpDependencyBundle : IIgnitionBundle
     /// <param name="defaultTimeout">Optional default timeout per endpoint check.</param>
     public HttpDependencyBundle(string[] endpoints, TimeSpan? defaultTimeout = null)
     {
-        ArgumentNullException.ThrowIfNull(endpoints);
+        ArgumentNullException.ThrowIfNull(endpoints, nameof(endpoints));
 
         if (endpoints.Length == 0)
         {

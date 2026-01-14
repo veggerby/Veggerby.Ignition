@@ -89,7 +89,7 @@ public sealed class MassTransitReadinessSignal : IIgnitionSignal
 
             try
             {
-                await busControl.WaitForHealthStatus(BusHealthStatus.Healthy, timeoutCts.Token);
+                await busControl.WaitForHealthStatus(BusHealthStatus.Healthy, timeoutCts.Token).ConfigureAwait(false);
                 _logger.LogDebug("MassTransit bus is healthy");
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)

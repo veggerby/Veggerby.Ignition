@@ -81,7 +81,7 @@ public sealed class AzureQueueReadinessSignal : IIgnitionSignal
         {
             // Verify service connectivity by getting service properties
             _logger.LogDebug("Verifying Azure Queue Storage service connection");
-            await _queueServiceClient.GetPropertiesAsync(cancellationToken);
+            await _queueServiceClient.GetPropertiesAsync(cancellationToken).ConfigureAwait(false);
 
             if (_options.VerifyQueueExists && !string.IsNullOrWhiteSpace(_options.QueueName))
             {
@@ -103,14 +103,14 @@ public sealed class AzureQueueReadinessSignal : IIgnitionSignal
 
         _logger.LogDebug("Verifying Azure Queue existence: {QueueName}", _options.QueueName);
 
-        var exists = await queueClient.ExistsAsync(cancellationToken);
+        var exists = await queueClient.ExistsAsync(cancellationToken).ConfigureAwait(false);
 
         if (!exists.Value)
         {
             if (_options.CreateIfNotExists)
             {
                 _logger.LogInformation("Creating Azure Queue: {QueueName}", _options.QueueName);
-                await queueClient.CreateAsync(cancellationToken: cancellationToken);
+                await queueClient.CreateAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
             }
             else
             {

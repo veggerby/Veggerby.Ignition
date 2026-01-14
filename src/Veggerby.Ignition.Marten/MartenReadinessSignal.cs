@@ -75,7 +75,7 @@ public sealed class MartenReadinessSignal : IIgnitionSignal
                 using var session = _documentStore.LightweightSession();
                 
                 // Perform a simple query to verify connectivity with a guaranteed database round-trip
-                await session.QueryAsync<int>("SELECT 1", token: cancellationToken);
+                await session.QueryAsync<int>("SELECT 1", token: cancellationToken).ConfigureAwait(false);
                 
                 _logger.LogDebug("Marten document store connection verified");
             }

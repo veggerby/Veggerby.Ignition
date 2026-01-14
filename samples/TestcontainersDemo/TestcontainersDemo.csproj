@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>TestcontainersDemo</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Testcontainers.Redis" />
+    <PackageReference Include="Testcontainers.RabbitMq" />
+    <PackageReference Include="Testcontainers.MongoDb" />
+    <PackageReference Include="Testcontainers.MsSql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Veggerby.Ignition\Veggerby.Ignition.csproj" />
+    <ProjectReference Include="..\..\src\Veggerby.Ignition.Postgres\Veggerby.Ignition.Postgres.csproj" />
+    <ProjectReference Include="..\..\src\Veggerby.Ignition.Redis\Veggerby.Ignition.Redis.csproj" />
+    <ProjectReference Include="..\..\src\Veggerby.Ignition.RabbitMq\Veggerby.Ignition.RabbitMq.csproj" />
+    <ProjectReference Include="..\..\src\Veggerby.Ignition.MongoDb\Veggerby.Ignition.MongoDb.csproj" />
+    <ProjectReference Include="..\..\src\Veggerby.Ignition.SqlServer\Veggerby.Ignition.SqlServer.csproj" />
+    <ProjectReference Include="..\..\src\Veggerby.Ignition.Http\Veggerby.Ignition.Http.csproj" />
+  </ItemGroup>
+
+</Project>

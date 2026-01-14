@@ -87,7 +87,7 @@ public sealed class GrpcReadinessSignal : IIgnitionSignal
                 Service = _options.ServiceName ?? string.Empty
             };
 
-            var response = await client.CheckAsync(request, cancellationToken: cancellationToken);
+            var response = await client.CheckAsync(request, cancellationToken: cancellationToken).ConfigureAwait(false);
 
             activity?.SetTag("grpc.health_status", response.Status.ToString());
 

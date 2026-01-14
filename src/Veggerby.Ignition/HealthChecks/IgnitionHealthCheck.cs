@@ -12,7 +12,7 @@ internal sealed class IgnitionHealthCheck(IIgnitionCoordinator readiness) : IHea
     {
         try
         {
-            var result = await readiness.GetResultAsync();
+            var result = await readiness.GetResultAsync().ConfigureAwait(false);
             if (result.TimedOut)
             {
                 return HealthCheckResult.Degraded("Startup readiness timed out.");

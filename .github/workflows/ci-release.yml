@@ -42,6 +42,7 @@ jobs:
           dotnet test Veggerby.Ignition.sln
           --configuration Release
           --no-build
+          --filter "Category!=Integration"
           --collect:"XPlat Code Coverage"
           --logger trx
           -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura

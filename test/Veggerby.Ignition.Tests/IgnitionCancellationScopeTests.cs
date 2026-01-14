@@ -12,7 +12,9 @@ public class IgnitionCancellationScopeTests
         configure?.Invoke(opts);
         var optionsWrapper = Options.Create(opts);
         var logger = Substitute.For<ILogger<IgnitionCoordinator>>();
-        return new IgnitionCoordinator(signals, optionsWrapper, logger);
+        var factories = signals.Select(s => new TestSignalFactory(s)).ToList();
+        var serviceProvider = new ServiceCollection().BuildServiceProvider();
+        return new IgnitionCoordinator(factories, serviceProvider, optionsWrapper, logger);
     }
 
     #region CancellationScope Tests
@@ -243,7 +245,9 @@ public class IgnitionCancellationScopeTests
         };
         var optionsWrapper = Options.Create(opts);
         var logger = Substitute.For<ILogger<IgnitionCoordinator>>();
-        var coord = new IgnitionCoordinator(new IIgnitionSignal[] { depSignal, childSignal }, graph, optionsWrapper, logger);
+        var factories = new IIgnitionSignal[] { depSignal, childSignal }.Select(s => new TestSignalFactory(s)).ToList();
+        var serviceProvider = new ServiceCollection().BuildServiceProvider();
+        var coord = new IgnitionCoordinator(factories, serviceProvider, graph, optionsWrapper, logger);
 
         // act
         await coord.WaitAllAsync();
@@ -279,7 +283,9 @@ public class IgnitionCancellationScopeTests
         };
         var optionsWrapper = Options.Create(opts);
         var logger = Substitute.For<ILogger<IgnitionCoordinator>>();
-        var coord = new IgnitionCoordinator(new IIgnitionSignal[] { depSignal, childSignal }, graph, optionsWrapper, logger);
+        var factories = new IIgnitionSignal[] { depSignal, childSignal }.Select(s => new TestSignalFactory(s)).ToList();
+        var serviceProvider = new ServiceCollection().BuildServiceProvider();
+        var coord = new IgnitionCoordinator(factories, serviceProvider, graph, optionsWrapper, logger);
 
         // act
         await coord.WaitAllAsync();
@@ -343,10 +349,12 @@ public class IgnitionCancellationScopeTests
 
         // assert
         var sp = services.BuildServiceProvider();
-        var signals = sp.GetServices<IIgnitionSignal>();
-        signals.Should().Contain(s => s.Name == "test-signal");
+        var factories = sp.GetServices<IIgnitionSignalFactory>().ToList();
+        factories.Should().HaveCount(1);
+        factories.First().Name.Should().Be("test-signal");
 
-        var scopedSignal = signals.First() as IScopedIgnitionSignal;
+        var createdSignal = factories.First().CreateSignal(sp);
+        var scopedSignal = createdSignal as IScopedIgnitionSignal;
         scopedSignal.Should().NotBeNull();
         scopedSignal!.CancellationScope.Should().BeSameAs(scope);
         scopedSignal.CancelScopeOnFailure.Should().BeTrue();
@@ -369,10 +377,12 @@ public class IgnitionCancellationScopeTests
 
         // assert
         var sp = services.BuildServiceProvider();
-        var signals = sp.GetServices<IIgnitionSignal>();
-        signals.Should().Contain(s => s.Name == "task-signal");
+        var factories = sp.GetServices<IIgnitionSignalFactory>().ToList();
+        factories.Should().HaveCount(1);
+        factories.First().Name.Should().Be("task-signal");
 
-        var scopedSignal = signals.First() as IScopedIgnitionSignal;
+        var createdSignal = factories.First().CreateSignal(sp);
+        var scopedSignal = createdSignal as IScopedIgnitionSignal;
         scopedSignal.Should().NotBeNull();
         scopedSignal!.CancellationScope.Should().BeSameAs(scope);
         scopedSignal.CancelScopeOnFailure.Should().BeTrue();

@@ -15,7 +15,7 @@ public class MongoDbReadinessSignalTests
         var logger = Substitute.For<ILogger<MongoDbReadinessSignal>>();
 
         // act & assert
-        Assert.Throws<ArgumentNullException>(() => new MongoDbReadinessSignal(null!, options, logger));
+        Assert.Throws<ArgumentNullException>(() => new MongoDbReadinessSignal((IMongoClient)null!, options, logger));
     }
 
     [Fact]
@@ -26,7 +26,7 @@ public class MongoDbReadinessSignalTests
         var logger = Substitute.For<ILogger<MongoDbReadinessSignal>>();
 
         // act & assert
-        Assert.Throws<ArgumentNullException>(() => new MongoDbReadinessSignal(client, null!, logger));
+        Assert.Throws<ArgumentNullException>(() => new MongoDbReadinessSignal((IMongoClient)client, null!, logger));
     }
 
     [Fact]
@@ -37,7 +37,7 @@ public class MongoDbReadinessSignalTests
         var options = new MongoDbReadinessOptions();
 
         // act & assert
-        Assert.Throws<ArgumentNullException>(() => new MongoDbReadinessSignal(client, options, null!));
+        Assert.Throws<ArgumentNullException>(() => new MongoDbReadinessSignal((IMongoClient)client, options, null!));
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public class MongoDbReadinessSignalTests
         var logger = Substitute.For<ILogger<MongoDbReadinessSignal>>();
 
         // act & assert
-        Assert.Throws<InvalidOperationException>(() => new MongoDbReadinessSignal(client, options, logger));
+        Assert.Throws<InvalidOperationException>(() => new MongoDbReadinessSignal((IMongoClient)client, options, logger));
     }
 
     [Fact]
@@ -62,7 +62,7 @@ public class MongoDbReadinessSignalTests
         var client = Substitute.For<IMongoClient>();
         var options = new MongoDbReadinessOptions();
         var logger = Substitute.For<ILogger<MongoDbReadinessSignal>>();
-        var signal = new MongoDbReadinessSignal(client, options, logger);
+        var signal = new MongoDbReadinessSignal((IMongoClient)client, options, logger);
 
         // act & assert
         signal.Name.Should().Be("mongodb-readiness");
@@ -76,7 +76,7 @@ public class MongoDbReadinessSignalTests
         var timeout = TimeSpan.FromSeconds(10);
         var options = new MongoDbReadinessOptions { Timeout = timeout };
         var logger = Substitute.For<ILogger<MongoDbReadinessSignal>>();
-        var signal = new MongoDbReadinessSignal(client, options, logger);
+        var signal = new MongoDbReadinessSignal((IMongoClient)client, options, logger);
 
         // act & assert
         signal.Timeout.Should().Be(timeout);
@@ -89,7 +89,7 @@ public class MongoDbReadinessSignalTests
         var client = Substitute.For<IMongoClient>();
         var options = new MongoDbReadinessOptions { Timeout = null };
         var logger = Substitute.For<ILogger<MongoDbReadinessSignal>>();
-        var signal = new MongoDbReadinessSignal(client, options, logger);
+        var signal = new MongoDbReadinessSignal((IMongoClient)client, options, logger);
 
         // act & assert
         signal.Timeout.Should().BeNull();
@@ -108,7 +108,7 @@ public class MongoDbReadinessSignalTests
 
         var options = new MongoDbReadinessOptions();
         var logger = Substitute.For<ILogger<MongoDbReadinessSignal>>();
-        var signal = new MongoDbReadinessSignal(client, options, logger);
+        var signal = new MongoDbReadinessSignal((IMongoClient)client, options, logger);
 
         // act
         await signal.WaitAsync();
@@ -130,7 +130,7 @@ public class MongoDbReadinessSignalTests
 
         var options = new MongoDbReadinessOptions();
         var logger = Substitute.For<ILogger<MongoDbReadinessSignal>>();
-        var signal = new MongoDbReadinessSignal(client, options, logger);
+        var signal = new MongoDbReadinessSignal((IMongoClient)client, options, logger);
 
         // act & assert
         await Assert.ThrowsAsync<MongoException>(() => signal.WaitAsync());
@@ -149,7 +149,7 @@ public class MongoDbReadinessSignalTests
 
         var options = new MongoDbReadinessOptions();
         var logger = Substitute.For<ILogger<MongoDbReadinessSignal>>();
-        var signal = new MongoDbReadinessSignal(client, options, logger);
+        var signal = new MongoDbReadinessSignal((IMongoClient)client, options, logger);
 
         // act
         await signal.WaitAsync();
@@ -180,7 +180,7 @@ public class MongoDbReadinessSignalTests
 
         var options = new MongoDbReadinessOptions();
         var logger = Substitute.For<ILogger<MongoDbReadinessSignal>>();
-        var signal = new MongoDbReadinessSignal(client, options, logger);
+        var signal = new MongoDbReadinessSignal((IMongoClient)client, options, logger);
         
         using var cts = new CancellationTokenSource();
         cts.Cancel();

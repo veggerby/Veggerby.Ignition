@@ -14,10 +14,10 @@ Veggerby.Ignition is a lightweight .NET library for coordinating application sta
 **Architecture:**
 
 - Core library: `src/Veggerby.Ignition`
-- Integration packages: `src/Veggerby.Ignition.*` (Marten, MassTransit, MongoDb, Postgres, RabbitMq, SqlServer)
+- Integration packages: `src/Veggerby.Ignition.*` (Marten, MassTransit, MongoDb, Postgres, RabbitMq, SqlServer, Grpc, Http, Aws, Azure, Orleans, Redis, Memcached)
 - Tests: `test/` (unit and integration tests for each package)
 - Documentation: `docs/` with comprehensive guides
-- Samples: `samples/` with runnable examples
+- Samples: `samples/` with runnable examples (Simple, Advanced, DependencyGraph, Bundles, WebApi, Worker, Messaging, Cloud, TimeoutStrategies, TimelineExport, Replay, SimpleMode)
 - Benchmarks: `benchmarks/` for performance profiling
 
 ## Setup Commands
@@ -55,11 +55,30 @@ dotnet run --project samples/Simple/Simple.csproj
 # Advanced features
 dotnet run --project samples/Advanced/Advanced.csproj
 
-# Dependency graph coordination
+# Dependency graph coordination (DAG)
 dotnet run --project samples/DependencyGraph/DependencyGraph.csproj
+
+# Bundles (reusable signal packages)
+dotnet run --project samples/Bundles/Bundles.csproj
 
 # Web API with health checks
 dotnet run --project samples/WebApi/WebApi.csproj
+
+# Worker service integration
+dotnet run --project samples/Worker/Worker.csproj
+
+# Message bus integration
+dotnet run --project samples/Messaging/Messaging.csproj
+
+# Cloud provider integration
+dotnet run --project samples/Cloud/Cloud.csproj
+
+# Timeout strategies
+dotnet run --project samples/TimeoutStrategies/TimeoutStrategies.csproj
+
+# Timeline export/replay
+dotnet run --project samples/TimelineExport/TimelineExport.csproj
+dotnet run --project samples/Replay/Replay.csproj
 ```
 
 **Run Benchmarks:**
@@ -140,9 +159,119 @@ dotnet test --filter "Category=Integration"
 - **xUnit** for test execution
 - **AwesomeAssertions** for fluent assertions (`.Should()` syntax)
 - **NSubstitute** for mocking dependencies
+- **Testcontainers** for integration tests requiring real infrastructure (Redis, PostgreSQL, RabbitMQ, etc.)
 - Test files use `// arrange`, `// act`, `// assert` comment structure
 - Tests must be deterministic (no flaky timing-dependent tests)
 - Use `TaskCompletionSource` for controlled async test scenarios
+
+**Integration Tests with Testcontainers:**
+
+Integration tests for packages requiring infrastructure (Redis, PostgreSQL, RabbitMQ, MongoDB, etc.) use **Testcontainers** to spin up real Docker containers during test execution.
+
+**Prerequisites:**
+
+```bash
+# Docker must be running
+docker --version
+
+# Docker daemon must be accessible
+docker ps
+```
+
+**Running Integration Tests:**
+
+Integration tests are tagged with `[Trait("Category", "Integration")]` and are **excluded by default**.
+
+**Dev Container Environment:**
+
+When running integration tests in a dev container environment (like VS Code dev containers), you must set the `TESTCONTAINERS_HOST_OVERRIDE` environment variable so that Testcontainers can properly connect to containers started within Docker-in-Docker:
+
+```bash
+export TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal
+```
+
+**Running Tests:**
+
+```bash
+# Run ONLY integration tests (requires Docker)
+# In dev container:
+export TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal && dotnet test Veggerby.Ignition.sln --filter "Category=Integration"
+
+# On host machine (no environment variable needed):
+dotnet test Veggerby.Ignition.sln --filter "Category=Integration"
+
+# Run integration tests for specific package (dev container):
+export TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal && dotnet test test/Veggerby.Ignition.Redis.Tests/Veggerby.Ignition.Redis.Tests.csproj --filter "Category=Integration"
+export TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal && dotnet test test/Veggerby.Ignition.Postgres.Tests/Veggerby.Ignition.Postgres.Tests.csproj --filter "Category=Integration"
+export TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal && dotnet test test/Veggerby.Ignition.RabbitMq.Tests/Veggerby.Ignition.RabbitMq.Tests.csproj --filter "Category=Integration"
+
+# Run unit tests only (default - excludes integration tests)
+dotnet test Veggerby.Ignition.sln --filter "Category!=Integration"
+
+# Run ALL tests (both unit and integration tests - requires Docker)
+# In dev container:
+export TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal && dotnet test Veggerby.Ignition.sln
+
+# On host machine:
+dotnet test Veggerby.Ignition.sln
+```
+
+**Testcontainers Pattern:**
+
+```csharp
+public class RedisIntegrationTests : IAsyncLifetime
+{
+    private readonly RedisContainer _redis = new RedisBuilder()
+        .WithImage("redis:7-alpine")
+        .Build();
+
+    public async Task InitializeAsync()
+    {
+        await _redis.StartAsync();
+    }
+
+    public async Task DisposeAsync()
+    {
+        await _redis.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task RedisSignal_ConnectsToRealRedis()
+    {
+        // arrange
+        var connectionString = _redis.GetConnectionString();
+        var signal = new RedisReadinessSignal(connectionString, options, logger);
+
+        // act
+        await signal.WaitAsync();
+
+        // assert
+        // Verify connection is established
+    }
+}
+```
+
+**Supported Testcontainers:**
+
+- **Redis**: `Testcontainers.Redis` - Redis cache/data store tests
+- **PostgreSQL**: `Testcontainers.PostgreSql` - PostgreSQL database tests
+- **RabbitMQ**: `Testcontainers.RabbitMq` - RabbitMQ message broker tests
+- **MongoDB**: `Testcontainers.MongoDb` - MongoDB document store tests
+- **SQL Server**: `Testcontainers.MsSql` - SQL Server database tests
+
+**Container Lifecycle:**
+
+- Containers start in `InitializeAsync()` (before each test class)
+- Containers stop in `DisposeAsync()` (after each test class)
+- Each test class gets a fresh container instance
+- Containers are automatically cleaned up after tests complete
+
+**Performance Considerations:**
+
+- Container startup adds ~2-10 seconds per test class
+- Use `[Collection]` attribute to share containers across multiple test classes when appropriate
+- Consider running integration tests separately from unit tests in CI/CD
+- Local development: keep Docker Desktop running for faster test execution
 
 **Testing Requirements:**
 
@@ -151,6 +280,7 @@ dotnet test --filter "Category=Integration"
 - Cover edge cases: zero signals, single signal, mixed success/failure/timeout states
 - Test idempotency (multiple coordinator waits return cached results)
 - Preserve existing test coverage when refactoring
+- **Integration tests**: Use Testcontainers for real infrastructure; avoid mocking external services when testing integration packages
 
 ## Code Style Guidelines
 
@@ -192,6 +322,7 @@ dotnet test --filter "Category=Integration"
 - No blocking waits (`.Result`, `.Wait()`) — async/await throughout
 - Use `Stopwatch` for timing, never `DateTime.Now` for elapsed measurement
 - Early-return guard clauses with blank line after guard block
+- **Always include `nameof` parameter** in all `Argument*Exception.ThrowIf*()` calls (e.g., `ArgumentNullException.ThrowIfNull(param, nameof(param))`, `ArgumentException.ThrowIfNullOrWhiteSpace(str, nameof(str))`) for better exception diagnostics during error triaging
 
 **XML Documentation:**
 
@@ -245,13 +376,23 @@ dotnet pack Veggerby.Ignition.sln --configuration Release
 
 **CI/CD Pipeline:**
 
-- `.github/workflows/ci-fast.yml`: Fast build and test on pull requests
+- `.github/workflows/ci-fast.yml`: Fast build and unit tests on all pull requests (draft or ready)
+- `.github/workflows/ci-integration.yml`: Integration tests on non-draft pull requests (required for merge)
 - `.github/workflows/ci-release.yml`: Full release pipeline with packaging
+
+**CI Integration Test Requirements:**
+
+- Integration tests run automatically when PR is marked ready for review
+- Integration tests are **required** to pass before merge
+- Draft PRs skip integration tests for faster iteration
+- Integration tests use Docker containers via Testcontainers
+- Environment variable `TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal` set in CI
 
 **Environment Variables:**
 
 - `DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1`: Skip first-run experience
 - `DOTNET_NOLOGO=true`: Suppress .NET logo output
+- `TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal`: Required for Testcontainers in CI/dev containers
 
 ## Pull Request Guidelines
 
@@ -289,10 +430,17 @@ dotnet test Veggerby.Ignition.sln
 
 **Required Checks:**
 
-- All tests pass
+- All unit tests pass (fast build workflow)
+- All integration tests pass when PR is ready for review (not draft)
 - No build warnings
 - Code follows style guidelines
 - Public APIs documented
+
+**CI Workflow:**
+
+1. **Draft PR**: Only fast build and unit tests run (quick feedback)
+2. **Ready for Review**: Integration tests automatically run (required for merge)
+3. **All checks must pass** before merge is allowed
 
 ## Project-Specific Context
 
@@ -323,6 +471,8 @@ dotnet test Veggerby.Ignition.sln
 
 - `Parallel`: Execute all signals concurrently (respects `MaxDegreeOfParallelism`)
 - `Sequential`: Execute in registration order
+- `DependencyAware`: Execute signals based on dependency graph (DAG with topological sort)
+- `Staged`: Execute signals in sequential stages/phases with parallel execution within each stage
 
 **Timeout Semantics:**
 
@@ -364,11 +514,16 @@ dotnet test Veggerby.Ignition.sln
 
 ### Key Files and Their Roles
 
-- `src/Veggerby.Ignition/IIgnitionSignal.cs`: Core signal abstraction
-- `src/Veggerby.Ignition/IIgnitionCoordinator.cs`: Coordinator interface
-- `src/Veggerby.Ignition/IgnitionCoordinator.cs`: Main coordination logic
-- `src/Veggerby.Ignition/IgnitionOptions.cs`: Configuration options
-- `src/Veggerby.Ignition/IgnitionHealthCheck.cs`: Health check integration
+- `src/Veggerby.Ignition/Core/IIgnitionSignal.cs`: Core signal abstraction
+- `src/Veggerby.Ignition/Core/IIgnitionCoordinator.cs`: Coordinator interface
+- `src/Veggerby.Ignition/Core/IgnitionCoordinator.cs`: Main coordination logic
+- `src/Veggerby.Ignition/Core/IgnitionOptions.cs`: Configuration options
+- `src/Veggerby.Ignition/HealthChecks/IgnitionHealthCheck.cs`: Health check integration
+- `src/Veggerby.Ignition/Graph/IIgnitionGraph.cs`: Dependency graph abstraction for DAG execution
+- `src/Veggerby.Ignition/Graph/IgnitionGraphBuilder.cs`: Builder for dependency graphs
+- `src/Veggerby.Ignition/Extensions/IIgnitionBundle.cs`: Bundle abstraction for reusable signal packages
+- `src/Veggerby.Ignition/Extensions/IIgnitionTimeoutStrategy.cs`: Pluggable timeout strategy interface
+- `src/Veggerby.Ignition/Diagnostics/IgnitionTimeline.cs`: Timeline recording and replay
 - `.editorconfig`: Code formatting rules
 - `.github/copilot-instructions.md`: Detailed agent instructions (see attachments)
 
@@ -409,8 +564,10 @@ public async Task FailFast_Sequential_StopsOnFirstFailure()
 - Idempotency (multiple `WaitAllAsync` calls)
 - Edge cases (zero signals, single signal, mixed statuses)
 - Policy variations (FailFast, BestEffort, ContinueOnTimeout)
-- Execution mode variations (Parallel, Sequential)
+- Execution mode variations (Parallel, Sequential, DependencyAware, Staged)
 - Concurrency limiting
+- Dependency graph ordering (for DependencyAware mode)
+- Bundle registration and configuration
 
 ### Documentation Standards
 
@@ -434,6 +591,10 @@ public async Task FailFast_Sequential_StopsOnFirstFailure()
 - `docs/cookbook.md`: Common recipes
 - `docs/advanced-patterns.md`: Advanced scenarios
 - `docs/api-reference.md`: API documentation
+- `docs/dependency-aware-execution.md`: DAG execution guide
+- `docs/bundles.md`: Bundles guide
+- `docs/integration-recipes.md`: Integration package recipes
+- `docs/new-features.md`: Feature epics and roadmap
 
 ## Debugging and Troubleshooting
 
@@ -450,8 +611,22 @@ public async Task FailFast_Sequential_StopsOnFirstFailure()
    - Verify no unused usings or variables
 
 3. **Integration test failures:**
-   - Verify external dependencies (databases, message brokers) are available
-   - Check test project configuration matches requirements
+   - **Docker not running**: Ensure Docker Desktop/daemon is running (`docker ps` should succeed)
+   - **Testcontainers connection errors**: Check Docker socket permissions and network connectivity
+   - **Container startup timeout**: Increase timeout or check Docker resource allocation (CPU/memory)
+   - **Port conflicts**: Ensure no other services are using the same ports
+   - **Image pull failures**: Check network connectivity and Docker Hub access
+   - To skip integration tests when Docker unavailable: `dotnet test --filter "Category!=Integration"`
+
+4. **Redis integration tests failing:**
+   - Verify Docker is running: `docker ps`
+   - Check Redis container starts: Container logs available in test output on failure
+   - Ensure sufficient Docker resources allocated
+
+5. **RabbitMQ/PostgreSQL/MongoDB tests failing:**
+   - Same Docker requirements as Redis
+   - Check container-specific environment variables are set correctly
+   - Verify test project has correct Testcontainers package references
    - Review test setup/teardown for proper isolation
 
 **Logging:**
@@ -489,9 +664,10 @@ A change is complete when ALL of the following hold:
 
 **Dependencies:**
 
-- Core: Zero external dependencies beyond BCL + Microsoft.Extensions.*
-- Tests: xUnit, AwesomeAssertions, NSubstitute only
-- Keep minimal dependency surface
+- **Core library**: Zero external dependencies beyond BCL + Microsoft.Extensions.*
+- **Unit tests**: xUnit, AwesomeAssertions, NSubstitute only
+- **Integration tests**: Add Testcontainers.* packages as needed (Redis, PostgreSql, RabbitMq, MongoDb, MsSql)
+- Keep minimal dependency surface in production code
 
 **Version Information:**
 

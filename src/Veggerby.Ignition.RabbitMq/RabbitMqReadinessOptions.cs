@@ -51,6 +51,19 @@ public sealed class RabbitMqReadinessOptions
     public TimeSpan RoundTripTestTimeout { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
+    /// Maximum number of retry attempts for transient connection failures.
+    /// Default is 3 attempts.
+    /// </summary>
+    public int MaxRetries { get; set; } = 3;
+
+    /// <summary>
+    /// Initial delay between retry attempts.
+    /// Subsequent delays use exponential backoff (doubled each retry).
+    /// Default is 100 milliseconds.
+    /// </summary>
+    public TimeSpan RetryDelay { get; set; } = TimeSpan.FromMilliseconds(100);
+
+    /// <summary>
     /// Adds a queue name to the list of queues to verify.
     /// </summary>
     /// <param name="queueName">Name of the queue to verify.</param>

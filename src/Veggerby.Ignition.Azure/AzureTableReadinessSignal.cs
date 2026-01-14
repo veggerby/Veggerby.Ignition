@@ -82,7 +82,7 @@ public sealed class AzureTableReadinessSignal : IIgnitionSignal
         {
             // Verify service connectivity by querying service properties
             _logger.LogDebug("Verifying Azure Table Storage service connection");
-            await _tableServiceClient.GetPropertiesAsync(cancellationToken);
+            await _tableServiceClient.GetPropertiesAsync(cancellationToken).ConfigureAwait(false);
 
             if (_options.VerifyTableExists && !string.IsNullOrWhiteSpace(_options.TableName))
             {
@@ -111,13 +111,13 @@ public sealed class AzureTableReadinessSignal : IIgnitionSignal
             if (_options.CreateIfNotExists)
             {
                 _logger.LogInformation("Ensuring Azure Table exists: {TableName}", _options.TableName);
-                await tableClient.CreateIfNotExistsAsync(cancellationToken);
+                await tableClient.CreateIfNotExistsAsync(cancellationToken).ConfigureAwait(false);
             }
             else
             {
                 // Attempt to get table properties to verify existence
                 // This will throw RequestFailedException if table doesn't exist
-                await tableClient.GetAccessPoliciesAsync(cancellationToken);
+                await tableClient.GetAccessPoliciesAsync(cancellationToken).ConfigureAwait(false);
                 _logger.LogDebug("Azure Table exists: {TableName}", _options.TableName);
             }
         }

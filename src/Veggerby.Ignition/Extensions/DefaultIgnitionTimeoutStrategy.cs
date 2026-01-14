@@ -33,8 +33,8 @@ public sealed class DefaultIgnitionTimeoutStrategy : IIgnitionTimeoutStrategy
     /// </returns>
     public (TimeSpan? signalTimeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionOptions options)
     {
-        ArgumentNullException.ThrowIfNull(signal);
-        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(signal, nameof(signal));
+        ArgumentNullException.ThrowIfNull(options, nameof(options));
 
         return (signal.Timeout, options.CancelIndividualOnTimeout);
     }

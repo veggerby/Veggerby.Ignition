@@ -258,7 +258,8 @@ public class IgnitionBuilderTests
             .AddSignal("test", ct => Task.CompletedTask, TimeSpan.FromSeconds(3)));
 
         var provider = services.BuildServiceProvider();
-        var signals = provider.GetServices<IIgnitionSignal>().ToList();
+        var factories = provider.GetServices<IIgnitionSignalFactory>().ToList();
+        var signals = factories.Select(f => f.CreateSignal(provider)).ToList();
 
         // assert
         signals.Count.Should().Be(1);
@@ -279,7 +280,8 @@ public class IgnitionBuilderTests
             .AddSignal("test2", ct => Task.CompletedTask, TimeSpan.FromSeconds(3)));
 
         var provider = services.BuildServiceProvider();
-        var signals = provider.GetServices<IIgnitionSignal>().ToList();
+        var factories = provider.GetServices<IIgnitionSignalFactory>().ToList();
+        var signals = factories.Select(f => f.CreateSignal(provider)).ToList();
 
         // assert
         signals.Count.Should().Be(2);

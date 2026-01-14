@@ -18,7 +18,7 @@ public static class TaskCompletionSourceExtensions
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="tcs"/> is null.</exception>
     public static bool Ignited(this TaskCompletionSource tcs)
     {
-        ArgumentNullException.ThrowIfNull(tcs);
+        ArgumentNullException.ThrowIfNull(tcs, nameof(tcs));
         return tcs.TrySetResult();
     }
 
@@ -31,8 +31,8 @@ public static class TaskCompletionSourceExtensions
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="tcs"/> or <paramref name="exception"/> is null.</exception>
     public static bool IgnitionFailed(this TaskCompletionSource tcs, Exception exception)
     {
-        ArgumentNullException.ThrowIfNull(tcs);
-        ArgumentNullException.ThrowIfNull(exception);
+        ArgumentNullException.ThrowIfNull(tcs, nameof(tcs));
+        ArgumentNullException.ThrowIfNull(exception, nameof(exception));
         return tcs.TrySetException(exception);
     }
 
@@ -46,7 +46,7 @@ public static class TaskCompletionSourceExtensions
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="tcs"/> is null.</exception>
     public static bool Ignited<T>(this TaskCompletionSource<T> tcs, T result)
     {
-        ArgumentNullException.ThrowIfNull(tcs);
+        ArgumentNullException.ThrowIfNull(tcs, nameof(tcs));
         return tcs.TrySetResult(result);
     }
 
@@ -60,8 +60,8 @@ public static class TaskCompletionSourceExtensions
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="tcs"/> or <paramref name="exception"/> is null.</exception>
     public static bool IgnitionFailed<T>(this TaskCompletionSource<T> tcs, Exception exception)
     {
-        ArgumentNullException.ThrowIfNull(tcs);
-        ArgumentNullException.ThrowIfNull(exception);
+        ArgumentNullException.ThrowIfNull(tcs, nameof(tcs));
+        ArgumentNullException.ThrowIfNull(exception, nameof(exception));
         return tcs.TrySetException(exception);
     }
 
@@ -74,7 +74,7 @@ public static class TaskCompletionSourceExtensions
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="tcs"/> is null.</exception>
     public static bool IgnitionCanceled<T>(this TaskCompletionSource<T> tcs)
     {
-        ArgumentNullException.ThrowIfNull(tcs);
+        ArgumentNullException.ThrowIfNull(tcs, nameof(tcs));
         return tcs.TrySetCanceled();
     }
 }

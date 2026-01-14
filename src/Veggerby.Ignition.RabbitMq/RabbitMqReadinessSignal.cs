@@ -17,7 +17,8 @@ namespace Veggerby.Ignition.RabbitMq;
 /// </summary>
 public sealed class RabbitMqReadinessSignal : IIgnitionSignal
 {
-    private readonly IConnectionFactory _connectionFactory;
+    private readonly IConnectionFactory? _connectionFactory;
+    private readonly Func<IConnectionFactory>? _connectionFactoryFactory;
     private readonly RabbitMqReadinessOptions _options;
     private readonly ILogger<RabbitMqReadinessSignal> _logger;
     private readonly object _sync = new();
@@ -35,6 +36,25 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
         ILogger<RabbitMqReadinessSignal> logger)
     {
         _connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
+        _connectionFactoryFactory = null;
+        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RabbitMqReadinessSignal"/> class
+    /// using a factory function for lazy connection factory creation.
+    /// </summary>
+    /// <param name="connectionFactoryFactory">Factory function that creates a connection factory when invoked.</param>
+    /// <param name="options">Configuration options for readiness verification.</param>
+    /// <param name="logger">Logger for diagnostic output.</param>
+    public RabbitMqReadinessSignal(
+        Func<IConnectionFactory> connectionFactoryFactory,
+        RabbitMqReadinessOptions options,
+        ILogger<RabbitMqReadinessSignal> logger)
+    {
+        _connectionFactory = null;
+        _connectionFactoryFactory = connectionFactoryFactory ?? throw new ArgumentNullException(nameof(connectionFactoryFactory));
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -63,11 +83,14 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
 
     private async Task ExecuteAsync(CancellationToken cancellationToken)
     {
+        // Resolve connection factory from factory if provided, otherwise use direct reference
+        var connectionFactory = _connectionFactory ?? _connectionFactoryFactory!();
+
         var activity = Activity.Current;
         
         // Note: IConnectionFactory endpoint properties vary by implementation
         // Only log what we can safely access
-        if (_connectionFactory is ConnectionFactory factory)
+        if (connectionFactory is ConnectionFactory factory)
         {
             activity?.SetTag("rabbitmq.host", factory.HostName);
             activity?.SetTag("rabbitmq.port", factory.Port);
@@ -89,10 +112,16 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
 
         try
         {
-            connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
-            _logger.LogDebug("RabbitMQ connection established");
+            var retryPolicy = new RetryPolicy(_options.MaxRetries, _options.RetryDelay, _logger);
 
-            channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
+            connection = await retryPolicy.ExecuteAsync(async ct =>
+            {
+                var conn = await connectionFactory.CreateConnectionAsync(ct).ConfigureAwait(false);
+                _logger.LogDebug("RabbitMQ connection established");
+                return conn;
+            }, "RabbitMQ connection", cancellationToken);
+
+            channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
             _logger.LogDebug("RabbitMQ channel created");
 
             await VerifyTopologyAsync(channel, cancellationToken);
@@ -113,14 +142,14 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
         {
             if (channel is not null)
             {
-                await channel.CloseAsync(CancellationToken.None);
-                await channel.DisposeAsync();
+                await channel.CloseAsync(CancellationToken.None).ConfigureAwait(false);
+                await channel.DisposeAsync().ConfigureAwait(false);
             }
 
             if (connection is not null)
             {
-                await connection.CloseAsync(CancellationToken.None);
-                await connection.DisposeAsync();
+                await connection.CloseAsync(CancellationToken.None).ConfigureAwait(false);
+                await connection.DisposeAsync().ConfigureAwait(false);
             }
         }
     }
@@ -135,7 +164,7 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
             {
                 try
                 {
-                    await channel.QueueDeclarePassiveAsync(queueName, cancellationToken);
+                    await channel.QueueDeclarePassiveAsync(queueName, cancellationToken).ConfigureAwait(false);
                     _logger.LogDebug("Queue '{QueueName}' verified", queueName);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -159,7 +188,7 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
             {
                 try
                 {
-                    await channel.ExchangeDeclarePassiveAsync(exchangeName, cancellationToken);
+                    await channel.ExchangeDeclarePassiveAsync(exchangeName, cancellationToken).ConfigureAwait(false);
                     _logger.LogDebug("Exchange '{ExchangeName}' verified", exchangeName);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)

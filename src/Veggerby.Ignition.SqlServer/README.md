@@ -6,11 +6,38 @@ SQL Server readiness signals for Veggerby.Ignition - verify database connections
 
 ```bash
 dotnet add package Veggerby.Ignition.SqlServer
+dotnet add package Microsoft.Data.SqlClient
 ```
 
 ## Usage
 
-### Basic Connection Verification
+### Modern Pattern: Connection Factory (Recommended)
+
+The recommended approach uses a connection factory registered in DI for better connection management:
+
+```csharp
+// Register connection factory in DI container
+builder.Services.AddSingleton<Func<SqlConnection>>(() => 
+    new SqlConnection("Server=localhost;Database=MyDb;Trusted_Connection=True;"));
+
+// Add SQL Server readiness signal (automatically resolves factory from DI)
+builder.Services.AddIgnition();
+builder.Services.AddSqlServerReadiness();
+
+var app = builder.Build();
+await app.Services.GetRequiredService<IIgnitionCoordinator>().WaitAllAsync();
+```
+
+**Why Connection Factory?**
+
+- **Cleaner DI integration**: No connection string duplication across services
+- **Centralized configuration**: Single factory registration shared by all consumers
+- **Testability**: Easy to mock or replace for testing
+- **Connection pooling**: SQL Server connection pooling managed by ADO.NET
+
+### Legacy Pattern: Connection String
+
+For simpler scenarios or when a connection factory isn't registered in DI:
 
 ```csharp
 builder.Services.AddIgnition();
@@ -25,26 +52,26 @@ await app.Services.GetRequiredService<IIgnitionCoordinator>().WaitAllAsync();
 ### With Validation Query
 
 ```csharp
-builder.Services.AddSqlServerReadiness(
-    "Server=localhost;Database=MyDb;Trusted_Connection=True;",
-    options =>
-    {
-        options.ValidationQuery = "SELECT 1";
-        options.Timeout = TimeSpan.FromSeconds(5);
-    });
+builder.Services.AddSingleton<Func<SqlConnection>>(() => new SqlConnection(connectionString));
+
+builder.Services.AddSqlServerReadiness(options =>
+{
+    options.ValidationQuery = "SELECT 1";
+    options.Timeout = TimeSpan.FromSeconds(5);
+});
 ```
 
 ### Advanced Schema Validation
 
 ```csharp
-builder.Services.AddSqlServerReadiness(
-    connectionString,
-    options =>
-    {
-        // Verify specific table exists
-        options.ValidationQuery = "SELECT TOP 1 1 FROM Users";
-        options.Timeout = TimeSpan.FromSeconds(10);
-    });
+builder.Services.AddSingleton<Func<SqlConnection>>(() => new SqlConnection(connectionString));
+
+builder.Services.AddSqlServerReadiness(options =>
+{
+    // Verify specific table exists
+    options.ValidationQuery = "SELECT TOP 1 1 FROM Users";
+    options.Timeout = TimeSpan.FromSeconds(10);
+});
 ```
 
 ## Features

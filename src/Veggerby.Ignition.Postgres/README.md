@@ -6,11 +6,38 @@ PostgreSQL readiness signals for Veggerby.Ignition - verify database connections
 
 ```bash
 dotnet add package Veggerby.Ignition.Postgres
+dotnet add package Npgsql
 ```
 
 ## Usage
 
-### Basic Connection Verification
+### Modern Pattern: NpgsqlDataSource (Recommended)
+
+The recommended approach uses `NpgsqlDataSource` for better connection pooling and DI integration:
+
+```csharp
+// Register NpgsqlDataSource in DI container
+builder.Services.AddNpgsqlDataSource(
+    "Host=localhost;Database=mydb;Username=user;Password=pass");
+
+// Add PostgreSQL readiness signal (automatically resolves NpgsqlDataSource from DI)
+builder.Services.AddIgnition();
+builder.Services.AddPostgresReadiness();
+
+var app = builder.Build();
+await app.Services.GetRequiredService<IIgnitionCoordinator>().WaitAllAsync();
+```
+
+**Why NpgsqlDataSource?**
+
+- **Better connection pooling**: Modern Npgsql 7.0+ recommended pattern
+- **Cleaner DI integration**: No connection string duplication
+- **Multiplexing support**: Enables advanced pooling scenarios
+- **Shared across services**: Same data source used by repositories/DbContext
+
+### Legacy Pattern: Connection String
+
+For simpler scenarios or when NpgsqlDataSource isn't registered in DI:
 
 ```csharp
 builder.Services.AddIgnition();
@@ -25,26 +52,26 @@ await app.Services.GetRequiredService<IIgnitionCoordinator>().WaitAllAsync();
 ### With Validation Query
 
 ```csharp
-builder.Services.AddPostgresReadiness(
-    "Host=localhost;Database=mydb;Username=user;Password=pass",
-    options =>
-    {
-        options.ValidationQuery = "SELECT 1";
-        options.Timeout = TimeSpan.FromSeconds(5);
-    });
+builder.Services.AddNpgsqlDataSource(connectionString);
+
+builder.Services.AddPostgresReadiness(options =>
+{
+    options.ValidationQuery = "SELECT 1";
+    options.Timeout = TimeSpan.FromSeconds(5);
+});
 ```
 
 ### Advanced Schema Validation
 
 ```csharp
-builder.Services.AddPostgresReadiness(
-    connectionString,
-    options =>
-    {
-        // Verify specific table exists
-        options.ValidationQuery = "SELECT 1 FROM users LIMIT 1";
-        options.Timeout = TimeSpan.FromSeconds(10);
-    });
+builder.Services.AddNpgsqlDataSource(connectionString);
+
+builder.Services.AddPostgresReadiness(options =>
+{
+    // Verify specific table exists
+    options.ValidationQuery = "SELECT 1 FROM users LIMIT 1";
+    options.Timeout = TimeSpan.FromSeconds(10);
+});
 ```
 
 ## Features
@@ -94,6 +121,46 @@ builder.Services
 
 ### Multiple Databases
 
+With `NpgsqlDataSource` (when you have multiple databases):
+
+```csharp
+// Primary database
+builder.Services.AddNpgsqlDataSource(
+    primaryConnectionString,
+    serviceKey: "primary");
+
+// Read replica
+builder.Services.AddNpgsqlDataSource(
+    replicaConnectionString,
+    serviceKey: "replica");
+
+// Note: Currently AddPostgresReadiness only supports the default (non-keyed) data source.
+// For multiple databases, register custom signals manually:
+builder.Services.AddIgnitionSignal(sp =>
+{
+    var primaryDs = sp.GetRequiredKeyedService<NpgsqlDataSource>("primary");
+    var logger = sp.GetRequiredService<ILogger<PostgresReadinessSignal>>();
+    return new PostgresReadinessSignal(primaryDs, new PostgresReadinessOptions
+    {
+        ValidationQuery = "SELECT 1",
+        Timeout = TimeSpan.FromSeconds(5)
+    }, logger);
+});
+
+builder.Services.AddIgnitionSignal(sp =>
+{
+    var replicaDs = sp.GetRequiredKeyedService<NpgsqlDataSource>("replica");
+    var logger = sp.GetRequiredService<ILogger<PostgresReadinessSignal>>();
+    return new PostgresReadinessSignal(replicaDs, new PostgresReadinessOptions
+    {
+        ValidationQuery = "SELECT 1",
+        Timeout = TimeSpan.FromSeconds(10)
+    }, logger);
+});
+```
+
+With connection strings (simpler for multiple databases):
+
 ```csharp
 // Primary database
 builder.Services.AddPostgresReadiness(
@@ -114,7 +181,7 @@ builder.Services.AddPostgresReadiness(
     });
 ```
 
-Note: Currently, multiple PostgreSQL signals will share the same name ("postgres-readiness"). For distinct signals, implement custom `IIgnitionSignal` with unique names.
+Note: Multiple PostgreSQL signals will share the same name ("postgres-readiness"). For distinct signal names, implement custom `IIgnitionSignal` instances.
 
 ## Error Handling
 

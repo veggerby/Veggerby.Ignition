@@ -40,6 +40,9 @@ public static class MassTransitIgnitionExtensions
     ///     });
     /// });
     /// 
+    /// // Suppress expected MassTransit connection warnings during startup
+    /// services.AddLogging(builder => builder.AddFilter("MassTransit", LogLevel.Error));
+    /// 
     /// services.AddMassTransitReadiness(options =>
     /// {
     ///     options.Timeout = TimeSpan.FromSeconds(10);

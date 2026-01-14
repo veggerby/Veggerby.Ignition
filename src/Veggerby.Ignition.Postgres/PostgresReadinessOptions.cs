@@ -22,4 +22,17 @@ public sealed class PostgresReadinessOptions
     /// More complex queries can verify schema readiness or data availability.
     /// </remarks>
     public string? ValidationQuery { get; set; }
+
+    /// <summary>
+    /// Maximum number of retry attempts for transient connection failures.
+    /// Default is 3 attempts.
+    /// </summary>
+    public int MaxRetries { get; set; } = 3;
+
+    /// <summary>
+    /// Initial delay between retry attempts.
+    /// Subsequent delays use exponential backoff (doubled each retry).
+    /// Default is 100 milliseconds.
+    /// </summary>
+    public TimeSpan RetryDelay { get; set; } = TimeSpan.FromMilliseconds(100);
 }
