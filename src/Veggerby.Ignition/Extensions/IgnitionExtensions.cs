@@ -759,8 +759,16 @@ public static class IgnitionExtensions
     /// and optionally applies attribute-based dependencies.
     /// </summary>
     /// <param name="services">Target DI service collection.</param>
-    /// <param name="applyAttributeDependencies">Whether to automatically discover dependencies from <see cref="SignalDependencyAttribute"/>.</param>
-    /// <param name="configure">Optional delegate to configure additional graph dependencies.</param>
+    /// <param name="applyAttributeDependencies">
+    /// Whether to automatically discover dependencies from <see cref="SignalDependencyAttribute"/>.
+    /// When <c>true</c> (default), automatically applies dependencies declared via attributes on signal implementations.
+    /// When <c>false</c>, only manually configured dependencies via the <paramref name="configure"/> action are applied.
+    /// Set to <c>false</c> if you want complete manual control over the dependency graph or if attribute scanning overhead is a concern.
+    /// </param>
+    /// <param name="configure">
+    /// Optional delegate to configure additional graph dependencies.
+    /// Receives the graph builder and service provider, allowing you to add explicit dependencies beyond those discovered from attributes.
+    /// </param>
     /// <returns>The same service collection for chaining.</returns>
     /// <remarks>
     /// <para>

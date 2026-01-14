@@ -15,13 +15,12 @@ public sealed class IgnitionStageSignalBuilder
 {
     private readonly IServiceCollection _services;
     private readonly int _stageNumber;
-    private readonly IgnitionExecutionMode _executionMode;
 
     internal IgnitionStageSignalBuilder(IServiceCollection services, int stageNumber, IgnitionExecutionMode executionMode)
     {
         _services = services;
         _stageNumber = stageNumber;
-        _executionMode = executionMode;
+        // executionMode parameter intentionally unused - reserved for future use in staged execution optimizations
     }
 
     /// <summary>

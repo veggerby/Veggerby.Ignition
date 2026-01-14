@@ -158,7 +158,7 @@ public sealed class RetryPolicy
             {
                 _logger?.LogDebug(
                     ex,
-                    "{OperationName} not ready yet (attempt {Attempt}/{MaxRetries}), retrying in {DelayMs}ms",
+                    "{OperationName} failed (transient, attempt {Attempt}/{MaxRetries}), retrying in {DelayMs}ms",
                     operationName,
                     attempt,
                     _maxRetries,
@@ -220,7 +220,7 @@ public sealed class RetryPolicy
             {
                 _logger?.LogDebug(
                     ex,
-                    "{OperationName} not ready yet (attempt {Attempt}/{MaxRetries}), retrying in {DelayMs}ms",
+                    "{OperationName} failed (transient, attempt {Attempt}/{MaxRetries}), retrying in {DelayMs}ms",
                     operationName,
                     attempt,
                     _maxRetries,
