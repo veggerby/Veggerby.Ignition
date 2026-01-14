@@ -22,14 +22,24 @@ public static class MongoDbIgnitionExtensions
     /// The signal name defaults to "mongodb-readiness". For cluster connectivity verification only,
     /// no additional configuration is required. To verify a specific collection, use the
     /// <paramref name="configure"/> delegate to specify database and collection names.
+    /// For staged execution, set <c>options.Stage</c> in the configuration delegate.
     /// </remarks>
     /// <example>
     /// <code>
+    /// // Simple usage
     /// services.AddMongoDbReadiness("mongodb://localhost:27017", options =>
     /// {
     ///     options.DatabaseName = "mydb";
     ///     options.VerifyCollection = "users";
     ///     options.Timeout = TimeSpan.FromSeconds(5);
+    /// });
+    /// 
+    /// // Staged execution
+    /// services.AddMongoDbReadiness("mongodb://localhost:27017", options =>
+    /// {
+    ///     options.Stage = 1;
+    ///     options.DatabaseName = "testdb";
+    ///     options.Timeout = TimeSpan.FromSeconds(30);
     /// });
     /// </code>
     /// </example>
@@ -40,13 +50,29 @@ public static class MongoDbIgnitionExtensions
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString, nameof(connectionString));
 
+        var options = new MongoDbReadinessOptions();
+        configure?.Invoke(options);
+
+        // If Stage is specified, use factory-based registration
+        if (options.Stage.HasValue)
+        {
+            var innerFactory = new MongoDbReadinessSignalFactory(_ => connectionString, options);
+            var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, options.Stage.Value);
+            services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
+
+            // Configure the stage's execution mode
+            services.Configure<IgnitionStageConfiguration>(config =>
+            {
+                config.EnsureStage(options.Stage.Value, IgnitionExecutionMode.Parallel);
+            });
+
+            return services;
+        }
+
         var client = new MongoClient(connectionString);
 
         services.AddSingleton<IIgnitionSignal>(sp =>
         {
-            var options = new MongoDbReadinessOptions();
-            configure?.Invoke(options);
-
             var logger = sp.GetRequiredService<ILogger<MongoDbReadinessSignal>>();
             return new MongoDbReadinessSignal(client, options, logger);
         });
@@ -63,6 +89,9 @@ public static class MongoDbIgnitionExtensions
     /// <remarks>
     /// Use this overload when you have an existing <see cref="IMongoClient"/> registered in DI.
     /// The signal will resolve the client from the service provider.
+    /// For staged execution, set <c>options.Stage</c> in the configuration delegate, but note
+    /// that this overload requires an existing client in DI and cannot properly support
+    /// staged factory-based scenarios. Use the connection string factory overload instead.
     /// </remarks>
     /// <example>
     /// <code>
@@ -79,11 +108,19 @@ public static class MongoDbIgnitionExtensions
         this IServiceCollection services,
         Action<MongoDbReadinessOptions>? configure = null)
     {
+        var options = new MongoDbReadinessOptions();
+        configure?.Invoke(options);
+
+        // If Stage is specified, this method cannot be used (need connection string factory for proper DI)
+        if (options.Stage.HasValue)
+        {
+            throw new InvalidOperationException(
+                "Staged execution with AddMongoDbReadiness() requires a connection string factory. " +
+                "Use the overload that accepts Func<IServiceProvider, string> connectionStringFactory parameter.");
+        }
+
         services.AddSingleton<IIgnitionSignal>(sp =>
         {
-            var options = new MongoDbReadinessOptions();
-            configure?.Invoke(options);
-
             var logger = sp.GetRequiredService<ILogger<MongoDbReadinessSignal>>();
             // Use factory pattern to defer client resolution until signal executes
             return new MongoDbReadinessSignal(
@@ -96,11 +133,10 @@ public static class MongoDbIgnitionExtensions
     }
 
     /// <summary>
-    /// Registers a MongoDB readiness signal using a connection string factory with a specific stage/phase number for staged execution.
+    /// Registers a MongoDB readiness signal using a connection string factory.
     /// </summary>
     /// <param name="services">Target DI service collection.</param>
     /// <param name="connectionStringFactory">Factory that produces the MongoDB connection string using the service provider.</param>
-    /// <param name="stage">The stage/phase number (0 = infrastructure, 1 = services, 2 = workers, etc.).</param>
     /// <param name="configure">Optional configuration delegate for readiness options.</param>
     /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
     /// <remarks>
@@ -113,6 +149,9 @@ public static class MongoDbIgnitionExtensions
     /// This is particularly useful with Testcontainers scenarios where Stage 0 starts containers
     /// and makes connection strings available for Stage 1+ to consume.
     /// </para>
+    /// <para>
+    /// For staged execution, set <c>options.Stage</c> in the configuration delegate.
+    /// </para>
     /// </remarks>
     /// <example>
     /// <code>
@@ -123,39 +162,19 @@ public static class MongoDbIgnitionExtensions
     ///     async ct => await infrastructure.StartMongoDbAsync(), stage: 0);
     /// 
     /// // Stage 1: Use connection string from infrastructure
-    /// services.AddMongoDbReadinessWithStage(
+    /// services.AddMongoDbReadiness(
     ///     sp => sp.GetRequiredService&lt;InfrastructureManager&gt;().MongoDbConnectionString,
-    ///     stage: 1,
     ///     options =>
     ///     {
+    ///         options.Stage = 1;
     ///         options.DatabaseName = "testdb";
     ///         options.Timeout = TimeSpan.FromSeconds(30);
     ///     });
     /// </code>
     /// </example>
-    public static IServiceCollection AddMongoDbReadinessWithStage(
+    public static IServiceCollection AddMongoDbReadiness(
         this IServiceCollection services,
         Func<IServiceProvider, string> connectionStringFactory,
-        int stage,
-        Action<MongoDbReadinessOptions>? configure = null)
-    {
-        return AddMongoDbReadinessWithStage(services, connectionStringFactory, stage, IgnitionExecutionMode.Parallel, configure);
-    }
-
-    /// <summary>
-    /// Registers a MongoDB readiness signal using a connection string factory with a specific stage/phase number and execution mode.
-    /// </summary>
-    /// <param name="services">Target DI service collection.</param>
-    /// <param name="connectionStringFactory">Factory that produces the MongoDB connection string using the service provider.</param>
-    /// <param name="stage">The stage/phase number (0 = infrastructure, 1 = services, 2 = workers, etc.).</param>
-    /// <param name="executionMode">Execution mode for this stage (Sequential, Parallel, DependencyAware).</param>
-    /// <param name="configure">Optional configuration delegate for readiness options.</param>
-    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
-    public static IServiceCollection AddMongoDbReadinessWithStage(
-        this IServiceCollection services,
-        Func<IServiceProvider, string> connectionStringFactory,
-        int stage,
-        IgnitionExecutionMode executionMode,
         Action<MongoDbReadinessOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(connectionStringFactory, nameof(connectionStringFactory));
@@ -164,15 +183,23 @@ public static class MongoDbIgnitionExtensions
         configure?.Invoke(options);
 
         var innerFactory = new MongoDbReadinessSignalFactory(connectionStringFactory, options);
-        var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, stage);
 
-        services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
-
-        // Configure the stage's execution mode
-        services.Configure<IgnitionStageConfiguration>(config =>
+        // If Stage is specified, wrap with StagedIgnitionSignalFactory
+        if (options.Stage.HasValue)
         {
-            config.EnsureStage(stage, executionMode);
-        });
+            var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, options.Stage.Value);
+            services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
+
+            // Configure the stage's execution mode
+            services.Configure<IgnitionStageConfiguration>(config =>
+            {
+                config.EnsureStage(options.Stage.Value, IgnitionExecutionMode.Parallel);
+            });
+        }
+        else
+        {
+            services.AddSingleton<IIgnitionSignalFactory>(innerFactory);
+        }
 
         return services;
     }

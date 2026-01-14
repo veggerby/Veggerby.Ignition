@@ -23,14 +23,23 @@ public static class RabbitMqIgnitionExtensions
     /// The signal name defaults to "rabbitmq-readiness". For connection-only verification,
     /// no additional configuration is required. To verify queues or exchanges, use the
     /// <paramref name="configure"/> delegate to specify topology elements.
+    /// For staged execution, set <c>options.Stage</c> in the configuration delegate.
     /// </remarks>
     /// <example>
     /// <code>
+    /// // Simple usage
     /// services.AddRabbitMqReadiness("amqp://localhost", options =>
     /// {
     ///     options.WithQueue("orders");
     ///     options.WithExchange("events");
     ///     options.Timeout = TimeSpan.FromSeconds(5);
+    /// });
+    /// 
+    /// // Staged execution
+    /// services.AddRabbitMqReadiness("amqp://localhost", options =>
+    /// {
+    ///     options.Stage = 3;
+    ///     options.Timeout = TimeSpan.FromSeconds(30);
     /// });
     /// </code>
     /// </example>
@@ -41,12 +50,31 @@ public static class RabbitMqIgnitionExtensions
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString, nameof(connectionString));
 
+        var options = new RabbitMqReadinessOptions();
+        configure?.Invoke(options);
+
+        // If Stage is specified, use factory-based registration
+        if (options.Stage.HasValue)
+        {
+            var innerFactory = new RabbitMqReadinessSignalFactory(_ => connectionString, options);
+            var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, options.Stage.Value);
+            services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
+
+            // Configure the stage's execution mode
+            services.Configure<IgnitionStageConfiguration>(config =>
+            {
+                config.EnsureStage(options.Stage.Value, IgnitionExecutionMode.Parallel);
+            });
+
+            return services;
+        }
+
         var factory = new ConnectionFactory
         {
             Uri = new Uri(connectionString)
         };
 
-        return AddRabbitMqReadiness(services, factory, configure);
+        return AddRabbitMqReadiness(services, factory, options);
     }
 
     /// <summary>
@@ -59,6 +87,9 @@ public static class RabbitMqIgnitionExtensions
     /// <remarks>
     /// Use this overload when you need fine-grained control over connection factory settings
     /// (e.g., SSL/TLS configuration, custom endpoints, credential management).
+    /// For staged execution, set <c>options.Stage</c> in the configuration delegate, but note
+    /// that this overload requires a pre-configured factory and cannot properly support
+    /// staged factory-based scenarios. Use the connection string factory overload instead.
     /// </remarks>
     /// <example>
     /// <code>
@@ -83,11 +114,30 @@ public static class RabbitMqIgnitionExtensions
     {
         ArgumentNullException.ThrowIfNull(connectionFactory, nameof(connectionFactory));
 
+        var options = new RabbitMqReadinessOptions();
+        configure?.Invoke(options);
+
+        // If Stage is specified, this method cannot be used (need connection string factory for proper DI)
+        if (options.Stage.HasValue)
+        {
+            throw new InvalidOperationException(
+                "Staged execution with AddRabbitMqReadiness() requires a connection string factory. " +
+                "Use the overload that accepts Func<IServiceProvider, string> connectionStringFactory parameter.");
+        }
+
+        return AddRabbitMqReadiness(services, connectionFactory, options);
+    }
+
+    /// <summary>
+    /// Internal helper to add RabbitMQ readiness with pre-configured factory and options.
+    /// </summary>
+    private static IServiceCollection AddRabbitMqReadiness(
+        this IServiceCollection services,
+        IConnectionFactory connectionFactory,
+        RabbitMqReadinessOptions options)
+    {
         services.AddSingleton<IIgnitionSignal>(sp =>
         {
-            var options = new RabbitMqReadinessOptions();
-            configure?.Invoke(options);
-
             var logger = sp.GetRequiredService<ILogger<RabbitMqReadinessSignal>>();
             return new RabbitMqReadinessSignal(connectionFactory, options, logger);
         });
@@ -105,6 +155,9 @@ public static class RabbitMqIgnitionExtensions
     /// Use this overload when you have an existing <see cref="IConnectionFactory"/> registered in DI.
     /// The signal will resolve the factory from the service provider.
     /// This is the recommended approach for modern .NET applications using dependency injection.
+    /// For staged execution, set <c>options.Stage</c> in the configuration delegate, but note
+    /// that this overload requires an existing factory in DI and cannot properly support
+    /// staged factory-based scenarios. Use the connection string factory overload instead.
     /// </remarks>
     /// <example>
     /// <code>
@@ -119,8 +172,8 @@ public static class RabbitMqIgnitionExtensions
     /// 
     /// services.AddRabbitMqReadiness(options =>
     /// {
-    ///     options.PerformRoundTripTest = true;
-    ///     options.Timeout = TimeSpan.FromSeconds(10);
+    ///     options.WithQueue("orders");
+    ///     options.Timeout = TimeSpan.FromSeconds(5);
     /// });
     /// </code>
     /// </example>
@@ -128,13 +181,21 @@ public static class RabbitMqIgnitionExtensions
         this IServiceCollection services,
         Action<RabbitMqReadinessOptions>? configure = null)
     {
+        var options = new RabbitMqReadinessOptions();
+        configure?.Invoke(options);
+
+        // If Stage is specified, this method cannot be used (need connection string factory for proper DI)
+        if (options.Stage.HasValue)
+        {
+            throw new InvalidOperationException(
+                "Staged execution with AddRabbitMqReadiness() requires a connection string factory. " +
+                "Use the overload that accepts Func<IServiceProvider, string> connectionStringFactory parameter.");
+        }
+
         services.AddSingleton<IIgnitionSignal>(sp =>
         {
-            var options = new RabbitMqReadinessOptions();
-            configure?.Invoke(options);
-
             var logger = sp.GetRequiredService<ILogger<RabbitMqReadinessSignal>>();
-            // Use factory pattern to defer connection factory resolution until signal executes
+            // Use factory pattern to defer factory resolution until signal executes
             return new RabbitMqReadinessSignal(
                 () => sp.GetRequiredService<IConnectionFactory>(),
                 options,
@@ -145,11 +206,10 @@ public static class RabbitMqIgnitionExtensions
     }
 
     /// <summary>
-    /// Registers a RabbitMQ readiness signal using a connection string factory with a specific stage/phase number for staged execution.
+    /// Registers a RabbitMQ readiness signal using a connection string factory.
     /// </summary>
     /// <param name="services">Target DI service collection.</param>
     /// <param name="connectionStringFactory">Factory that produces the RabbitMQ connection string using the service provider.</param>
-    /// <param name="stage">The stage/phase number (0 = infrastructure, 1 = services, 2 = workers, etc.).</param>
     /// <param name="configure">Optional configuration delegate for readiness options.</param>
     /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
     /// <remarks>
@@ -162,6 +222,9 @@ public static class RabbitMqIgnitionExtensions
     /// This is particularly useful with Testcontainers scenarios where Stage 0 starts containers
     /// and makes connection strings available for Stage 1+ to consume.
     /// </para>
+    /// <para>
+    /// For staged execution, set <c>options.Stage</c> in the configuration delegate.
+    /// </para>
     /// </remarks>
     /// <example>
     /// <code>
@@ -172,38 +235,18 @@ public static class RabbitMqIgnitionExtensions
     ///     async ct => await infrastructure.StartRabbitMqAsync(), stage: 0);
     /// 
     /// // Stage 3: Use connection string from infrastructure
-    /// services.AddRabbitMqReadinessWithStage(
+    /// services.AddRabbitMqReadiness(
     ///     sp => sp.GetRequiredService&lt;InfrastructureManager&gt;().RabbitMqConnectionString,
-    ///     stage: 3,
     ///     options =>
     ///     {
+    ///         options.Stage = 3;
     ///         options.Timeout = TimeSpan.FromSeconds(30);
     ///     });
     /// </code>
     /// </example>
-    public static IServiceCollection AddRabbitMqReadinessWithStage(
+    public static IServiceCollection AddRabbitMqReadiness(
         this IServiceCollection services,
         Func<IServiceProvider, string> connectionStringFactory,
-        int stage,
-        Action<RabbitMqReadinessOptions>? configure = null)
-    {
-        return AddRabbitMqReadinessWithStage(services, connectionStringFactory, stage, IgnitionExecutionMode.Parallel, configure);
-    }
-
-    /// <summary>
-    /// Registers a RabbitMQ readiness signal using a connection string factory with a specific stage/phase number and execution mode.
-    /// </summary>
-    /// <param name="services">Target DI service collection.</param>
-    /// <param name="connectionStringFactory">Factory that produces the RabbitMQ connection string using the service provider.</param>
-    /// <param name="stage">The stage/phase number (0 = infrastructure, 1 = services, 2 = workers, etc.).</param>
-    /// <param name="executionMode">Execution mode for this stage (Sequential, Parallel, DependencyAware).</param>
-    /// <param name="configure">Optional configuration delegate for readiness options.</param>
-    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
-    public static IServiceCollection AddRabbitMqReadinessWithStage(
-        this IServiceCollection services,
-        Func<IServiceProvider, string> connectionStringFactory,
-        int stage,
-        IgnitionExecutionMode executionMode,
         Action<RabbitMqReadinessOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(connectionStringFactory, nameof(connectionStringFactory));
@@ -212,15 +255,23 @@ public static class RabbitMqIgnitionExtensions
         configure?.Invoke(options);
 
         var innerFactory = new RabbitMqReadinessSignalFactory(connectionStringFactory, options);
-        var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, stage);
 
-        services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
-
-        // Configure the stage's execution mode
-        services.Configure<IgnitionStageConfiguration>(config =>
+        // If Stage is specified, wrap with StagedIgnitionSignalFactory
+        if (options.Stage.HasValue)
         {
-            config.EnsureStage(stage, executionMode);
-        });
+            var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, options.Stage.Value);
+            services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
+
+            // Configure the stage's execution mode
+            services.Configure<IgnitionStageConfiguration>(config =>
+            {
+                config.EnsureStage(options.Stage.Value, IgnitionExecutionMode.Parallel);
+            });
+        }
+        else
+        {
+            services.AddSingleton<IIgnitionSignalFactory>(innerFactory);
+        }
 
         return services;
     }

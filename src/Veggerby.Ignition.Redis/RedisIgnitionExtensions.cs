@@ -24,14 +24,24 @@ public static class RedisIgnitionExtensions
     /// The signal name defaults to "redis-readiness". For connection-only verification,
     /// no additional configuration is required. To execute PING or test key operations,
     /// use the <paramref name="configure"/> delegate to specify the verification strategy.
+    /// For staged execution, set <c>options.Stage</c> in the configuration delegate.
     /// </remarks>
     /// <example>
     /// <code>
+    /// // Simple usage
     /// services.AddRedisReadiness("localhost:6379", options =>
     /// {
     ///     options.VerificationStrategy = RedisVerificationStrategy.PingAndTestKey;
     ///     options.TestKeyPrefix = "ignition:readiness:";
     ///     options.Timeout = TimeSpan.FromSeconds(5);
+    /// });
+    /// 
+    /// // Staged execution
+    /// services.AddRedisReadiness("localhost:6379", options =>
+    /// {
+    ///     options.Stage = 2;
+    ///     options.VerificationStrategy = RedisVerificationStrategy.Ping;
+    ///     options.Timeout = TimeSpan.FromSeconds(30);
     /// });
     /// </code>
     /// </example>
@@ -41,6 +51,25 @@ public static class RedisIgnitionExtensions
         Action<RedisReadinessOptions>? configure = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString, nameof(connectionString));
+
+        var options = new RedisReadinessOptions();
+        configure?.Invoke(options);
+
+        // If Stage is specified, use factory-based registration
+        if (options.Stage.HasValue)
+        {
+            var innerFactory = new RedisReadinessSignalFactory(_ => connectionString, options);
+            var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, options.Stage.Value);
+            services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
+
+            // Configure the stage's execution mode
+            services.Configure<IgnitionStageConfiguration>(config =>
+            {
+                config.EnsureStage(options.Stage.Value, IgnitionExecutionMode.Parallel);
+            });
+
+            return services;
+        }
 
         // Register the connection multiplexer as singleton if not already registered
         services.AddSingleton<IConnectionMultiplexer>(sp =>
@@ -53,9 +82,6 @@ public static class RedisIgnitionExtensions
 
         services.AddSingleton<IIgnitionSignalFactory>(sp =>
         {
-            var options = new RedisReadinessOptions();
-            configure?.Invoke(options);
-
             var multiplexer = sp.GetRequiredService<IConnectionMultiplexer>();
             var logger = sp.GetRequiredService<ILogger<RedisReadinessSignal>>();
             var signal = new RedisReadinessSignal(multiplexer, options, logger);
@@ -69,7 +95,7 @@ public static class RedisIgnitionExtensions
 
     /// <summary>
     /// Registers a Redis readiness signal using an existing <see cref="IConnectionMultiplexer"/>
-    /// from the DI container.
+    /// from the DI container, or a connection string factory for staged execution.
     /// </summary>
     /// <param name="services">Target DI service collection.</param>
     /// <param name="configure">Optional configuration delegate for readiness options.</param>
@@ -78,6 +104,7 @@ public static class RedisIgnitionExtensions
     /// This overload expects an <see cref="IConnectionMultiplexer"/> to be already registered
     /// in the DI container. Use this when you have custom connection configuration or want
     /// to share a connection multiplexer across multiple components.
+    /// For staged execution, set <c>options.Stage</c> in the configuration delegate.
     /// </remarks>
     /// <example>
     /// <code>
@@ -97,11 +124,19 @@ public static class RedisIgnitionExtensions
         this IServiceCollection services,
         Action<RedisReadinessOptions>? configure = null)
     {
+        var options = new RedisReadinessOptions();
+        configure?.Invoke(options);
+
+        // If Stage is specified, this method cannot be used (need connection string factory for proper DI)
+        if (options.Stage.HasValue)
+        {
+            throw new InvalidOperationException(
+                "Staged execution with AddRedisReadiness() requires a connection string factory. " +
+                "Use the overload that accepts Func<IServiceProvider, string> connectionStringFactory parameter.");
+        }
+
         services.AddSingleton<IIgnitionSignalFactory>(sp =>
         {
-            var options = new RedisReadinessOptions();
-            configure?.Invoke(options);
-
             var logger = sp.GetRequiredService<ILogger<RedisReadinessSignal>>();
             // Use factory pattern to defer multiplexer resolution until signal executes
             var signal = new RedisReadinessSignal(
@@ -116,11 +151,10 @@ public static class RedisIgnitionExtensions
     }
 
     /// <summary>
-    /// Registers a Redis readiness signal using a connection string factory with a specific stage/phase number for staged execution.
+    /// Registers a Redis readiness signal using a connection string factory.
     /// </summary>
     /// <param name="services">Target DI service collection.</param>
     /// <param name="connectionStringFactory">Factory that produces the Redis connection string using the service provider.</param>
-    /// <param name="stage">The stage/phase number (0 = infrastructure, 1 = services, 2 = workers, etc.).</param>
     /// <param name="configure">Optional configuration delegate for readiness options.</param>
     /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
     /// <remarks>
@@ -133,6 +167,9 @@ public static class RedisIgnitionExtensions
     /// This is particularly useful with Testcontainers scenarios where Stage 0 starts containers
     /// and makes connection strings available for Stage 1+ to consume.
     /// </para>
+    /// <para>
+    /// For staged execution, set <c>options.Stage</c> in the configuration delegate.
+    /// </para>
     /// </remarks>
     /// <example>
     /// <code>
@@ -143,39 +180,19 @@ public static class RedisIgnitionExtensions
     ///     async ct => await infrastructure.StartRedisAsync(), stage: 0);
     /// 
     /// // Stage 2: Use connection string from infrastructure
-    /// services.AddRedisReadinessWithStage(
+    /// services.AddRedisReadiness(
     ///     sp => sp.GetRequiredService&lt;InfrastructureManager&gt;().RedisConnectionString,
-    ///     stage: 2,
     ///     options =>
     ///     {
+    ///         options.Stage = 2;
     ///         options.VerificationStrategy = RedisVerificationStrategy.Ping;
     ///         options.Timeout = TimeSpan.FromSeconds(30);
     ///     });
     /// </code>
     /// </example>
-    public static IServiceCollection AddRedisReadinessWithStage(
+    public static IServiceCollection AddRedisReadiness(
         this IServiceCollection services,
         Func<IServiceProvider, string> connectionStringFactory,
-        int stage,
-        Action<RedisReadinessOptions>? configure = null)
-    {
-        return AddRedisReadinessWithStage(services, connectionStringFactory, stage, IgnitionExecutionMode.Parallel, configure);
-    }
-
-    /// <summary>
-    /// Registers a Redis readiness signal using a connection string factory with a specific stage/phase number and execution mode.
-    /// </summary>
-    /// <param name="services">Target DI service collection.</param>
-    /// <param name="connectionStringFactory">Factory that produces the Redis connection string using the service provider.</param>
-    /// <param name="stage">The stage/phase number (0 = infrastructure, 1 = services, 2 = workers, etc.).</param>
-    /// <param name="executionMode">Execution mode for this stage (Sequential, Parallel, DependencyAware).</param>
-    /// <param name="configure">Optional configuration delegate for readiness options.</param>
-    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
-    public static IServiceCollection AddRedisReadinessWithStage(
-        this IServiceCollection services,
-        Func<IServiceProvider, string> connectionStringFactory,
-        int stage,
-        IgnitionExecutionMode executionMode,
         Action<RedisReadinessOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(connectionStringFactory, nameof(connectionStringFactory));
@@ -184,15 +201,23 @@ public static class RedisIgnitionExtensions
         configure?.Invoke(options);
 
         var innerFactory = new RedisReadinessSignalFactory(connectionStringFactory, options);
-        var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, stage);
 
-        services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
-
-        // Configure the stage's execution mode
-        services.Configure<IgnitionStageConfiguration>(config =>
+        // If Stage is specified, wrap with StagedIgnitionSignalFactory
+        if (options.Stage.HasValue)
         {
-            config.EnsureStage(stage, executionMode);
-        });
+            var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, options.Stage.Value);
+            services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
+
+            // Configure the stage's execution mode
+            services.Configure<IgnitionStageConfiguration>(config =>
+            {
+                config.EnsureStage(options.Stage.Value, IgnitionExecutionMode.Parallel);
+            });
+        }
+        else
+        {
+            services.AddSingleton<IIgnitionSignalFactory>(innerFactory);
+        }
 
         return services;
     }
