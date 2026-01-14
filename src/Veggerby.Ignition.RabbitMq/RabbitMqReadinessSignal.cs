@@ -115,7 +115,7 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
             connection = await CreateConnectionWithRetryAsync(connectionFactory, cancellationToken);
             _logger.LogDebug("RabbitMQ connection established");
 
-            channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
+            channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
             _logger.LogDebug("RabbitMQ channel created");
 
             await VerifyTopologyAsync(channel, cancellationToken);
@@ -136,14 +136,14 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
         {
             if (channel is not null)
             {
-                await channel.CloseAsync(CancellationToken.None);
-                await channel.DisposeAsync();
+                await channel.CloseAsync(CancellationToken.None).ConfigureAwait(false);
+                await channel.DisposeAsync().ConfigureAwait(false);
             }
 
             if (connection is not null)
             {
-                await connection.CloseAsync(CancellationToken.None);
-                await connection.DisposeAsync();
+                await connection.CloseAsync(CancellationToken.None).ConfigureAwait(false);
+                await connection.DisposeAsync().ConfigureAwait(false);
             }
         }
     }
@@ -158,7 +158,7 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
             {
                 try
                 {
-                    await channel.QueueDeclarePassiveAsync(queueName, cancellationToken);
+                    await channel.QueueDeclarePassiveAsync(queueName, cancellationToken).ConfigureAwait(false);
                     _logger.LogDebug("Queue '{QueueName}' verified", queueName);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -182,7 +182,7 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
             {
                 try
                 {
-                    await channel.ExchangeDeclarePassiveAsync(exchangeName, cancellationToken);
+                    await channel.ExchangeDeclarePassiveAsync(exchangeName, cancellationToken).ConfigureAwait(false);
                     _logger.LogDebug("Exchange '{ExchangeName}' verified", exchangeName);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -270,7 +270,7 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
         {
             try
             {
-                return await connectionFactory.CreateConnectionAsync(cancellationToken);
+                return await connectionFactory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

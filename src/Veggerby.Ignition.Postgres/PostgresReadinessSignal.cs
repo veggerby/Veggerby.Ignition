@@ -169,7 +169,7 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
             // Dispose data source if we own it (created from connection string)
             if (_ownsDataSource && _dataSource != null)
             {
-                await _dataSource.DisposeAsync();
+                await _dataSource.DisposeAsync().ConfigureAwait(false);
             }
         }
     }
@@ -190,14 +190,14 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
             NpgsqlConnection? connection = null;
             try
             {
-                connection = await dataSource.OpenConnectionAsync(cancellationToken);
+                connection = await dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
                 return connection;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 if (connection != null)
                 {
-                    await connection.DisposeAsync();
+                    await connection.DisposeAsync().ConfigureAwait(false);
                 }
 
                 lastException = ex;
@@ -234,7 +234,7 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
         _logger.LogDebug("Executing validation query: {Query}", _options.ValidationQuery);
 
         using var command = new NpgsqlCommand(_options.ValidationQuery, connection);
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
 
         _logger.LogDebug("Validation query executed successfully");
     }

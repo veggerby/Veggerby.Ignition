@@ -134,12 +134,12 @@ public sealed class SqlServerReadinessSignal : IIgnitionSignal
             var connection = _connectionFactory();
             try
             {
-                await connection.OpenAsync(cancellationToken);
+                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
                 return connection;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                await connection.DisposeAsync();
+                await connection.DisposeAsync().ConfigureAwait(false);
                 lastException = ex;
                 retryCount++;
 
@@ -171,7 +171,7 @@ public sealed class SqlServerReadinessSignal : IIgnitionSignal
         _logger.LogDebug("Executing validation query: {Query}", _options.ValidationQuery);
 
         using var command = new SqlCommand(_options.ValidationQuery, connection);
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
 
         _logger.LogDebug("Validation query executed successfully");
     }
