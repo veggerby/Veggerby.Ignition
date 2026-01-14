@@ -14,7 +14,7 @@ namespace Veggerby.Ignition.Azure;
 /// Ignition signal for verifying Azure Blob Storage readiness.
 /// Validates connection and optionally verifies container existence or creates it if missing.
 /// </summary>
-public sealed class AzureBlobReadinessSignal : IIgnitionSignal
+internal sealed class AzureBlobReadinessSignal : IIgnitionSignal
 {
     private readonly BlobServiceClient _blobServiceClient;
     private readonly AzureBlobReadinessOptions _options;

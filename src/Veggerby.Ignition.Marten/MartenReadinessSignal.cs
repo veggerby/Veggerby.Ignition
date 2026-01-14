@@ -14,7 +14,7 @@ namespace Veggerby.Ignition.Marten;
 /// Ignition signal for verifying Marten document store readiness.
 /// Validates that the document store is accessible and ready.
 /// </summary>
-public sealed class MartenReadinessSignal : IIgnitionSignal
+internal sealed class MartenReadinessSignal : IIgnitionSignal
 {
     private readonly IDocumentStore _documentStore;
     private readonly MartenReadinessOptions _options;

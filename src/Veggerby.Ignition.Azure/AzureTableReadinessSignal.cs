@@ -15,7 +15,7 @@ namespace Veggerby.Ignition.Azure;
 /// Ignition signal for verifying Azure Table Storage readiness.
 /// Validates connection and optionally verifies table existence or creates it if missing.
 /// </summary>
-public sealed class AzureTableReadinessSignal : IIgnitionSignal
+internal sealed class AzureTableReadinessSignal : IIgnitionSignal
 {
     private readonly TableServiceClient _tableServiceClient;
     private readonly AzureTableReadinessOptions _options;

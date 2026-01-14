@@ -14,7 +14,7 @@ namespace Veggerby.Ignition.Http;
 /// Ignition signal for verifying HTTP endpoint readiness.
 /// Validates HTTP connectivity and optionally response content.
 /// </summary>
-public sealed class HttpReadinessSignal : IIgnitionSignal
+internal sealed class HttpReadinessSignal : IIgnitionSignal
 {
     private readonly HttpClient _httpClient;
     private readonly string _url;

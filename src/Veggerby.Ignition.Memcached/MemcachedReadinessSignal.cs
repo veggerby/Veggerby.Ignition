@@ -15,7 +15,7 @@ namespace Veggerby.Ignition.Memcached;
 /// Ignition signal for verifying Memcached cache readiness.
 /// Validates connection and optionally executes stats or test key operations.
 /// </summary>
-public sealed class MemcachedReadinessSignal : IIgnitionSignal
+internal sealed class MemcachedReadinessSignal : IIgnitionSignal
 {
     private readonly IMemcachedClient _memcachedClient;
     private readonly MemcachedReadinessOptions _options;

@@ -15,7 +15,7 @@ namespace Veggerby.Ignition.RabbitMq;
 /// Ignition signal for verifying RabbitMQ broker readiness.
 /// Validates connection establishment and optionally verifies queue/exchange topology.
 /// </summary>
-public sealed class RabbitMqReadinessSignal : IIgnitionSignal
+internal sealed class RabbitMqReadinessSignal : IIgnitionSignal
 {
     private readonly IConnectionFactory? _connectionFactory;
     private readonly Func<IConnectionFactory>? _connectionFactoryFactory;

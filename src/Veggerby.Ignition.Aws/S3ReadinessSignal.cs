@@ -16,7 +16,7 @@ namespace Veggerby.Ignition.Aws;
 /// Ignition signal for verifying AWS S3 bucket readiness.
 /// Validates connection and optionally verifies bucket existence and access permissions.
 /// </summary>
-public sealed class S3ReadinessSignal : IIgnitionSignal
+internal sealed class S3ReadinessSignal : IIgnitionSignal
 {
     private readonly IAmazonS3 _s3Client;
     private readonly S3ReadinessOptions _options;

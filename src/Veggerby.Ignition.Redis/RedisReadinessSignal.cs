@@ -14,7 +14,7 @@ namespace Veggerby.Ignition.Redis;
 /// Ignition signal for verifying Redis cache readiness.
 /// Validates connection and optionally executes PING or test key operations.
 /// </summary>
-public sealed class RedisReadinessSignal : IIgnitionSignal
+internal sealed class RedisReadinessSignal : IIgnitionSignal
 {
     private readonly IConnectionMultiplexer? _connectionMultiplexer;
     private readonly Func<IConnectionMultiplexer>? _connectionMultiplexerFactory;
