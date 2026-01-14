@@ -156,9 +156,9 @@ public sealed class RetryPolicy
             }
             catch (Exception ex) when (ex is not OperationCanceledException && attempt < _maxRetries)
             {
-                _logger?.LogWarning(
+                _logger?.LogDebug(
                     ex,
-                    "{OperationName} failed (attempt {Attempt}/{MaxRetries}), retrying in {DelayMs}ms",
+                    "{OperationName} failed (transient, attempt {Attempt}/{MaxRetries}), retrying in {DelayMs}ms",
                     operationName,
                     attempt,
                     _maxRetries,
@@ -218,9 +218,9 @@ public sealed class RetryPolicy
             }
             catch (Exception ex) when (ex is not OperationCanceledException && attempt < _maxRetries)
             {
-                _logger?.LogWarning(
+                _logger?.LogDebug(
                     ex,
-                    "{OperationName} failed (attempt {Attempt}/{MaxRetries}), retrying in {DelayMs}ms",
+                    "{OperationName} failed (transient, attempt {Attempt}/{MaxRetries}), retrying in {DelayMs}ms",
                     operationName,
                     attempt,
                     _maxRetries,

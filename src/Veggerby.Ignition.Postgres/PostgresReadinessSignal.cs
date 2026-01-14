@@ -22,7 +22,7 @@ namespace Veggerby.Ignition.Postgres;
 /// </list>
 /// </para>
 /// </remarks>
-public sealed class PostgresReadinessSignal : IIgnitionSignal
+internal sealed class PostgresReadinessSignal : IIgnitionSignal
 {
     private readonly NpgsqlDataSource? _dataSource;
     private readonly Func<NpgsqlDataSource>? _dataSourceFactory;

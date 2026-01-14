@@ -14,7 +14,7 @@ namespace Veggerby.Ignition.Azure;
 /// Ignition signal for verifying Azure Queue Storage readiness.
 /// Validates connection and optionally verifies queue existence or creates it if missing.
 /// </summary>
-public sealed class AzureQueueReadinessSignal : IIgnitionSignal
+internal sealed class AzureQueueReadinessSignal : IIgnitionSignal
 {
     private readonly QueueServiceClient _queueServiceClient;
     private readonly AzureQueueReadinessOptions _options;

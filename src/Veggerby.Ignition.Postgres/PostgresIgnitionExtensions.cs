@@ -27,6 +27,11 @@ public static class PostgresIgnitionExtensions
     /// no additional configuration is required. To execute a validation query, use the
     /// <paramref name="configure"/> delegate to specify the query.
     /// </para>
+    /// <para>
+    /// For staged execution, set <c>options.Stage</c> in the configuration delegate, but note
+    /// that this overload requires an existing <see cref="NpgsqlDataSource"/> in DI and cannot
+    /// properly support staged factory-based scenarios. Use the connection string factory overload instead.
+    /// </para>
     /// </remarks>
     /// <example>
     /// <para>Using NpgsqlDataSource (recommended):</para>
@@ -47,11 +52,19 @@ public static class PostgresIgnitionExtensions
         this IServiceCollection services,
         Action<PostgresReadinessOptions>? configure = null)
     {
+        var options = new PostgresReadinessOptions();
+        configure?.Invoke(options);
+
+        // If Stage is specified, this method cannot be used (need connection string factory for proper DI)
+        if (options.Stage.HasValue)
+        {
+            throw new InvalidOperationException(
+                "Staged execution with AddPostgresReadiness() requires a connection string factory. " +
+                "Use the overload that accepts Func<IServiceProvider, string> connectionStringFactory parameter.");
+        }
+
         services.AddSingleton<IIgnitionSignal>(sp =>
         {
-            var options = new PostgresReadinessOptions();
-            configure?.Invoke(options);
-
             var logger = sp.GetRequiredService<ILogger<PostgresReadinessSignal>>();
             
             // Use factory pattern to defer data source resolution until signal executes
@@ -78,13 +91,25 @@ public static class PostgresIgnitionExtensions
     /// prefer using <see cref="AddPostgresReadiness(IServiceCollection, Action{PostgresReadinessOptions}?)"/>
     /// with <see cref="NpgsqlDataSource"/> registered in DI.
     /// </para>
+    /// <para>
+    /// For staged execution, set <c>options.Stage</c> in the configuration delegate.
+    /// </para>
     /// </remarks>
     /// <example>
     /// <code>
+    /// // Simple usage
     /// services.AddPostgresReadiness("Host=localhost;Database=mydb;Username=user;Password=pass", options =>
     /// {
     ///     options.ValidationQuery = "SELECT 1";
     ///     options.Timeout = TimeSpan.FromSeconds(5);
+    /// });
+    /// 
+    /// // Staged execution
+    /// services.AddPostgresReadiness("Host=localhost;Database=mydb", options =>
+    /// {
+    ///     options.Stage = 1;
+    ///     options.ValidationQuery = "SELECT 1";
+    ///     options.Timeout = TimeSpan.FromSeconds(30);
     /// });
     /// </code>
     /// </example>
@@ -95,11 +120,27 @@ public static class PostgresIgnitionExtensions
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString, nameof(connectionString));
 
+        var options = new PostgresReadinessOptions();
+        configure?.Invoke(options);
+
+        // If Stage is specified, use factory-based registration
+        if (options.Stage.HasValue)
+        {
+            var innerFactory = new PostgresReadinessSignalFactory(_ => connectionString, options);
+            var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, options.Stage.Value);
+            services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
+
+            // Configure the stage's execution mode
+            services.Configure<IgnitionStageConfiguration>(config =>
+            {
+                config.EnsureStage(options.Stage.Value, IgnitionExecutionMode.Parallel);
+            });
+
+            return services;
+        }
+
         services.AddSingleton<IIgnitionSignal>(sp =>
         {
-            var options = new PostgresReadinessOptions();
-            configure?.Invoke(options);
-
             var logger = sp.GetRequiredService<ILogger<PostgresReadinessSignal>>();
             return new PostgresReadinessSignal(connectionString, options, logger);
         });
@@ -108,11 +149,10 @@ public static class PostgresIgnitionExtensions
     }
 
     /// <summary>
-    /// Registers a PostgreSQL readiness signal using a connection string factory with a specific stage/phase number for staged execution.
+    /// Registers a PostgreSQL readiness signal using a connection string factory.
     /// </summary>
     /// <param name="services">Target DI service collection.</param>
     /// <param name="connectionStringFactory">Factory that produces the PostgreSQL connection string using the service provider.</param>
-    /// <param name="stage">The stage/phase number (0 = infrastructure, 1 = services, 2 = workers, etc.).</param>
     /// <param name="configure">Optional configuration delegate for readiness options.</param>
     /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
     /// <remarks>
@@ -125,6 +165,9 @@ public static class PostgresIgnitionExtensions
     /// This is particularly useful with Testcontainers scenarios where Stage 0 starts containers
     /// and makes connection strings available for Stage 1+ to consume.
     /// </para>
+    /// <para>
+    /// For staged execution, set <c>options.Stage</c> in the configuration delegate.
+    /// </para>
     /// </remarks>
     /// <example>
     /// <code>
@@ -135,45 +178,19 @@ public static class PostgresIgnitionExtensions
     ///     async ct => await infrastructure.StartPostgresAsync(), stage: 0);
     /// 
     /// // Stage 1: Use connection string from infrastructure
-    /// services.AddPostgresReadinessWithStage(
+    /// services.AddPostgresReadiness(
     ///     sp => sp.GetRequiredService&lt;InfrastructureManager&gt;().PostgresConnectionString,
-    ///     stage: 1,
     ///     options =>
     ///     {
+    ///         options.Stage = 1;
     ///         options.ValidationQuery = "SELECT 1";
     ///         options.Timeout = TimeSpan.FromSeconds(30);
     ///     });
     /// </code>
     /// </example>
-    public static IServiceCollection AddPostgresReadinessWithStage(
+    public static IServiceCollection AddPostgresReadiness(
         this IServiceCollection services,
         Func<IServiceProvider, string> connectionStringFactory,
-        int stage,
-        Action<PostgresReadinessOptions>? configure = null)
-    {
-        return AddPostgresReadinessWithStage(services, connectionStringFactory, stage, IgnitionExecutionMode.Parallel, configure);
-    }
-
-    /// <summary>
-    /// Registers a PostgreSQL readiness signal using a connection string factory with a specific stage/phase number and execution mode.
-    /// </summary>
-    /// <param name="services">Target DI service collection.</param>
-    /// <param name="connectionStringFactory">Factory that produces the PostgreSQL connection string using the service provider.</param>
-    /// <param name="stage">The stage/phase number (0 = infrastructure, 1 = services, 2 = workers, etc.).</param>
-    /// <param name="executionMode">Execution mode for this stage (Sequential, Parallel, DependencyAware).</param>
-    /// <param name="configure">Optional configuration delegate for readiness options.</param>
-    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
-    /// <remarks>
-    /// <para>
-    /// This overload allows specifying the execution mode for the stage. If multiple signals are registered
-    /// to the same stage number, the first registered execution mode is used for the entire stage.
-    /// </para>
-    /// </remarks>
-    public static IServiceCollection AddPostgresReadinessWithStage(
-        this IServiceCollection services,
-        Func<IServiceProvider, string> connectionStringFactory,
-        int stage,
-        IgnitionExecutionMode executionMode,
         Action<PostgresReadinessOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(connectionStringFactory, nameof(connectionStringFactory));
@@ -182,15 +199,23 @@ public static class PostgresIgnitionExtensions
         configure?.Invoke(options);
 
         var innerFactory = new PostgresReadinessSignalFactory(connectionStringFactory, options);
-        var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, stage);
 
-        services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
-
-        // Configure the stage's execution mode
-        services.Configure<IgnitionStageConfiguration>(config =>
+        // If Stage is specified, wrap with StagedIgnitionSignalFactory
+        if (options.Stage.HasValue)
         {
-            config.EnsureStage(stage, executionMode);
-        });
+            var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, options.Stage.Value);
+            services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
+
+            // Configure the stage's execution mode
+            services.Configure<IgnitionStageConfiguration>(config =>
+            {
+                config.EnsureStage(options.Stage.Value, IgnitionExecutionMode.Parallel);
+            });
+        }
+        else
+        {
+            services.AddSingleton<IIgnitionSignalFactory>(innerFactory);
+        }
 
         return services;
     }

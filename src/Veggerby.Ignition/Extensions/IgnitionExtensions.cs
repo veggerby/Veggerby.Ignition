@@ -311,6 +311,143 @@ public static class IgnitionExtensions
     }
 
     /// <summary>
+    /// Adapts an existing already-created readiness <see cref="Task"/> into an ignition signal with configuration options.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="name">Logical signal name used for diagnostics and result reporting.</param>
+    /// <param name="readyTask">Task that completes when the underlying component is ready.</param>
+    /// <param name="configure">Optional configuration delegate for signal options.</param>
+    /// <returns>The same service collection for chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// Use the <paramref name="configure"/> delegate to set <see cref="TaskSignalOptions.Stage"/> for staged execution
+    /// or <see cref="TaskSignalOptions.Timeout"/> for per-signal timeout overrides.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// // Simple usage
+    /// services.AddIgnitionFromTask("my-task", myTask);
+    /// 
+    /// // With stage
+    /// services.AddIgnitionFromTask("container-start", startTask, options => options.Stage = 0);
+    /// 
+    /// // With timeout and stage
+    /// services.AddIgnitionFromTask("slow-init", slowTask, options =>
+    /// {
+    ///     options.Stage = 1;
+    ///     options.Timeout = TimeSpan.FromMinutes(2);
+    /// });
+    /// </code>
+    /// </example>
+    public static IServiceCollection AddIgnitionFromTask(
+        this IServiceCollection services,
+        string name,
+        Task readyTask,
+        Action<TaskSignalOptions>? configure)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
+        ArgumentNullException.ThrowIfNull(readyTask, nameof(readyTask));
+
+        var options = new TaskSignalOptions();
+        configure?.Invoke(options);
+
+        var signal = IgnitionSignal.FromTask(name, readyTask, options.Timeout);
+
+        // If Stage is specified, use staged registration
+        if (options.Stage.HasValue)
+        {
+            var innerFactory = new DelegateIgnitionSignalFactory(name, _ => signal, options.Timeout);
+            var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, options.Stage.Value);
+            services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
+
+            // Configure the stage's execution mode
+            services.Configure<IgnitionStageConfiguration>(config =>
+            {
+                config.EnsureStage(options.Stage.Value, options.ExecutionMode);
+            });
+
+            return services;
+        }
+
+        return services.AddIgnitionSignal(signal);
+    }
+
+    /// <summary>
+    /// Adapts a lazily-invoked readiness task factory into an ignition signal with configuration options.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="name">Logical signal name used for diagnostics and result reporting.</param>
+    /// <param name="readyTaskFactory">Factory producing the readiness task. Receives the cancellation token from the FIRST wait invocation.</param>
+    /// <param name="configure">Optional configuration delegate for signal options.</param>
+    /// <returns>The same service collection for chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// Use the <paramref name="configure"/> delegate to set <see cref="TaskSignalOptions.Stage"/> for staged execution
+    /// or <see cref="TaskSignalOptions.Timeout"/> for per-signal timeout overrides.
+    /// </para>
+    /// <para>
+    /// This method is particularly useful for staged execution scenarios where infrastructure (Stage 0) must complete
+    /// before dependent services (Stage 1+) can be initialized.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// // Simple usage
+    /// services.AddIgnitionFromTask("db-ready", async ct => await db.ConnectAsync(ct));
+    /// 
+    /// // With stage for Testcontainers pattern
+    /// services.AddIgnitionFromTask(
+    ///     "postgres-container",
+    ///     async ct => await infrastructure.StartPostgresAsync(),
+    ///     options => options.Stage = 0);
+    /// 
+    /// // With timeout and stage
+    /// services.AddIgnitionFromTask(
+    ///     "data-migration",
+    ///     async ct => await migrator.MigrateAsync(ct),
+    ///     options =>
+    ///     {
+    ///         options.Stage = 2;
+    ///         options.Timeout = TimeSpan.FromMinutes(5);
+    ///         options.ExecutionMode = IgnitionExecutionMode.Sequential;
+    ///     });
+    /// </code>
+    /// </example>
+    public static IServiceCollection AddIgnitionFromTask(
+        this IServiceCollection services,
+        string name,
+        Func<CancellationToken, Task> readyTaskFactory,
+        Action<TaskSignalOptions>? configure)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
+        ArgumentNullException.ThrowIfNull(readyTaskFactory, nameof(readyTaskFactory));
+
+        var options = new TaskSignalOptions();
+        configure?.Invoke(options);
+
+        var signal = IgnitionSignal.FromTaskFactory(name, readyTaskFactory, options.Timeout);
+
+        // If Stage is specified, use staged registration
+        if (options.Stage.HasValue)
+        {
+            var innerFactory = new DelegateIgnitionSignalFactory(name, _ => signal, options.Timeout);
+            var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, options.Stage.Value);
+            services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
+
+            // Configure the stage's execution mode
+            services.Configure<IgnitionStageConfiguration>(config =>
+            {
+                config.EnsureStage(options.Stage.Value, options.ExecutionMode);
+            });
+
+            return services;
+        }
+
+        return services.AddIgnitionSignal(signal);
+    }
+
+    /// <summary>
     /// Registers a readiness signal for a single lazily-resolved <typeparamref name="TService"/> instance using a non-cancellable selector.
     /// </summary>
     /// <typeparam name="TService">Service type that exposes a readiness task (for example a hosted background service exposing <c>ReadyTask</c>).</typeparam>
@@ -614,6 +751,77 @@ public static class IgnitionExtensions
     {
         ArgumentNullException.ThrowIfNull(graph, nameof(graph));
         services.AddSingleton(graph);
+        return services;
+    }
+
+    /// <summary>
+    /// Registers an <see cref="IIgnitionGraph"/> that automatically includes all registered signal factories
+    /// and optionally applies attribute-based dependencies.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="applyAttributeDependencies">
+    /// Whether to automatically discover dependencies from <see cref="SignalDependencyAttribute"/>.
+    /// When <c>true</c> (default), automatically applies dependencies declared via attributes on signal implementations.
+    /// When <c>false</c>, only manually configured dependencies via the <paramref name="configure"/> action are applied.
+    /// Set to <c>false</c> if you want complete manual control over the dependency graph or if attribute scanning overhead is a concern.
+    /// </param>
+    /// <param name="configure">
+    /// Optional delegate to configure additional graph dependencies.
+    /// Receives the graph builder and service provider, allowing you to add explicit dependencies beyond those discovered from attributes.
+    /// </param>
+    /// <returns>The same service collection for chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// This method simplifies the common pattern of:
+    /// 1. Resolving all <see cref="IIgnitionSignalFactory"/> instances
+    /// 2. Creating signals from factories
+    /// 3. Adding signals to the graph builder
+    /// 4. Optionally applying attribute-based dependencies
+    /// </para>
+    /// <para>
+    /// The <paramref name="configure"/> delegate receives the graph builder and service provider,
+    /// allowing you to add additional explicit dependencies beyond those discovered from attributes.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// // Simple usage - just auto-discover from attributes
+    /// services.AddIgnitionGraphFromFactories(applyAttributeDependencies: true);
+    /// 
+    /// // With additional manual dependencies
+    /// services.AddIgnitionGraphFromFactories(true, (builder, sp) =>
+    /// {
+    ///     builder.AddDependency("service-a", "service-b");
+    ///     builder.AddDependency("service-b", "database");
+    /// });
+    /// </code>
+    /// </example>
+    public static IServiceCollection AddIgnitionGraphFromFactories(
+        this IServiceCollection services,
+        bool applyAttributeDependencies = true,
+        Action<IgnitionGraphBuilder, IServiceProvider>? configure = null)
+    {
+        services.AddSingleton<IIgnitionGraph>(sp =>
+        {
+            var builder = new IgnitionGraphBuilder();
+            
+            // Automatically resolve factories and create signals
+            var factories = sp.GetServices<IIgnitionSignalFactory>();
+            var signals = factories.Select(f => f.CreateSignal(sp)).ToList();
+            builder.AddSignals(signals);
+
+            // Apply attribute dependencies if requested
+            if (applyAttributeDependencies)
+            {
+                builder.ApplyAttributeDependencies();
+            }
+
+            // Allow additional configuration
+            configure?.Invoke(builder, sp);
+
+            return builder.Build();
+        });
+
         return services;
     }
 

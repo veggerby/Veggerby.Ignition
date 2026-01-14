@@ -125,10 +125,10 @@ public class Program
                     options.GlobalTimeout = TimeSpan.FromSeconds(10);
                 });
 
-                services.AddTransient<IIgnitionSignal, DatabaseSignal>();
-                services.AddTransient<IIgnitionSignal, CacheWarmupSignal>();
-                services.AddTransient<IIgnitionSignal, ConfigurationSignal>();
-                services.AddTransient<IIgnitionSignal, ExternalServiceSignal>();
+                services.AddIgnitionSignal<DatabaseSignal>();
+                services.AddIgnitionSignal<CacheWarmupSignal>();
+                services.AddIgnitionSignal<ConfigurationSignal>();
+                services.AddIgnitionSignal<ExternalServiceSignal>();
             })
             .ConfigureLogging(logging => logging.ClearProviders())
             .Build();
@@ -185,9 +185,9 @@ public class Program
                     options.GlobalTimeout = TimeSpan.FromSeconds(15);
                 });
 
-                services.AddTransient<IIgnitionSignal, ConfigurationSignal>();
-                services.AddTransient<IIgnitionSignal, DatabaseSignal>();
-                services.AddTransient<IIgnitionSignal, ExternalServiceSignal>();
+                services.AddIgnitionSignal<ConfigurationSignal>();
+                services.AddIgnitionSignal<DatabaseSignal>();
+                services.AddIgnitionSignal<ExternalServiceSignal>();
             })
             .ConfigureLogging(logging => logging.ClearProviders())
             .Build();
@@ -226,9 +226,9 @@ public class Program
                     options.CancelIndividualOnTimeout = true;
                 });
 
-                services.AddTransient<IIgnitionSignal, ConfigurationSignal>();
-                services.AddTransient<IIgnitionSignal, SlowSignal>(); // This will timeout
-                services.AddTransient<IIgnitionSignal, ExternalServiceSignal>();
+                services.AddIgnitionSignal<ConfigurationSignal>();
+                services.AddIgnitionSignal<SlowSignal>(); // This will timeout
+                services.AddIgnitionSignal<ExternalServiceSignal>();
             })
             .ConfigureLogging(logging => logging.ClearProviders())
             .Build();

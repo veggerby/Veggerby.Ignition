@@ -14,7 +14,7 @@ namespace Veggerby.Ignition.Grpc;
 /// <summary>
 /// Ignition signal for verifying gRPC service readiness via health check protocol.
 /// </summary>
-public sealed class GrpcReadinessSignal : IIgnitionSignal
+internal sealed class GrpcReadinessSignal : IIgnitionSignal
 {
     private readonly GrpcChannel _channel;
     private readonly string _serviceUrl;

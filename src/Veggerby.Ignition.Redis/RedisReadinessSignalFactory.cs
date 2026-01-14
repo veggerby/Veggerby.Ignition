@@ -35,7 +35,7 @@ public sealed class RedisReadinessSignalFactory : IIgnitionSignalFactory
     public TimeSpan? Timeout => _options.Timeout;
 
     /// <inheritdoc/>
-    public int? Stage => null;
+    public int? Stage => _options.Stage;
 
     /// <inheritdoc/>
     public IIgnitionSignal CreateSignal(IServiceProvider serviceProvider)
@@ -44,6 +44,7 @@ public sealed class RedisReadinessSignalFactory : IIgnitionSignalFactory
         var configOptions = ConfigurationOptions.Parse(connectionString);
         // Ensure resilient connection: retry until timeout instead of failing immediately
         configOptions.AbortOnConnectFail = false;
+        configOptions.ConnectTimeout = _options.ConnectTimeout;
         var multiplexer = ConnectionMultiplexer.Connect(configOptions);
         var logger = serviceProvider.GetRequiredService<ILogger<RedisReadinessSignal>>();
         

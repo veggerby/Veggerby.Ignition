@@ -14,7 +14,7 @@ namespace Veggerby.Ignition.MongoDb;
 /// Ignition signal for verifying MongoDB cluster readiness.
 /// Validates cluster connectivity and optionally verifies collection existence.
 /// </summary>
-public sealed class MongoDbReadinessSignal : IIgnitionSignal
+internal sealed class MongoDbReadinessSignal : IIgnitionSignal
 {
     private readonly IMongoClient? _client;
     private readonly Func<IMongoClient>? _clientFactory;

@@ -1,4 +1,5 @@
 using Microsoft.Data.SqlClient;
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -29,16 +30,29 @@ public static class SqlServerIgnitionExtensions
     /// <para>
     /// For simpler scenarios without factory registration, use the overload accepting a connection string.
     /// </para>
+    /// <para>
+    /// For staged execution, set <c>options.Stage</c> in the configuration delegate, but note
+    /// that this overload requires an existing connection factory in DI and cannot properly support
+    /// staged factory-based scenarios. Use the connection string factory overload instead.
+    /// </para>
     /// </remarks>
     public static IServiceCollection AddSqlServerReadiness(
         this IServiceCollection services,
         Action<SqlServerReadinessOptions>? configure = null)
     {
+        var options = new SqlServerReadinessOptions();
+        configure?.Invoke(options);
+
+        // If Stage is specified, this method cannot be used (need connection string factory for proper DI)
+        if (options.Stage.HasValue)
+        {
+            throw new InvalidOperationException(
+                "Staged execution with AddSqlServerReadiness() requires a connection string factory. " +
+                "Use the overload that accepts Func<IServiceProvider, string> connectionStringFactory parameter.");
+        }
+
         services.AddSingleton<IIgnitionSignal>(sp =>
         {
-            var options = new SqlServerReadinessOptions();
-            configure?.Invoke(options);
-
             var logger = sp.GetRequiredService<ILogger<SqlServerReadinessSignal>>();
             
             // Use nested factory to defer both factory retrieval and connection creation
@@ -62,13 +76,23 @@ public static class SqlServerIgnitionExtensions
     /// The signal name defaults to "sqlserver-readiness". For connection-only verification,
     /// no additional configuration is required. To execute a validation query, use the
     /// <paramref name="configure"/> delegate to specify the query.
+    /// For staged execution, set <c>options.Stage</c> in the configuration delegate.
     /// </remarks>
     /// <example>
     /// <code>
+    /// // Simple usage
     /// services.AddSqlServerReadiness("Server=localhost;Database=MyDb;Trusted_Connection=True;", options =>
     /// {
     ///     options.ValidationQuery = "SELECT 1";
     ///     options.Timeout = TimeSpan.FromSeconds(5);
+    /// });
+    /// 
+    /// // Staged execution
+    /// services.AddSqlServerReadiness("Server=localhost;Database=MyDb", options =>
+    /// {
+    ///     options.Stage = 1;
+    ///     options.ValidationQuery = "SELECT 1";
+    ///     options.Timeout = TimeSpan.FromSeconds(30);
     /// });
     /// </code>
     /// </example>
@@ -79,11 +103,27 @@ public static class SqlServerIgnitionExtensions
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString, nameof(connectionString));
 
+        var options = new SqlServerReadinessOptions();
+        configure?.Invoke(options);
+
+        // If Stage is specified, use factory-based registration
+        if (options.Stage.HasValue)
+        {
+            var innerFactory = new SqlServerReadinessSignalFactory(_ => connectionString, options);
+            var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, options.Stage.Value);
+            services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
+
+            // Configure the stage's execution mode
+            services.Configure<IgnitionStageConfiguration>(config =>
+            {
+                config.EnsureStage(options.Stage.Value, IgnitionExecutionMode.Parallel);
+            });
+
+            return services;
+        }
+
         services.AddSingleton<IIgnitionSignal>(sp =>
         {
-            var options = new SqlServerReadinessOptions();
-            configure?.Invoke(options);
-
             var logger = sp.GetRequiredService<ILogger<SqlServerReadinessSignal>>();
             return new SqlServerReadinessSignal(connectionString, options, logger);
         });
@@ -92,11 +132,10 @@ public static class SqlServerIgnitionExtensions
     }
 
     /// <summary>
-    /// Registers a SQL Server readiness signal using a connection string factory with a specific stage/phase number for staged execution.
+    /// Registers a SQL Server readiness signal using a connection string factory.
     /// </summary>
     /// <param name="services">Target DI service collection.</param>
     /// <param name="connectionStringFactory">Factory that produces the SQL Server connection string using the service provider.</param>
-    /// <param name="stage">The stage/phase number (0 = infrastructure, 1 = services, 2 = workers, etc.).</param>
     /// <param name="configure">Optional configuration delegate for readiness options.</param>
     /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
     /// <remarks>
@@ -109,6 +148,9 @@ public static class SqlServerIgnitionExtensions
     /// This is particularly useful with Testcontainers scenarios where Stage 0 starts containers
     /// and makes connection strings available for Stage 1+ to consume.
     /// </para>
+    /// <para>
+    /// For staged execution, set <c>options.Stage</c> in the configuration delegate.
+    /// </para>
     /// </remarks>
     /// <example>
     /// <code>
@@ -119,39 +161,19 @@ public static class SqlServerIgnitionExtensions
     ///     async ct => await infrastructure.StartSqlServerAsync(), stage: 0);
     /// 
     /// // Stage 1: Use connection string from infrastructure
-    /// services.AddSqlServerReadinessWithStage(
+    /// services.AddSqlServerReadiness(
     ///     sp => sp.GetRequiredService&lt;InfrastructureManager&gt;().SqlServerConnectionString,
-    ///     stage: 1,
     ///     options =>
     ///     {
+    ///         options.Stage = 1;
     ///         options.ValidationQuery = "SELECT 1";
     ///         options.Timeout = TimeSpan.FromSeconds(30);
     ///     });
     /// </code>
     /// </example>
-    public static IServiceCollection AddSqlServerReadinessWithStage(
+    public static IServiceCollection AddSqlServerReadiness(
         this IServiceCollection services,
         Func<IServiceProvider, string> connectionStringFactory,
-        int stage,
-        Action<SqlServerReadinessOptions>? configure = null)
-    {
-        return AddSqlServerReadinessWithStage(services, connectionStringFactory, stage, IgnitionExecutionMode.Parallel, configure);
-    }
-
-    /// <summary>
-    /// Registers a SQL Server readiness signal using a connection string factory with a specific stage/phase number and execution mode.
-    /// </summary>
-    /// <param name="services">Target DI service collection.</param>
-    /// <param name="connectionStringFactory">Factory that produces the SQL Server connection string using the service provider.</param>
-    /// <param name="stage">The stage/phase number (0 = infrastructure, 1 = services, 2 = workers, etc.).</param>
-    /// <param name="executionMode">Execution mode for this stage (Sequential, Parallel, DependencyAware).</param>
-    /// <param name="configure">Optional configuration delegate for readiness options.</param>
-    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
-    public static IServiceCollection AddSqlServerReadinessWithStage(
-        this IServiceCollection services,
-        Func<IServiceProvider, string> connectionStringFactory,
-        int stage,
-        IgnitionExecutionMode executionMode,
         Action<SqlServerReadinessOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(connectionStringFactory, nameof(connectionStringFactory));
@@ -160,16 +182,25 @@ public static class SqlServerIgnitionExtensions
         configure?.Invoke(options);
 
         var innerFactory = new SqlServerReadinessSignalFactory(connectionStringFactory, options);
-        var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, stage);
 
-        services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
-
-        // Configure the stage's execution mode
-        services.Configure<IgnitionStageConfiguration>(config =>
+        // If Stage is specified, wrap with StagedIgnitionSignalFactory
+        if (options.Stage.HasValue)
         {
-            config.EnsureStage(stage, executionMode);
-        });
+            var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, options.Stage.Value);
+            services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
+
+            // Configure the stage's execution mode
+            services.Configure<IgnitionStageConfiguration>(config =>
+            {
+                config.EnsureStage(options.Stage.Value, IgnitionExecutionMode.Parallel);
+            });
+        }
+        else
+        {
+            services.AddSingleton<IIgnitionSignalFactory>(innerFactory);
+        }
 
         return services;
     }
 }
+

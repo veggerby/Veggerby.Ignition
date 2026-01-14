@@ -13,7 +13,7 @@ namespace Veggerby.Ignition.SqlServer;
 /// Ignition signal for verifying SQL Server database readiness.
 /// Validates connection establishment and optionally executes a validation query.
 /// </summary>
-public sealed class SqlServerReadinessSignal : IIgnitionSignal
+internal sealed class SqlServerReadinessSignal : IIgnitionSignal
 {
     private readonly Func<SqlConnection> _connectionFactory;
     private readonly SqlServerReadinessOptions _options;

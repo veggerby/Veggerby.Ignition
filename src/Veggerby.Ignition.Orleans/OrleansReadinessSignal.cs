@@ -18,7 +18,7 @@ namespace Veggerby.Ignition.Orleans;
 /// (such as testing grain activation or checking cluster membership), implement a custom
 /// signal that makes actual grain calls or uses management grain methods.
 /// </remarks>
-public sealed class OrleansReadinessSignal : IIgnitionSignal
+internal sealed class OrleansReadinessSignal : IIgnitionSignal
 {
     private readonly IClusterClient _clusterClient;
     private readonly OrleansReadinessOptions _options;

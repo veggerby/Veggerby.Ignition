@@ -205,10 +205,10 @@ public class Program
                 services.AddIgnition(configureOptions);
 
                 // Register all signals
-                services.AddTransient<IIgnitionSignal, CacheWarmupSignal>();
-                services.AddTransient<IIgnitionSignal, DatabaseMigrationSignal>();
-                services.AddTransient<IIgnitionSignal, ExternalServiceSignal>();
-                services.AddTransient<IIgnitionSignal, SlowServiceSignal>();
+                services.AddIgnitionSignal<CacheWarmupSignal>();
+                services.AddIgnitionSignal<DatabaseMigrationSignal>();
+                services.AddIgnitionSignal<ExternalServiceSignal>();
+                services.AddIgnitionSignal<SlowServiceSignal>();
             })
             .ConfigureLogging(logging =>
             {

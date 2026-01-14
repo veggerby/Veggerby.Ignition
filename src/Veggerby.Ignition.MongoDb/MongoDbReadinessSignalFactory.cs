@@ -35,7 +35,7 @@ public sealed class MongoDbReadinessSignalFactory : IIgnitionSignalFactory
     public TimeSpan? Timeout => _options.Timeout;
 
     /// <inheritdoc/>
-    public int? Stage => null;
+    public int? Stage => _options.Stage;
 
     /// <inheritdoc/>
     public IIgnitionSignal CreateSignal(IServiceProvider serviceProvider)

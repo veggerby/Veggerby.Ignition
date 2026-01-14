@@ -61,4 +61,30 @@ public sealed class RedisReadinessOptions
     /// Default is 100ms.
     /// </summary>
     public TimeSpan RetryDelay { get; set; } = TimeSpan.FromMilliseconds(100);
+
+    /// <summary>
+    /// Timeout for establishing initial Redis connection.
+    /// Default is 10 seconds to allow for service readiness after container starts.
+    /// </summary>
+    /// <remarks>
+    /// This is particularly important in containerized environments where Redis may report
+    /// as "container ready" before it's actually accepting connections.
+    /// </remarks>
+    public int ConnectTimeout { get; set; } = 10000;
+
+    /// <summary>
+    /// Optional stage/phase number for staged execution.
+    /// If <c>null</c>, the signal belongs to stage 0 (default/unstaged).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Stages enable sequential execution across logical phases (e.g., infrastructure → services → workers).
+    /// All signals in stage N complete before stage N+1 begins.
+    /// </para>
+    /// <para>
+    /// Particularly useful with Testcontainers scenarios where Stage 0 starts containers
+    /// and makes connection strings available for Stage 1+ to consume.
+    /// </para>
+    /// </remarks>
+    public int? Stage { get; set; }
 }

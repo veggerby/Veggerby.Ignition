@@ -21,7 +21,10 @@ public class RedisIntegrationTests : IAsyncLifetime
 
         await _redisContainer.StartAsync();
 
-        _connectionString = _redisContainer.GetConnectionString();
+        var configOptions = ConfigurationOptions.Parse(_redisContainer.GetConnectionString());
+        configOptions.AbortOnConnectFail = false;
+        configOptions.ConnectTimeout = 1000;
+        _connectionString = configOptions.ToString();
     }
 
     public async Task DisposeAsync()
@@ -40,7 +43,9 @@ public class RedisIntegrationTests : IAsyncLifetime
         var connectionMultiplexer = await ConnectionMultiplexer.ConnectAsync(_connectionString!);
         var options = new RedisReadinessOptions
         {
-            VerificationStrategy = RedisVerificationStrategy.ConnectionOnly
+            VerificationStrategy = RedisVerificationStrategy.ConnectionOnly,
+            MaxRetries = 10,
+            RetryDelay = TimeSpan.FromMilliseconds(500)
         };
         var logger = Substitute.For<ILogger<RedisReadinessSignal>>();
         var signal = new RedisReadinessSignal(connectionMultiplexer, options, logger);
@@ -64,7 +69,9 @@ public class RedisIntegrationTests : IAsyncLifetime
         var connectionMultiplexer = await ConnectionMultiplexer.ConnectAsync(_connectionString!);
         var options = new RedisReadinessOptions
         {
-            VerificationStrategy = RedisVerificationStrategy.Ping
+            VerificationStrategy = RedisVerificationStrategy.Ping,
+            MaxRetries = 10,
+            RetryDelay = TimeSpan.FromMilliseconds(500)
         };
         var logger = Substitute.For<ILogger<RedisReadinessSignal>>();
         var signal = new RedisReadinessSignal(connectionMultiplexer, options, logger);
@@ -89,7 +96,9 @@ public class RedisIntegrationTests : IAsyncLifetime
         var options = new RedisReadinessOptions
         {
             VerificationStrategy = RedisVerificationStrategy.PingAndTestKey,
-            TestKeyPrefix = "integration:test:"
+            TestKeyPrefix = "integration:test:",
+            MaxRetries = 10,
+            RetryDelay = TimeSpan.FromMilliseconds(500)
         };
         var logger = Substitute.For<ILogger<RedisReadinessSignal>>();
         var signal = new RedisReadinessSignal(connectionMultiplexer, options, logger);
@@ -119,7 +128,9 @@ public class RedisIntegrationTests : IAsyncLifetime
         var options = new RedisReadinessOptions
         {
             VerificationStrategy = RedisVerificationStrategy.PingAndTestKey,
-            TestKeyPrefix = "cleanup:test:"
+            TestKeyPrefix = "cleanup:test:",
+            MaxRetries = 10,
+            RetryDelay = TimeSpan.FromMilliseconds(500)
         };
         var logger = Substitute.For<ILogger<RedisReadinessSignal>>();
         var signal = new RedisReadinessSignal(connectionMultiplexer, options, logger);
@@ -153,6 +164,8 @@ public class RedisIntegrationTests : IAsyncLifetime
         services.AddRedisReadiness(_connectionString!, options =>
         {
             options.VerificationStrategy = RedisVerificationStrategy.Ping;
+            options.MaxRetries = 10;
+            options.RetryDelay = TimeSpan.FromMilliseconds(500);
         });
 
         var provider = services.BuildServiceProvider();
@@ -182,6 +195,8 @@ public class RedisIntegrationTests : IAsyncLifetime
         services.AddRedisReadiness(options =>
         {
             options.VerificationStrategy = RedisVerificationStrategy.PingAndTestKey;
+            options.MaxRetries = 10;
+            options.RetryDelay = TimeSpan.FromMilliseconds(500);
         });
 
         var provider = services.BuildServiceProvider();

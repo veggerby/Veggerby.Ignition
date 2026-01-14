@@ -15,7 +15,7 @@ namespace Veggerby.Ignition.MassTransit;
 /// Ignition signal for verifying MassTransit bus readiness.
 /// Leverages MassTransit's built-in health checks to ensure the bus is started and ready to process messages.
 /// </summary>
-public sealed class MassTransitReadinessSignal : IIgnitionSignal
+internal sealed class MassTransitReadinessSignal : IIgnitionSignal
 {
     private readonly IBus _bus;
     private readonly MassTransitReadinessOptions _options;

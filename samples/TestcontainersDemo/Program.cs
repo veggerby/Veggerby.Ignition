@@ -2,15 +2,15 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+
 using MongoDB.Driver;
+
 using Npgsql;
+
 using RabbitMQ.Client;
+
 using StackExchange.Redis;
-using Testcontainers.MongoDb;
-using Testcontainers.MsSql;
-using Testcontainers.PostgreSql;
-using Testcontainers.RabbitMq;
-using Testcontainers.Redis;
+
 using Veggerby.Ignition;
 using Veggerby.Ignition.Http;
 using Veggerby.Ignition.MongoDb;
@@ -71,109 +71,87 @@ public class Program
 
         // Stage 0: Start Infrastructure Containers (parallel within stage)
         Console.WriteLine("📋 Registering Stage 0: Infrastructure Startup (Testcontainers)");
-        builder.Services.AddIgnitionFromTaskWithStage(
-            "postgres-container",
-            async ct => await infrastructure.StartPostgresAsync(),
-            stage: 0);
-        builder.Services.AddIgnitionFromTaskWithStage(
-            "redis-container",
-            async ct => await infrastructure.StartRedisAsync(),
-            stage: 0);
-        builder.Services.AddIgnitionFromTaskWithStage(
-            "rabbitmq-container",
-            async ct => await infrastructure.StartRabbitMqAsync(),
-            stage: 0);
-        builder.Services.AddIgnitionFromTaskWithStage(
-            "mongodb-container",
-            async ct => await infrastructure.StartMongoDbAsync(),
-            stage: 0);
-        builder.Services.AddIgnitionFromTaskWithStage(
-            "sqlserver-container",
-            async ct => await infrastructure.StartSqlServerAsync(),
-            stage: 0);
+        builder.Services.AddIgnitionStage(0, stage => stage
+            .AddTaskSignal("postgres-container", async ct => await infrastructure.StartPostgresAsync())
+            .AddTaskSignal("redis-container", async ct => await infrastructure.StartRedisAsync())
+            .AddTaskSignal("rabbitmq-container", async ct => await infrastructure.StartRabbitMqAsync())
+            .AddTaskSignal("mongodb-container", async ct => await infrastructure.StartMongoDbAsync())
+            .AddTaskSignal("sqlserver-container", async ct => await infrastructure.StartSqlServerAsync()));
 
         // Stage 1: Databases (parallel within stage)
         // Use factory-based extensions for proper DI - signals instantiated when stage executes
         Console.WriteLine("📋 Registering Stage 1: Databases (PostgreSQL, SQL Server, MongoDB)");
-        builder.Services.AddPostgresReadinessWithStage(
+        builder.Services.AddPostgresReadiness(
             sp => sp.GetRequiredService<InfrastructureManager>().PostgresConnectionString,
-            stage: 1,
             options =>
             {
+                options.Stage = 1;
                 options.ValidationQuery = "SELECT 1";
                 options.Timeout = TimeSpan.FromSeconds(30);
             });
 
-        builder.Services.AddSqlServerReadinessWithStage(
+        builder.Services.AddSqlServerReadiness(
             sp => sp.GetRequiredService<InfrastructureManager>().SqlServerConnectionString,
-            stage: 1,
             options =>
             {
+                options.Stage = 1;
                 options.ValidationQuery = "SELECT 1";
                 options.Timeout = TimeSpan.FromSeconds(30);
+                options.MaxRetries = 10; // SQL Server can take longer to fully initialize
+                options.RetryDelay = TimeSpan.FromMilliseconds(500);
             });
 
-        builder.Services.AddMongoDbReadinessWithStage(
+        builder.Services.AddMongoDbReadiness(
             sp => sp.GetRequiredService<InfrastructureManager>().MongoDbConnectionString,
-            stage: 1,
             options =>
             {
+                options.Stage = 1;
                 options.DatabaseName = "testdb";
                 options.Timeout = TimeSpan.FromSeconds(30);
             });
 
         // Stage 2: Caches (Redis)
         Console.WriteLine("📋 Registering Stage 2: Caches (Redis)");
-        builder.Services.AddRedisReadinessWithStage(
+        builder.Services.AddRedisReadiness(
             sp => sp.GetRequiredService<InfrastructureManager>().RedisConnectionString,
-            stage: 2,
             options =>
             {
+                options.Stage = 2;
                 options.VerificationStrategy = RedisVerificationStrategy.Ping;
                 options.Timeout = TimeSpan.FromSeconds(30);
             });
 
         // Stage 3: Message Queues (RabbitMQ)
         Console.WriteLine("📋 Registering Stage 3: Message Queues (RabbitMQ)");
-        builder.Services.AddRabbitMqReadinessWithStage(
+        builder.Services.AddRabbitMqReadiness(
             sp => sp.GetRequiredService<InfrastructureManager>().RabbitMqConnectionString,
-            stage: 3,
             options =>
             {
+                options.Stage = 3;
                 options.Timeout = TimeSpan.FromSeconds(30);
             });
 
         // Stage 4: Application Services (simulated)
         Console.WriteLine("📋 Registering Stage 4: Application Services");
-        builder.Services.AddIgnitionFromTaskWithStage(
-            "app-initialization",
-            async ct =>
+        builder.Services.AddIgnitionStage(4, stage => stage
+            .AddTaskSignal("app-initialization", async ct =>
             {
                 Console.WriteLine("   🚀 Initializing application components...");
                 await Task.Delay(500, ct);
                 Console.WriteLine("   ✅ Application components ready");
-            },
-            stage: 4);
-
-        builder.Services.AddIgnitionFromTaskWithStage(
-            "cache-warmup",
-            async ct =>
+            })
+            .AddTaskSignal("cache-warmup", async ct =>
             {
                 Console.WriteLine("   🔥 Warming up caches...");
                 await Task.Delay(800, ct);
                 Console.WriteLine("   ✅ Caches warmed");
-            },
-            stage: 4);
-
-        builder.Services.AddIgnitionFromTaskWithStage(
-            "background-services",
-            async ct =>
+            })
+            .AddTaskSignal("background-services", async ct =>
             {
                 Console.WriteLine("   ⚙️  Starting background services...");
                 await Task.Delay(300, ct);
                 Console.WriteLine("   ✅ Background services started");
-            },
-            stage: 4);
+            }));
 
         var app = builder.Build();
 
@@ -275,115 +253,5 @@ public class Program
             var name when name.Contains("rabbitmq") => 3,
             _ => 4
         };
-    }
-}
-
-/// <summary>
-/// Manages Testcontainers lifecycle for all infrastructure services.
-/// </summary>
-public class InfrastructureManager
-{
-    private PostgreSqlContainer? _postgres;
-    private RedisContainer? _redis;
-    private RabbitMqContainer? _rabbitMq;
-    private MongoDbContainer? _mongoDb;
-    private MsSqlContainer? _sqlServer;
-
-    public string PostgresConnectionString { get; private set; } = string.Empty;
-    public string RedisConnectionString { get; private set; } = string.Empty;
-    public string RabbitMqConnectionString { get; private set; } = string.Empty;
-    public string MongoDbConnectionString { get; private set; } = string.Empty;
-    public string SqlServerConnectionString { get; private set; } = string.Empty;
-
-    public async Task StartPostgresAsync()
-    {
-        Console.WriteLine("  🐘 Starting PostgreSQL...");
-        _postgres = new PostgreSqlBuilder()
-            .WithImage("postgres:17-alpine")
-            .Build();
-        await _postgres.StartAsync();
-        PostgresConnectionString = _postgres.GetConnectionString();
-        Console.WriteLine($"  ✅ PostgreSQL ready at {_postgres.Hostname}:{_postgres.GetMappedPublicPort(5432)}");
-    }
-
-    public async Task StartRedisAsync()
-    {
-        Console.WriteLine("  🔴 Starting Redis...");
-        _redis = new RedisBuilder()
-            .WithImage("redis:7-alpine")
-            .Build();
-        await _redis.StartAsync();
-        RedisConnectionString = _redis.GetConnectionString();
-        Console.WriteLine($"  ✅ Redis ready at {_redis.Hostname}:{_redis.GetMappedPublicPort(6379)}");
-    }
-
-    public async Task StartRabbitMqAsync()
-    {
-        Console.WriteLine("  🐰 Starting RabbitMQ...");
-        _rabbitMq = new RabbitMqBuilder()
-            .WithImage("rabbitmq:4.0-alpine")
-            .Build();
-        await _rabbitMq.StartAsync();
-        RabbitMqConnectionString = _rabbitMq.GetConnectionString();
-        Console.WriteLine($"  ✅ RabbitMQ ready at {_rabbitMq.Hostname}:{_rabbitMq.GetMappedPublicPort(5672)}");
-    }
-
-    public async Task StartMongoDbAsync()
-    {
-        Console.WriteLine("  🍃 Starting MongoDB...");
-        _mongoDb = new MongoDbBuilder()
-            .WithImage("mongo:8")
-            .Build();
-        await _mongoDb.StartAsync();
-        MongoDbConnectionString = _mongoDb.GetConnectionString();
-        Console.WriteLine($"  ✅ MongoDB ready at {_mongoDb.Hostname}:{_mongoDb.GetMappedPublicPort(27017)}");
-    }
-
-    public async Task StartSqlServerAsync()
-    {
-        Console.WriteLine("  🗄️  Starting SQL Server...");
-        _sqlServer = new MsSqlBuilder()
-            .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
-            .Build();
-        await _sqlServer.StartAsync();
-        SqlServerConnectionString = _sqlServer.GetConnectionString();
-        Console.WriteLine($"  ✅ SQL Server ready at {_sqlServer.Hostname}:{_sqlServer.GetMappedPublicPort(1433)}");
-    }
-
-    public async Task StopAsync()
-    {
-        var tasks = new List<Task>();
-
-        if (_postgres != null)
-        {
-            Console.WriteLine("  🐘 Stopping PostgreSQL...");
-            tasks.Add(_postgres.DisposeAsync().AsTask());
-        }
-
-        if (_redis != null)
-        {
-            Console.WriteLine("  🔴 Stopping Redis...");
-            tasks.Add(_redis.DisposeAsync().AsTask());
-        }
-
-        if (_rabbitMq != null)
-        {
-            Console.WriteLine("  🐰 Stopping RabbitMQ...");
-            tasks.Add(_rabbitMq.DisposeAsync().AsTask());
-        }
-
-        if (_mongoDb != null)
-        {
-            Console.WriteLine("  🍃 Stopping MongoDB...");
-            tasks.Add(_mongoDb.DisposeAsync().AsTask());
-        }
-
-        if (_sqlServer != null)
-        {
-            Console.WriteLine("  🗄️  Stopping SQL Server...");
-            tasks.Add(_sqlServer.DisposeAsync().AsTask());
-        }
-
-        await Task.WhenAll(tasks);
     }
 }
