@@ -95,51 +95,51 @@ public class Program
         // Stage 1: Databases (parallel within stage)
         // Use factory-based extensions for proper DI - signals instantiated when stage executes
         Console.WriteLine("📋 Registering Stage 1: Databases (PostgreSQL, SQL Server, MongoDB)");
-        builder.Services.AddPostgresReadinessWithStage(
+        builder.Services.AddPostgresReadiness(
             sp => sp.GetRequiredService<InfrastructureManager>().PostgresConnectionString,
-            stage: 1,
             options =>
             {
+                options.Stage = 1;
                 options.ValidationQuery = "SELECT 1";
                 options.Timeout = TimeSpan.FromSeconds(30);
             });
 
-        builder.Services.AddSqlServerReadinessWithStage(
+        builder.Services.AddSqlServerReadiness(
             sp => sp.GetRequiredService<InfrastructureManager>().SqlServerConnectionString,
-            stage: 1,
             options =>
             {
+                options.Stage = 1;
                 options.ValidationQuery = "SELECT 1";
                 options.Timeout = TimeSpan.FromSeconds(30);
             });
 
-        builder.Services.AddMongoDbReadinessWithStage(
+        builder.Services.AddMongoDbReadiness(
             sp => sp.GetRequiredService<InfrastructureManager>().MongoDbConnectionString,
-            stage: 1,
             options =>
             {
+                options.Stage = 1;
                 options.DatabaseName = "testdb";
                 options.Timeout = TimeSpan.FromSeconds(30);
             });
 
         // Stage 2: Caches (Redis)
         Console.WriteLine("📋 Registering Stage 2: Caches (Redis)");
-        builder.Services.AddRedisReadinessWithStage(
+        builder.Services.AddRedisReadiness(
             sp => sp.GetRequiredService<InfrastructureManager>().RedisConnectionString,
-            stage: 2,
             options =>
             {
+                options.Stage = 2;
                 options.VerificationStrategy = RedisVerificationStrategy.Ping;
                 options.Timeout = TimeSpan.FromSeconds(30);
             });
 
         // Stage 3: Message Queues (RabbitMQ)
         Console.WriteLine("📋 Registering Stage 3: Message Queues (RabbitMQ)");
-        builder.Services.AddRabbitMqReadinessWithStage(
+        builder.Services.AddRabbitMqReadiness(
             sp => sp.GetRequiredService<InfrastructureManager>().RabbitMqConnectionString,
-            stage: 3,
             options =>
             {
+                options.Stage = 3;
                 options.Timeout = TimeSpan.FromSeconds(30);
             });
 
