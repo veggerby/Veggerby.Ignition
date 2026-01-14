@@ -1,3 +1,4 @@
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -11,6 +12,23 @@ namespace Veggerby.Ignition.Grpc.Tests;
 
 public class GrpcReadinessSignalTests
 {
+    private static GrpcChannel CreateFastTimeoutChannel(string address)
+    {
+        var httpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(1)
+        };
+        return GrpcChannel.ForAddress(address, new GrpcChannelOptions
+        {
+            HttpHandler = new SocketsHttpHandler
+            {
+                ConnectTimeout = TimeSpan.FromSeconds(1),
+                PooledConnectionIdleTimeout = TimeSpan.FromSeconds(1)
+            },
+            DisposeHttpClient = true
+        });
+    }
+
     [Fact]
     public void Constructor_NullChannel_ThrowsArgumentNullException()
     {
@@ -38,7 +56,7 @@ public class GrpcReadinessSignalTests
     public void Constructor_EmptyServiceUrl_ThrowsArgumentException()
     {
         // arrange
-        var channel = GrpcChannel.ForAddress("http://example.com");
+        var channel = CreateFastTimeoutChannel("http://example.com");
         var options = new GrpcReadinessOptions();
         var logger = Substitute.For<ILogger<GrpcReadinessSignal>>();
 
@@ -50,7 +68,7 @@ public class GrpcReadinessSignalTests
     public void Constructor_NullOptions_ThrowsArgumentNullException()
     {
         // arrange
-        var channel = GrpcChannel.ForAddress("http://example.com");
+        var channel = CreateFastTimeoutChannel("http://example.com");
         var logger = Substitute.For<ILogger<GrpcReadinessSignal>>();
 
         // act & assert
@@ -61,7 +79,7 @@ public class GrpcReadinessSignalTests
     public void Constructor_NullLogger_ThrowsArgumentNullException()
     {
         // arrange
-        var channel = GrpcChannel.ForAddress("http://example.com");
+        var channel = CreateFastTimeoutChannel("http://example.com");
         var options = new GrpcReadinessOptions();
 
         // act & assert
@@ -72,7 +90,7 @@ public class GrpcReadinessSignalTests
     public void Name_ReturnsExpectedValue()
     {
         // arrange
-        var channel = GrpcChannel.ForAddress("http://example.com");
+        var channel = CreateFastTimeoutChannel("http://example.com");
         var options = new GrpcReadinessOptions();
         var logger = Substitute.For<ILogger<GrpcReadinessSignal>>();
         var signal = new GrpcReadinessSignal(channel, "http://example.com", options, logger);
@@ -86,7 +104,7 @@ public class GrpcReadinessSignalTests
     {
         // arrange
         var timeout = TimeSpan.FromSeconds(10);
-        var channel = GrpcChannel.ForAddress("http://example.com");
+        var channel = CreateFastTimeoutChannel("http://example.com");
         var options = new GrpcReadinessOptions { Timeout = timeout };
         var logger = Substitute.For<ILogger<GrpcReadinessSignal>>();
         var signal = new GrpcReadinessSignal(channel, "http://example.com", options, logger);
@@ -99,7 +117,7 @@ public class GrpcReadinessSignalTests
     public void Timeout_NullOptionsTimeout_ReturnsNull()
     {
         // arrange
-        var channel = GrpcChannel.ForAddress("http://example.com");
+        var channel = CreateFastTimeoutChannel("http://example.com");
         var options = new GrpcReadinessOptions { Timeout = null };
         var logger = Substitute.For<ILogger<GrpcReadinessSignal>>();
         var signal = new GrpcReadinessSignal(channel, "http://example.com", options, logger);
@@ -109,30 +127,28 @@ public class GrpcReadinessSignalTests
     }
 
     [Fact]
-    [Trait("Speed", "Slow")] // Takes ~15s - properly tests gRPC connection failure to invalid host
     public async Task WaitAsync_ConnectionFailure_ThrowsException()
     {
         // arrange
-        var channel = GrpcChannel.ForAddress("http://invalid-host-that-does-not-exist.local");
+        var channel = CreateFastTimeoutChannel("http://127.0.0.1:59999");
         var options = new GrpcReadinessOptions();
         var logger = Substitute.For<ILogger<GrpcReadinessSignal>>();
-        var signal = new GrpcReadinessSignal(channel, "http://invalid-host-that-does-not-exist.local", options, logger);
+        var signal = new GrpcReadinessSignal(channel, "http://127.0.0.1:59999", options, logger);
 
         // act & assert - Connection failures can throw various exception types
         await Assert.ThrowsAnyAsync<Exception>(() => signal.WaitAsync());
     }
 
     [Fact]
-    [Trait("Speed", "Slow")] // Takes ~10s - properly tests gRPC idempotent behavior with real connection failures
     public async Task WaitAsync_Idempotent_ExecutesOnce()
     {
         // arrange - We can't easily test idempotency with real gRPC without a mock server
         // This test validates the idempotent behavior pattern by ensuring multiple awaits
         // on a failed connection don't cause different exceptions
-        var channel = GrpcChannel.ForAddress("http://invalid-host.local");
+        var channel = CreateFastTimeoutChannel("http://127.0.0.1:59998");
         var options = new GrpcReadinessOptions();
         var logger = Substitute.For<ILogger<GrpcReadinessSignal>>();
-        var signal = new GrpcReadinessSignal(channel, "http://invalid-host.local", options, logger);
+        var signal = new GrpcReadinessSignal(channel, "http://127.0.0.1:59998", options, logger);
 
         // act
         Exception? firstException = null;
