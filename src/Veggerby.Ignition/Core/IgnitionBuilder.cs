@@ -148,6 +148,22 @@ internal sealed class IgnitionBuilder : IIgnitionBuilder
         return this;
     }
 
+    public IIgnitionBuilder WithLifecycleHooks<TLifecycleHooks>() where TLifecycleHooks : class, IIgnitionLifecycleHooks
+    {
+        _services.AddIgnitionLifecycleHooks<TLifecycleHooks>();
+
+        return this;
+    }
+
+    public IIgnitionBuilder WithLifecycleHooks(Func<IServiceProvider, IIgnitionLifecycleHooks> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory, nameof(factory));
+
+        _services.AddIgnitionLifecycleHooks(factory);
+
+        return this;
+    }
+
     /// <summary>
     /// Internal method to finalize registration by applying all configurations to the service collection.
     /// </summary>

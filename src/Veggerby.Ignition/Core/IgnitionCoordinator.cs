@@ -145,10 +145,37 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
     {
         TransitionToState(IgnitionState.Running);
 
+        // Invoke OnBeforeIgnitionAsync hook
+        if (_options.LifecycleHooks is not null)
+        {
+            try
+            {
+                await _options.LifecycleHooks.OnBeforeIgnitionAsync(CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Exception in OnBeforeIgnitionAsync lifecycle hook");
+            }
+        }
+
         if (_factories.Count == 0)
         {
             _logger.LogDebug("No startup wait handles registered; continuing immediately.");
             var emptyResult = IgnitionResult.EmptySuccess;
+
+            // Invoke OnAfterIgnitionAsync hook for empty result
+            if (_options.LifecycleHooks is not null)
+            {
+                try
+                {
+                    await _options.LifecycleHooks.OnAfterIgnitionAsync(emptyResult, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Exception in OnAfterIgnitionAsync lifecycle hook");
+                }
+            }
+
             TransitionToFinalState(emptyResult);
             return emptyResult;
         }
@@ -165,6 +192,20 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         // All execution modes now go through staged execution path
         // Non-staged modes are treated as single-stage execution (stage 0)
         var result = await RunStagedAsync(globalCts, globalTimeoutTask, swGlobal);
+
+        // Invoke OnAfterIgnitionAsync hook
+        if (_options.LifecycleHooks is not null)
+        {
+            try
+            {
+                await _options.LifecycleHooks.OnAfterIgnitionAsync(result, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Exception in OnAfterIgnitionAsync lifecycle hook");
+            }
+        }
+
         TransitionToFinalState(result);
         return result;
     }
@@ -1264,6 +1305,19 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
 
             using (perHandleCts)
             {
+                // Invoke OnBeforeSignalAsync hook
+                if (_options.LifecycleHooks is not null)
+                {
+                    try
+                    {
+                        await _options.LifecycleHooks.OnBeforeSignalAsync(h.Name, perHandleCts.Token);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Exception in OnBeforeSignalAsync for {SignalName}", h.Name);
+                    }
+                }
+
                 Task work = h.WaitAsync(perHandleCts.Token);
 
                 // Determine timeout and cancellation behavior from strategy or defaults
@@ -1298,24 +1352,54 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                         }
 
                         var completedAt = swGlobal.Elapsed;
-                        return new IgnitionSignalResult(
+                        var timedOutResult = new IgnitionSignalResult(
                             h.Name,
                             IgnitionSignalStatus.TimedOut,
                             sw.Elapsed,
                             CancellationReason: CancellationReason.PerSignalTimeout,
                             StartedAt: startedAt,
                             CompletedAt: completedAt);
+
+                        // Invoke OnAfterSignalAsync hook for timed out signal
+                        if (_options.LifecycleHooks is not null)
+                        {
+                            try
+                            {
+                                await _options.LifecycleHooks.OnAfterSignalAsync(timedOutResult, CancellationToken.None);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning(ex, "Exception in OnAfterSignalAsync for {SignalName}", h.Name);
+                            }
+                        }
+
+                        return timedOutResult;
                     }
                 }
 
                 await work; // propagate exceptions if failed
                 var successCompletedAt = swGlobal.Elapsed;
-                return new IgnitionSignalResult(
+                var successResult = new IgnitionSignalResult(
                     h.Name,
                     IgnitionSignalStatus.Succeeded,
                     sw.Elapsed,
                     StartedAt: startedAt,
                     CompletedAt: successCompletedAt);
+
+                // Invoke OnAfterSignalAsync hook for successful signal
+                if (_options.LifecycleHooks is not null)
+                {
+                    try
+                    {
+                        await _options.LifecycleHooks.OnAfterSignalAsync(successResult, CancellationToken.None);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Exception in OnAfterSignalAsync for {SignalName}", h.Name);
+                    }
+                }
+
+                return successResult;
             }
         }
         catch (OperationCanceledException)
@@ -1333,7 +1417,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                 cancelledBy = signalScope.TriggeringSignalName;
 
                 // Return Cancelled status for scope-based cancellations
-                return new IgnitionSignalResult(
+                var cancelledResult = new IgnitionSignalResult(
                     h.Name,
                     IgnitionSignalStatus.Cancelled,
                     sw.Elapsed,
@@ -1341,6 +1425,21 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                     CancelledBySignal: cancelledBy,
                     StartedAt: startedAt,
                     CompletedAt: completedAt);
+
+                // Invoke OnAfterSignalAsync hook for cancelled signal
+                if (_options.LifecycleHooks is not null)
+                {
+                    try
+                    {
+                        await _options.LifecycleHooks.OnAfterSignalAsync(cancelledResult, CancellationToken.None);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Exception in OnAfterSignalAsync for {SignalName}", h.Name);
+                    }
+                }
+
+                return cancelledResult;
             }
             else if (globalToken.IsCancellationRequested)
             {
@@ -1352,7 +1451,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
             }
 
             // Treat global/external cancellations as timeouts for backward compatibility
-            return new IgnitionSignalResult(
+            var timedOutResult = new IgnitionSignalResult(
                 h.Name,
                 IgnitionSignalStatus.TimedOut,
                 sw.Elapsed,
@@ -1360,6 +1459,21 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                 CancelledBySignal: cancelledBy,
                 StartedAt: startedAt,
                 CompletedAt: completedAt);
+
+            // Invoke OnAfterSignalAsync hook for timed out signal
+            if (_options.LifecycleHooks is not null)
+            {
+                try
+                {
+                    await _options.LifecycleHooks.OnAfterSignalAsync(timedOutResult, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Exception in OnAfterSignalAsync for {SignalName}", h.Name);
+                }
+            }
+
+            return timedOutResult;
         }
         catch (Exception ex)
         {
@@ -1370,13 +1484,28 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
             }
 
             var completedAt = swGlobal.Elapsed;
-            return new IgnitionSignalResult(
+            var failedResult = new IgnitionSignalResult(
                 h.Name,
                 IgnitionSignalStatus.Failed,
                 sw.Elapsed,
                 ex,
                 StartedAt: startedAt,
                 CompletedAt: completedAt);
+
+            // Invoke OnAfterSignalAsync hook for failed signal
+            if (_options.LifecycleHooks is not null)
+            {
+                try
+                {
+                    await _options.LifecycleHooks.OnAfterSignalAsync(failedResult, CancellationToken.None);
+                }
+                catch (Exception hookEx)
+                {
+                    _logger.LogWarning(hookEx, "Exception in OnAfterSignalAsync for {SignalName}", h.Name);
+                }
+            }
+
+            return failedResult;
         }
     }
 
