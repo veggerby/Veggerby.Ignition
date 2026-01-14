@@ -40,21 +40,25 @@ public class IgnitionSignalFactoryTests
     public async Task FromTaskFactory_PropagatesCancellation()
     {
         // arrange
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var cts = new CancellationTokenSource();
-        var signal = IgnitionSignal.FromTaskFactory("cancel", ct => Task.Delay(200, ct));
+        
+        var signal = IgnitionSignal.FromTaskFactory("cancel", async ct =>
+        {
+            // Use TaskCompletionSource to ensure the task doesn't complete before cancellation
+            using var registration = ct.Register(() => tcs.TrySetCanceled(ct));
+            await tcs.Task;
+        });
 
         // act
-        cts.CancelAfter(20);
-        try
+        cts.Cancel(); // Cancel immediately
+        
+        var exception = await Assert.ThrowsAsync<TaskCanceledException>(async () =>
         {
             await signal.WaitAsync(cts.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            // assert
-            cts.IsCancellationRequested.Should().BeTrue();
-            return;
-        }
-        false.Should().BeTrue("Expected cancellation but task completed successfully");
+        });
+
+        // assert
+        cts.IsCancellationRequested.Should().BeTrue();
     }
 }

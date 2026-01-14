@@ -49,4 +49,16 @@ public sealed class RedisReadinessOptions
     /// Test keys are created with a 60-second TTL and explicitly deleted after verification.
     /// </remarks>
     public string TestKeyPrefix { get; set; } = "ignition:readiness:";
+
+    /// <summary>
+    /// Maximum number of retry attempts for connection and operation failures.
+    /// Default is 3 retries.
+    /// </summary>
+    public int MaxRetries { get; set; } = 3;
+
+    /// <summary>
+    /// Initial delay between retry attempts. Uses exponential backoff.
+    /// Default is 100ms.
+    /// </summary>
+    public TimeSpan RetryDelay { get; set; } = TimeSpan.FromMilliseconds(100);
 }

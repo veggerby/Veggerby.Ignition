@@ -147,9 +147,14 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
 
         try
         {
-            using var connection = await OpenConnectionWithRetryAsync(dataSource, cancellationToken);
+            var retryPolicy = new RetryPolicy(_options.MaxRetries, _options.RetryDelay, _logger);
 
-            _logger.LogDebug("PostgreSQL connection established");
+            using var connection = await retryPolicy.ExecuteAsync(async ct =>
+            {
+                var conn = await dataSource.OpenConnectionAsync(ct).ConfigureAwait(false);
+                _logger.LogDebug("PostgreSQL connection established");
+                return conn;
+            }, "PostgreSQL connection", cancellationToken);
 
             if (!string.IsNullOrWhiteSpace(_options.ValidationQuery))
             {
@@ -172,61 +177,6 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
                 await _dataSource.DisposeAsync().ConfigureAwait(false);
             }
         }
-    }
-
-    private async Task<NpgsqlConnection> OpenConnectionWithRetryAsync(NpgsqlDataSource dataSource, CancellationToken cancellationToken)
-    {
-        const int initialDelayMs = 100;
-        const double multiplier = 1.5;
-        const int maxDelayMs = 5000;
-        const int maxRetries = 3;
-
-        var delay = initialDelayMs;
-        var retryCount = 0;
-        Exception? lastException = null;
-
-        while (!cancellationToken.IsCancellationRequested && retryCount < maxRetries)
-        {
-            NpgsqlConnection? connection = null;
-            try
-            {
-                connection = await dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-                return connection;
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                if (connection != null)
-                {
-                    await connection.DisposeAsync().ConfigureAwait(false);
-                }
-
-                lastException = ex;
-                retryCount++;
-
-                if (retryCount >= maxRetries)
-                {
-                    _logger.LogError(ex, "PostgreSQL connection failed after {MaxRetries} attempts", maxRetries);
-                    throw;
-                }
-
-                _logger.LogDebug(
-                    ex,
-                    "PostgreSQL connection attempt {Retry}/{MaxRetries} failed, retrying in {DelayMs}ms",
-                    retryCount,
-                    maxRetries,
-                    delay);
-
-                await Task.Delay(delay, cancellationToken);
-                delay = Math.Min((int)(delay * multiplier), maxDelayMs);
-            }
-        }
-
-        if (cancellationToken.IsCancellationRequested)
-        {
-            throw new OperationCanceledException("Connection attempt cancelled", cancellationToken);
-        }
-
-        throw lastException ?? new InvalidOperationException("Connection attempt failed");
     }
 
     private async Task ExecuteValidationQueryAsync(NpgsqlConnection connection, CancellationToken cancellationToken)

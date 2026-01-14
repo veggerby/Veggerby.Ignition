@@ -97,33 +97,33 @@ public sealed class RedisReadinessSignal : IIgnitionSignal
             endpoints,
             _options.VerificationStrategy);
 
-        try
-        {
-            if (!multiplexer.IsConnected)
+        var retryPolicy = new RetryPolicy(_options.MaxRetries, _options.RetryDelay, _logger);
+
+        await retryPolicy.ExecuteAsync(
+            async ct =>
             {
-                throw new InvalidOperationException("Redis connection multiplexer is not connected");
-            }
+                if (!multiplexer.IsConnected)
+                {
+                    throw new InvalidOperationException("Redis connection multiplexer is not connected");
+                }
 
-            _logger.LogDebug("Redis connection established");
+                _logger.LogDebug("Redis connection established");
 
-            if (_options.VerificationStrategy == RedisVerificationStrategy.Ping ||
-                _options.VerificationStrategy == RedisVerificationStrategy.PingAndTestKey)
-            {
-                await ExecutePingAsync(multiplexer, cancellationToken);
-            }
+                if (_options.VerificationStrategy == RedisVerificationStrategy.Ping ||
+                    _options.VerificationStrategy == RedisVerificationStrategy.PingAndTestKey)
+                {
+                    await ExecutePingAsync(multiplexer, ct);
+                }
 
-            if (_options.VerificationStrategy == RedisVerificationStrategy.PingAndTestKey)
-            {
-                await ExecuteTestKeyRoundTripAsync(multiplexer, cancellationToken);
-            }
+                if (_options.VerificationStrategy == RedisVerificationStrategy.PingAndTestKey)
+                {
+                    await ExecuteTestKeyRoundTripAsync(multiplexer, ct);
+                }
+            },
+            "Redis readiness check",
+            cancellationToken);
 
-            _logger.LogInformation("Redis readiness check completed successfully");
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _logger.LogError(ex, "Redis readiness check failed");
-            throw;
-        }
+        _logger.LogInformation("Redis readiness check completed successfully");
     }
 
     private async Task ExecutePingAsync(IConnectionMultiplexer multiplexer, CancellationToken cancellationToken)

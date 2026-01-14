@@ -88,7 +88,14 @@ public sealed class SqlServerReadinessSignal : IIgnitionSignal
     {
         var activity = Activity.Current;
 
-        using var connection = await OpenConnectionWithRetryAsync(cancellationToken);
+        var retryPolicy = new RetryPolicy(_options.MaxRetries, _options.RetryDelay, _logger);
+
+        using var connection = await retryPolicy.ExecuteAsync(async ct =>
+        {
+            var conn = _connectionFactory();
+            await conn.OpenAsync(ct).ConfigureAwait(false);
+            return conn;
+        }, "SQL Server connection", cancellationToken);
 
         var serverName = connection.DataSource;
         var databaseName = connection.Database;
@@ -118,52 +125,6 @@ public sealed class SqlServerReadinessSignal : IIgnitionSignal
             _logger.LogError(ex, "SQL Server readiness check failed");
             throw;
         }
-    }
-
-    private async Task<SqlConnection> OpenConnectionWithRetryAsync(CancellationToken cancellationToken)
-    {
-        var delay = TimeSpan.FromMilliseconds(100);
-        const int maxDelay = 5000;
-        const double multiplier = 1.5;
-        const int maxRetries = 3;
-        var retryCount = 0;
-        Exception? lastException = null;
-
-        while (!cancellationToken.IsCancellationRequested && retryCount < maxRetries)
-        {
-            var connection = _connectionFactory();
-            try
-            {
-                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-                return connection;
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                await connection.DisposeAsync().ConfigureAwait(false);
-                lastException = ex;
-                retryCount++;
-
-                if (retryCount >= maxRetries)
-                {
-                    _logger.LogError(ex, "SQL Server connection failed after {MaxRetries} attempts", maxRetries);
-                    throw;
-                }
-
-                _logger.LogDebug(ex, "SQL Server connection attempt {Retry}/{MaxRetries} failed, retrying after {Delay}ms", retryCount, maxRetries, delay.TotalMilliseconds);
-                
-                await Task.Delay(delay, cancellationToken);
-                
-                // Exponential backoff
-                delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds * multiplier, maxDelay));
-            }
-        }
-
-        if (cancellationToken.IsCancellationRequested)
-        {
-            throw new OperationCanceledException("Connection attempt cancelled", cancellationToken);
-        }
-
-        throw lastException ?? new InvalidOperationException("Connection attempt failed");
     }
 
     private async Task ExecuteValidationQueryAsync(SqlConnection connection, CancellationToken cancellationToken)

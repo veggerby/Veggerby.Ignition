@@ -112,8 +112,14 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
 
         try
         {
-            connection = await CreateConnectionWithRetryAsync(connectionFactory, cancellationToken);
-            _logger.LogDebug("RabbitMQ connection established");
+            var retryPolicy = new RetryPolicy(_options.MaxRetries, _options.RetryDelay, _logger);
+
+            connection = await retryPolicy.ExecuteAsync(async ct =>
+            {
+                var conn = await connectionFactory.CreateConnectionAsync(ct).ConfigureAwait(false);
+                _logger.LogDebug("RabbitMQ connection established");
+                return conn;
+            }, "RabbitMQ connection", cancellationToken);
 
             channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
             _logger.LogDebug("RabbitMQ channel created");
@@ -253,50 +259,5 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
         {
             throw new TimeoutException($"Round-trip test timed out after {_options.RoundTripTestTimeout}");
         }
-    }
-
-    private async Task<IConnection> CreateConnectionWithRetryAsync(
-        IConnectionFactory connectionFactory,
-        CancellationToken cancellationToken)
-    {
-        var delay = TimeSpan.FromMilliseconds(100);
-        const int maxDelay = 5000;
-        const double multiplier = 1.5;
-        const int maxRetries = 3;
-        var retryCount = 0;
-        Exception? lastException = null;
-
-        while (!cancellationToken.IsCancellationRequested && retryCount < maxRetries)
-        {
-            try
-            {
-                return await connectionFactory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                lastException = ex;
-                retryCount++;
-
-                if (retryCount >= maxRetries)
-                {
-                    _logger.LogError(ex, "RabbitMQ connection failed after {MaxRetries} attempts", maxRetries);
-                    throw;
-                }
-
-                _logger.LogDebug(ex, "RabbitMQ connection attempt {Retry}/{MaxRetries} failed, retrying after {Delay}ms", retryCount, maxRetries, delay.TotalMilliseconds);
-                
-                await Task.Delay(delay, cancellationToken);
-                
-                // Exponential backoff
-                delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds * multiplier, maxDelay));
-            }
-        }
-
-        if (cancellationToken.IsCancellationRequested)
-        {
-            throw new OperationCanceledException("Connection attempt cancelled", cancellationToken);
-        }
-
-        throw lastException ?? new InvalidOperationException("Connection attempt failed");
     }
 }
