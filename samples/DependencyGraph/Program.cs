@@ -187,14 +187,7 @@ public class Program
                 services.AddIgnitionSignal<ApiSignal>();
 
                 // Build graph from attributes
-                services.AddIgnitionGraph((builder, sp) =>
-                {
-                    // Get factories and create signals
-                    var factories = sp.GetServices<IIgnitionSignalFactory>();
-                    var signals = factories.Select(f => f.CreateSignal(sp)).ToList();
-                    builder.AddSignals(signals);
-                    builder.ApplyAttributeDependencies(); // Automatically discover dependencies from attributes
-                });
+                services.AddIgnitionGraphFromFactories(applyAttributeDependencies: true);
             })
             .ConfigureLogging(logging =>
             {
@@ -236,6 +229,11 @@ public class Program
                 // Build graph using fluent API
                 services.AddIgnitionGraph((builder, sp) =>
                 {
+                    // Note: we resolve factories and construct signals manually here rather than using
+                    // AddIgnitionGraphFromFactories because this example explicitly demonstrates the
+                    // fluent API for defining dependencies programmatically. We need concrete signal
+                    // instances to pass into builder.DependsOn(...) below.
+                    
                     // Get factories and create signals
                     var factories = sp.GetServices<IIgnitionSignalFactory>();
                     var signals = factories.Select(f => f.CreateSignal(sp)).ToList();
