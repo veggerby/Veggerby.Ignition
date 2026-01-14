@@ -44,7 +44,12 @@ public static class RedisIgnitionExtensions
 
         // Register the connection multiplexer as singleton if not already registered
         services.AddSingleton<IConnectionMultiplexer>(sp =>
-            ConnectionMultiplexer.Connect(connectionString));
+        {
+            var configOptions = ConfigurationOptions.Parse(connectionString);
+            // Ensure resilient connection: retry until timeout instead of failing immediately
+            configOptions.AbortOnConnectFail = false;
+            return ConnectionMultiplexer.Connect(configOptions);
+        });
 
         services.AddSingleton<IIgnitionSignalFactory>(sp =>
         {

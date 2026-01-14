@@ -41,7 +41,10 @@ public sealed class RedisReadinessSignalFactory : IIgnitionSignalFactory
     public IIgnitionSignal CreateSignal(IServiceProvider serviceProvider)
     {
         var connectionString = _connectionStringFactory(serviceProvider);
-        var multiplexer = ConnectionMultiplexer.Connect(connectionString);
+        var configOptions = ConfigurationOptions.Parse(connectionString);
+        // Ensure resilient connection: retry until timeout instead of failing immediately
+        configOptions.AbortOnConnectFail = false;
+        var multiplexer = ConnectionMultiplexer.Connect(configOptions);
         var logger = serviceProvider.GetRequiredService<ILogger<RedisReadinessSignal>>();
         
         return new RedisReadinessSignal(multiplexer, _options, logger);
