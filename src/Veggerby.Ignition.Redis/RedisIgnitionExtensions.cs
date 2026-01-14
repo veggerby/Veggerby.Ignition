@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
@@ -45,14 +46,17 @@ public static class RedisIgnitionExtensions
         services.AddSingleton<IConnectionMultiplexer>(sp =>
             ConnectionMultiplexer.Connect(connectionString));
 
-        services.AddSingleton<IIgnitionSignal>(sp =>
+        services.AddSingleton<IIgnitionSignalFactory>(sp =>
         {
             var options = new RedisReadinessOptions();
             configure?.Invoke(options);
 
             var multiplexer = sp.GetRequiredService<IConnectionMultiplexer>();
             var logger = sp.GetRequiredService<ILogger<RedisReadinessSignal>>();
-            return new RedisReadinessSignal(multiplexer, options, logger);
+            var signal = new RedisReadinessSignal(multiplexer, options, logger);
+            
+            // Simple wrapper factory
+            return new SimpleRedisSignalFactory(signal);
         });
 
         return services;
@@ -88,17 +92,19 @@ public static class RedisIgnitionExtensions
         this IServiceCollection services,
         Action<RedisReadinessOptions>? configure = null)
     {
-        services.AddSingleton<IIgnitionSignal>(sp =>
+        services.AddSingleton<IIgnitionSignalFactory>(sp =>
         {
             var options = new RedisReadinessOptions();
             configure?.Invoke(options);
 
             var logger = sp.GetRequiredService<ILogger<RedisReadinessSignal>>();
             // Use factory pattern to defer multiplexer resolution until signal executes
-            return new RedisReadinessSignal(
+            var signal = new RedisReadinessSignal(
                 () => sp.GetRequiredService<IConnectionMultiplexer>(),
                 options,
                 logger);
+            
+            return new SimpleRedisSignalFactory(signal);
         });
 
         return services;
@@ -185,4 +191,23 @@ public static class RedisIgnitionExtensions
 
         return services;
     }
+}
+
+/// <summary>
+/// Simple factory wrapper for pre-created Redis signals.
+/// </summary>
+internal sealed class SimpleRedisSignalFactory : IIgnitionSignalFactory
+{
+    private readonly IIgnitionSignal _signal;
+
+    public SimpleRedisSignalFactory(IIgnitionSignal signal)
+    {
+        _signal = signal ?? throw new ArgumentNullException(nameof(signal));
+    }
+
+    public string Name => _signal.Name;
+    public TimeSpan? Timeout => _signal.Timeout;
+    public int? Stage => null;
+
+    public IIgnitionSignal CreateSignal(IServiceProvider serviceProvider) => _signal;
 }

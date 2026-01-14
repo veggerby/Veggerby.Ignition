@@ -15,7 +15,6 @@ public class RabbitMqIntegrationTests : IAsyncLifetime
     {
         _rabbitMqContainer = new RabbitMqBuilder()
             .WithImage("rabbitmq:4.0-alpine")
-            .WithWaitStrategy(Wait.ForUnixContainer())
             .Build();
 
         await _rabbitMqContainer.StartAsync();
