@@ -53,7 +53,7 @@ public sealed class CancellationScope : ICancellationScope
     /// <param name="linkedToken">A cancellation token to link to this scope.</param>
     public CancellationScope(string name, ICancellationScope? parent, CancellationToken linkedToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
 
         Name = name;
         Parent = parent;
@@ -144,7 +144,7 @@ public sealed class CancellationScope : ICancellationScope
     /// <inheritdoc/>
     public ICancellationScope CreateChildScope(string name)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
 
         if (_disposed)
         {

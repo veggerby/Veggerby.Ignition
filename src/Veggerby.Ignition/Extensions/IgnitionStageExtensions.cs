@@ -42,7 +42,7 @@ public static class IgnitionStageExtensions
         this IServiceCollection services,
         Action<IgnitionStageBuilder> configureStages)
     {
-        ArgumentNullException.ThrowIfNull(configureStages);
+        ArgumentNullException.ThrowIfNull(configureStages, nameof(configureStages));
 
         // Register the stage configuration
         var stageBuilder = new IgnitionStageBuilder();
@@ -94,8 +94,8 @@ public static class IgnitionStageExtensions
         IgnitionExecutionMode executionMode = IgnitionExecutionMode.Parallel,
         TimeSpan? timeout = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentNullException.ThrowIfNull(signalFactory);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
+        ArgumentNullException.ThrowIfNull(signalFactory, nameof(signalFactory));
 
         // Create factory with stage metadata
         var innerFactory = new DelegateIgnitionSignalFactory(name, signalFactory, timeout);
@@ -130,8 +130,8 @@ public static class IgnitionStageExtensions
         IgnitionExecutionMode executionMode = IgnitionExecutionMode.Parallel,
         TimeSpan? timeout = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentNullException.ThrowIfNull(taskFactory);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
+        ArgumentNullException.ThrowIfNull(taskFactory, nameof(taskFactory));
 
         return services.AddSignalToStage(
             stageNumber,

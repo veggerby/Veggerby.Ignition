@@ -158,7 +158,7 @@ public static class MongoDbIgnitionExtensions
         IgnitionExecutionMode executionMode,
         Action<MongoDbReadinessOptions>? configure = null)
     {
-        ArgumentNullException.ThrowIfNull(connectionStringFactory);
+        ArgumentNullException.ThrowIfNull(connectionStringFactory, nameof(connectionStringFactory));
 
         var options = new MongoDbReadinessOptions();
         configure?.Invoke(options);

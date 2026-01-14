@@ -13,8 +13,8 @@ internal sealed class DelegateIgnitionSignalFactory : IIgnitionSignalFactory
 
     public DelegateIgnitionSignalFactory(string name, Func<IServiceProvider, IIgnitionSignal> factory, TimeSpan? timeout = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
+        ArgumentNullException.ThrowIfNull(factory, nameof(factory));
 
         Name = name;
         _factory = factory;
@@ -27,7 +27,7 @@ internal sealed class DelegateIgnitionSignalFactory : IIgnitionSignalFactory
 
     public IIgnitionSignal CreateSignal(IServiceProvider serviceProvider)
     {
-        ArgumentNullException.ThrowIfNull(serviceProvider);
+        ArgumentNullException.ThrowIfNull(serviceProvider, nameof(serviceProvider));
         return _factory(serviceProvider);
     }
 }

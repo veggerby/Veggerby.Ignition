@@ -20,7 +20,7 @@ public sealed class StagedIgnitionSignalFactory : IIgnitionSignalFactory
     /// <param name="stage">The stage/phase number for this signal.</param>
     public StagedIgnitionSignalFactory(IIgnitionSignalFactory innerFactory, int stage)
     {
-        ArgumentNullException.ThrowIfNull(innerFactory);
+        ArgumentNullException.ThrowIfNull(innerFactory, nameof(innerFactory));
         
         if (stage < 0)
         {

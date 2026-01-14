@@ -322,6 +322,7 @@ public class RedisIntegrationTests : IAsyncLifetime
 - No blocking waits (`.Result`, `.Wait()`) — async/await throughout
 - Use `Stopwatch` for timing, never `DateTime.Now` for elapsed measurement
 - Early-return guard clauses with blank line after guard block
+- **Always include `nameof` parameter** in all `Argument*Exception.ThrowIf*()` calls (e.g., `ArgumentNullException.ThrowIfNull(param, nameof(param))`, `ArgumentException.ThrowIfNullOrWhiteSpace(str, nameof(str))`) for better exception diagnostics during error triaging
 
 **XML Documentation:**
 

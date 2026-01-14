@@ -30,8 +30,8 @@ internal sealed class IgnitionBuilder : IIgnitionBuilder
 
     public IIgnitionBuilder AddSignal(string name, Func<CancellationToken, Task> taskFactory, TimeSpan? timeout = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentNullException.ThrowIfNull(taskFactory);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
+        ArgumentNullException.ThrowIfNull(taskFactory, nameof(taskFactory));
 
         _signalRegistrations.Add(svc =>
         {
@@ -44,8 +44,8 @@ internal sealed class IgnitionBuilder : IIgnitionBuilder
 
     public IIgnitionBuilder AddSignal(string name, Task readyTask, TimeSpan? timeout = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentNullException.ThrowIfNull(readyTask);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
+        ArgumentNullException.ThrowIfNull(readyTask, nameof(readyTask));
 
         _signalRegistrations.Add(svc =>
         {
@@ -58,7 +58,7 @@ internal sealed class IgnitionBuilder : IIgnitionBuilder
 
     public IIgnitionBuilder AddSignal(IIgnitionSignal signal)
     {
-        ArgumentNullException.ThrowIfNull(signal);
+        ArgumentNullException.ThrowIfNull(signal, nameof(signal));
 
         _signalRegistrations.Add(svc => svc.AddIgnitionSignal(signal));
 
@@ -141,7 +141,7 @@ internal sealed class IgnitionBuilder : IIgnitionBuilder
 
     public IIgnitionBuilder ConfigureAdvanced(Action<IgnitionOptions> configure)
     {
-        ArgumentNullException.ThrowIfNull(configure);
+        ArgumentNullException.ThrowIfNull(configure, nameof(configure));
 
         _advancedConfigurations.Add(configure);
 

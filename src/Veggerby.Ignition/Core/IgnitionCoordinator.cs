@@ -63,10 +63,10 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         IOptions<IgnitionOptions> options,
         ILogger<IgnitionCoordinator> logger)
     {
-        ArgumentNullException.ThrowIfNull(factories);
-        ArgumentNullException.ThrowIfNull(serviceProvider);
-        ArgumentNullException.ThrowIfNull(options);
-        ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(factories, nameof(factories));
+        ArgumentNullException.ThrowIfNull(serviceProvider, nameof(serviceProvider));
+        ArgumentNullException.ThrowIfNull(options, nameof(options));
+        ArgumentNullException.ThrowIfNull(logger, nameof(logger));
 
         _factories = factories.ToList();
         _serviceProvider = serviceProvider;

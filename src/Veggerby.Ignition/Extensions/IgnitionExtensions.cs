@@ -83,7 +83,7 @@ public static class IgnitionExtensions
         this IServiceCollection services,
         IIgnitionTimeoutStrategy strategy)
     {
-        ArgumentNullException.ThrowIfNull(strategy);
+        ArgumentNullException.ThrowIfNull(strategy, nameof(strategy));
 
         services.Configure<IgnitionOptions>(options => options.TimeoutStrategy = strategy);
 
@@ -104,7 +104,7 @@ public static class IgnitionExtensions
         this IServiceCollection services,
         Func<IServiceProvider, IIgnitionTimeoutStrategy> strategyFactory)
     {
-        ArgumentNullException.ThrowIfNull(strategyFactory);
+        ArgumentNullException.ThrowIfNull(strategyFactory, nameof(strategyFactory));
 
         services.AddSingleton<IIgnitionTimeoutStrategy>(strategyFactory);
         services.AddOptions<IgnitionOptions>()
@@ -153,7 +153,7 @@ public static class IgnitionExtensions
         this IServiceCollection services,
         IIgnitionMetrics metrics)
     {
-        ArgumentNullException.ThrowIfNull(metrics);
+        ArgumentNullException.ThrowIfNull(metrics, nameof(metrics));
 
         services.Configure<IgnitionOptions>(options => options.Metrics = metrics);
 
@@ -174,7 +174,7 @@ public static class IgnitionExtensions
         this IServiceCollection services,
         Func<IServiceProvider, IIgnitionMetrics> metricsFactory)
     {
-        ArgumentNullException.ThrowIfNull(metricsFactory);
+        ArgumentNullException.ThrowIfNull(metricsFactory, nameof(metricsFactory));
 
         services.AddSingleton<IIgnitionMetrics>(metricsFactory);
         services.AddOptions<IgnitionOptions>()
@@ -213,7 +213,7 @@ public static class IgnitionExtensions
         this IServiceCollection services,
         IIgnitionSignal signal)
     {
-        ArgumentNullException.ThrowIfNull(signal);
+        ArgumentNullException.ThrowIfNull(signal, nameof(signal));
         
         // Wrap signal in a factory for consistent handling
         var factory = new DelegateIgnitionSignalFactory(signal.Name, _ => signal, signal.Timeout);
@@ -249,7 +249,7 @@ public static class IgnitionExtensions
         this IServiceCollection services,
         IEnumerable<IIgnitionSignal> signals)
     {
-        ArgumentNullException.ThrowIfNull(signals);
+        ArgumentNullException.ThrowIfNull(signals, nameof(signals));
         
         foreach (var s in signals)
         {
@@ -612,7 +612,7 @@ public static class IgnitionExtensions
         this IServiceCollection services,
         IIgnitionGraph graph)
     {
-        ArgumentNullException.ThrowIfNull(graph);
+        ArgumentNullException.ThrowIfNull(graph, nameof(graph));
         services.AddSingleton(graph);
         return services;
     }
@@ -631,7 +631,7 @@ public static class IgnitionExtensions
         this IServiceCollection services,
         Action<IgnitionGraphBuilder, IServiceProvider> configure)
     {
-        ArgumentNullException.ThrowIfNull(configure);
+        ArgumentNullException.ThrowIfNull(configure, nameof(configure));
 
         services.AddSingleton<IIgnitionGraph>(sp =>
         {
@@ -660,7 +660,7 @@ public static class IgnitionExtensions
         IIgnitionBundle bundle,
         Action<IgnitionBundleOptions>? configure = null)
     {
-        ArgumentNullException.ThrowIfNull(bundle);
+        ArgumentNullException.ThrowIfNull(bundle, nameof(bundle));
 
         bundle.ConfigureBundle(services, configure);
 
@@ -700,7 +700,7 @@ public static class IgnitionExtensions
         IEnumerable<IIgnitionBundle> bundles,
         Action<IgnitionBundleOptions>? configure = null)
     {
-        ArgumentNullException.ThrowIfNull(bundles);
+        ArgumentNullException.ThrowIfNull(bundles, nameof(bundles));
 
         foreach (var bundle in bundles)
         {
@@ -912,7 +912,7 @@ public static class IgnitionExtensions
         this IServiceCollection services,
         string scopeName)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(scopeName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(scopeName, nameof(scopeName));
 
         var scope = new CancellationScope(scopeName);
         services.AddSingleton(scope);
@@ -932,8 +932,8 @@ public static class IgnitionExtensions
         string scopeName,
         ICancellationScope parent)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(scopeName);
-        ArgumentNullException.ThrowIfNull(parent);
+        ArgumentException.ThrowIfNullOrWhiteSpace(scopeName, nameof(scopeName));
+        ArgumentNullException.ThrowIfNull(parent, nameof(parent));
 
         var scope = new CancellationScope(scopeName, parent);
         services.AddSingleton(scope);
@@ -955,8 +955,8 @@ public static class IgnitionExtensions
         ICancellationScope scope,
         bool cancelScopeOnFailure = false)
     {
-        ArgumentNullException.ThrowIfNull(signal);
-        ArgumentNullException.ThrowIfNull(scope);
+        ArgumentNullException.ThrowIfNull(signal, nameof(signal));
+        ArgumentNullException.ThrowIfNull(scope, nameof(scope));
 
         var scopedSignal = new ScopedSignalWrapper(signal, scope, cancelScopeOnFailure);
         var factory = new DelegateIgnitionSignalFactory(
@@ -986,9 +986,9 @@ public static class IgnitionExtensions
         bool cancelScopeOnFailure = false,
         TimeSpan? timeout = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentNullException.ThrowIfNull(taskFactory);
-        ArgumentNullException.ThrowIfNull(scope);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
+        ArgumentNullException.ThrowIfNull(taskFactory, nameof(taskFactory));
+        ArgumentNullException.ThrowIfNull(scope, nameof(scope));
 
         var signal = IgnitionSignal.FromTaskFactory(name, taskFactory, timeout);
         var scopedSignal = new ScopedSignalWrapper(signal, scope, cancelScopeOnFailure);
@@ -1047,7 +1047,7 @@ public static class IgnitionExtensions
         IIgnitionSignal signal,
         int stage)
     {
-        ArgumentNullException.ThrowIfNull(signal);
+        ArgumentNullException.ThrowIfNull(signal, nameof(signal));
 
         // Wrap the signal in a factory
         var innerFactory = new DelegateIgnitionSignalFactory(signal.Name, _ => signal, signal.Timeout);
@@ -1073,8 +1073,8 @@ public static class IgnitionExtensions
         int stage,
         TimeSpan? timeout = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentNullException.ThrowIfNull(taskFactory);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
+        ArgumentNullException.ThrowIfNull(taskFactory, nameof(taskFactory));
 
         var innerFactory = new DelegateIgnitionSignalFactory(
             name,
@@ -1102,8 +1102,8 @@ public static class IgnitionExtensions
         int stage,
         TimeSpan? timeout = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentNullException.ThrowIfNull(readyTask);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
+        ArgumentNullException.ThrowIfNull(readyTask, nameof(readyTask));
 
         var innerFactory = new DelegateIgnitionSignalFactory(
             name,
@@ -1146,8 +1146,8 @@ public static class IgnitionExtensions
         int stage,
         TimeSpan? timeout = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentNullException.ThrowIfNull(signalFactory);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
+        ArgumentNullException.ThrowIfNull(signalFactory, nameof(signalFactory));
 
         var innerFactory = new DelegateIgnitionSignalFactory(name, signalFactory, timeout);
         var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, stage);
@@ -1187,7 +1187,7 @@ public static class IgnitionExtensions
         this IServiceCollection services,
         Action<IIgnitionBuilder> configure)
     {
-        ArgumentNullException.ThrowIfNull(configure);
+        ArgumentNullException.ThrowIfNull(configure, nameof(configure));
 
         var builder = new IgnitionBuilder(services);
         configure(builder);

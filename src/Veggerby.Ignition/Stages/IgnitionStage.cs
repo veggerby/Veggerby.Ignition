@@ -74,7 +74,7 @@ public sealed class IgnitionStage
     /// <param name="factory">The factory to add.</param>
     public void AddFactory(IIgnitionSignalFactory factory)
     {
-        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentNullException.ThrowIfNull(factory, nameof(factory));
         _factories.Add(factory);
     }
 
@@ -89,7 +89,7 @@ public sealed class IgnitionStage
     /// </remarks>
     public void AddChildStage(IgnitionStage childStage)
     {
-        ArgumentNullException.ThrowIfNull(childStage);
+        ArgumentNullException.ThrowIfNull(childStage, nameof(childStage));
         _childStages.Add(childStage);
     }
 

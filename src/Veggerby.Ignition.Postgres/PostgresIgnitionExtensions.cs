@@ -176,7 +176,7 @@ public static class PostgresIgnitionExtensions
         IgnitionExecutionMode executionMode,
         Action<PostgresReadinessOptions>? configure = null)
     {
-        ArgumentNullException.ThrowIfNull(connectionStringFactory);
+        ArgumentNullException.ThrowIfNull(connectionStringFactory, nameof(connectionStringFactory));
 
         var options = new PostgresReadinessOptions();
         configure?.Invoke(options);

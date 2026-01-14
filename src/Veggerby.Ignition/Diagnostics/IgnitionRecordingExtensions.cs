@@ -36,7 +36,7 @@ public static class IgnitionRecordingExtensions
         IgnitionState? finalState = null,
         IReadOnlyDictionary<string, string>? metadata = null)
     {
-        ArgumentNullException.ThrowIfNull(result);
+        ArgumentNullException.ThrowIfNull(result, nameof(result));
 
         var signals = BuildRecordedSignals(result, graph);
         var stages = BuildRecordedStages(result);

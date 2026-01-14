@@ -173,7 +173,7 @@ public static class RedisIgnitionExtensions
         IgnitionExecutionMode executionMode,
         Action<RedisReadinessOptions>? configure = null)
     {
-        ArgumentNullException.ThrowIfNull(connectionStringFactory);
+        ArgumentNullException.ThrowIfNull(connectionStringFactory, nameof(connectionStringFactory));
 
         var options = new RedisReadinessOptions();
         configure?.Invoke(options);

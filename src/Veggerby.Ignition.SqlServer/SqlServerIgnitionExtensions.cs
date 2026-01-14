@@ -154,7 +154,7 @@ public static class SqlServerIgnitionExtensions
         IgnitionExecutionMode executionMode,
         Action<SqlServerReadinessOptions>? configure = null)
     {
-        ArgumentNullException.ThrowIfNull(connectionStringFactory);
+        ArgumentNullException.ThrowIfNull(connectionStringFactory, nameof(connectionStringFactory));
 
         var options = new SqlServerReadinessOptions();
         configure?.Invoke(options);

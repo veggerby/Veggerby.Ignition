@@ -206,7 +206,7 @@ public static class RabbitMqIgnitionExtensions
         IgnitionExecutionMode executionMode,
         Action<RabbitMqReadinessOptions>? configure = null)
     {
-        ArgumentNullException.ThrowIfNull(connectionStringFactory);
+        ArgumentNullException.ThrowIfNull(connectionStringFactory, nameof(connectionStringFactory));
 
         var options = new RabbitMqReadinessOptions();
         configure?.Invoke(options);

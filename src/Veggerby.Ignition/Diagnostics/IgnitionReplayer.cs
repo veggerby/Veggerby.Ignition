@@ -147,7 +147,7 @@ public sealed class IgnitionReplayer
     /// <exception cref="ArgumentNullException">Thrown when recording is null.</exception>
     public IgnitionReplayer(IgnitionRecording recording)
     {
-        ArgumentNullException.ThrowIfNull(recording);
+        ArgumentNullException.ThrowIfNull(recording, nameof(recording));
         _recording = recording;
     }
 
@@ -183,7 +183,7 @@ public sealed class IgnitionReplayer
     /// <exception cref="ArgumentException">Thrown when the signal is not found in the recording.</exception>
     public WhatIfSimulationResult SimulateEarlierTimeout(string signalName, double newTimeoutMs)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(signalName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(signalName, nameof(signalName));
 
         var signal = _recording.Signals.FirstOrDefault(s => s.SignalName == signalName);
         if (signal is null)
@@ -258,7 +258,7 @@ public sealed class IgnitionReplayer
     /// <exception cref="ArgumentException">Thrown when the signal is not found in the recording.</exception>
     public WhatIfSimulationResult SimulateFailure(string signalName)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(signalName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(signalName, nameof(signalName));
 
         var signal = _recording.Signals.FirstOrDefault(s => s.SignalName == signalName);
         if (signal is null)
@@ -316,7 +316,7 @@ public sealed class IgnitionReplayer
     /// <exception cref="ArgumentNullException">Thrown when other is null.</exception>
     public RecordingComparisonResult CompareTo(IgnitionRecording other)
     {
-        ArgumentNullException.ThrowIfNull(other);
+        ArgumentNullException.ThrowIfNull(other, nameof(other));
 
         var durationDiff = other.TotalDurationMs - _recording.TotalDurationMs;
         var durationPercent = _recording.TotalDurationMs > 0

@@ -30,7 +30,7 @@ public sealed class SignalDependencyAttribute : Attribute
     /// <param name="signalType">The type of the signal this signal depends on. Must implement <see cref="IIgnitionSignal"/>.</param>
     public SignalDependencyAttribute(Type signalType)
     {
-        ArgumentNullException.ThrowIfNull(signalType);
+        ArgumentNullException.ThrowIfNull(signalType, nameof(signalType));
         if (!typeof(IIgnitionSignal).IsAssignableFrom(signalType))
         {
             throw new ArgumentException($"Signal type must implement {nameof(IIgnitionSignal)}.", nameof(signalType));
