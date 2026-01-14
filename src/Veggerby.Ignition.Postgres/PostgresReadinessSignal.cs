@@ -179,10 +179,13 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
         const int initialDelayMs = 100;
         const double multiplier = 1.5;
         const int maxDelayMs = 5000;
+        const int maxRetries = 3;
 
         var delay = initialDelayMs;
+        var retryCount = 0;
+        Exception? lastException = null;
 
-        while (true)
+        while (retryCount < maxRetries)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -199,15 +202,28 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
                     await connection.DisposeAsync();
                 }
 
+                lastException = ex;
+                retryCount++;
+
+                if (retryCount >= maxRetries)
+                {
+                    _logger.LogError(ex, "PostgreSQL connection failed after {MaxRetries} attempts", maxRetries);
+                    throw;
+                }
+
                 _logger.LogDebug(
                     ex,
-                    "PostgreSQL connection attempt failed, retrying in {DelayMs}ms",
+                    "PostgreSQL connection attempt {Retry}/{MaxRetries} failed, retrying in {DelayMs}ms",
+                    retryCount,
+                    maxRetries,
                     delay);
 
                 await Task.Delay(delay, cancellationToken);
                 delay = Math.Min((int)(delay * multiplier), maxDelayMs);
             }
         }
+
+        throw lastException ?? new InvalidOperationException("Connection attempt failed");
     }
 
     private async Task ExecuteValidationQueryAsync(NpgsqlConnection connection, CancellationToken cancellationToken)
