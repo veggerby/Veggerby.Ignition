@@ -62,6 +62,70 @@ public static class IgnitionStageExtensions
     }
 
     /// <summary>
+    /// Configures signals for a specific stage using a fluent builder pattern.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="stageNumber">The stage number (0 = infrastructure, 1 = services, 2 = workers, etc.).</param>
+    /// <param name="configureStage">Configuration delegate for adding signals to this stage.</param>
+    /// <param name="executionMode">Execution mode for this stage (default: Parallel).</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// This method provides a fluent API for configuring multiple signals within a single stage,
+    /// eliminating the need to specify the stage number repeatedly.
+    /// </para>
+    /// <para>
+    /// Automatically configures staged execution mode if not already set.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// // Configure Stage 0 with multiple container startup signals
+    /// services.AddIgnitionStage(0, stage => stage
+    ///     .AddTaskSignal("postgres-container", async ct => await infra.StartPostgresAsync())
+    ///     .AddTaskSignal("redis-container", async ct => await infra.StartRedisAsync())
+    ///     .AddTaskSignal("rabbitmq-container", async ct => await infra.StartRabbitMqAsync()));
+    /// 
+    /// // Configure Stage 1 with sequential execution
+    /// services.AddIgnitionStage(1, stage => stage
+    ///     .AddTaskSignal("db-migration", async ct => await migrator.MigrateAsync(ct))
+    ///     .AddTaskSignal("seed-data", async ct => await seeder.SeedAsync(ct)),
+    ///     IgnitionExecutionMode.Sequential);
+    /// </code>
+    /// </example>
+    public static IServiceCollection AddIgnitionStage(
+        this IServiceCollection services,
+        int stageNumber,
+        Action<IgnitionStageSignalBuilder> configureStage,
+        IgnitionExecutionMode executionMode = IgnitionExecutionMode.Parallel)
+    {
+        ArgumentNullException.ThrowIfNull(configureStage, nameof(configureStage));
+
+        if (stageNumber < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(stageNumber), "Stage number cannot be negative.");
+        }
+
+        // Ensure staged execution mode is set
+        services.Configure<IgnitionOptions>(options =>
+        {
+            options.ExecutionMode = IgnitionExecutionMode.Staged;
+        });
+
+        // Configure the stage's execution mode
+        services.Configure<IgnitionStageConfiguration>(config =>
+        {
+            config.EnsureStage(stageNumber, executionMode);
+        });
+
+        // Build the stage signals
+        var builder = new IgnitionStageSignalBuilder(services, stageNumber, executionMode);
+        configureStage(builder);
+
+        return services;
+    }
+
+    /// <summary>
     /// Adds a signal factory to a specific stage with explicit execution mode configuration.
     /// </summary>
     /// <param name="services">Target DI service collection.</param>

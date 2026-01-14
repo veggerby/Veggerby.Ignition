@@ -71,26 +71,12 @@ public class Program
 
         // Stage 0: Start Infrastructure Containers (parallel within stage)
         Console.WriteLine("📋 Registering Stage 0: Infrastructure Startup (Testcontainers)");
-        builder.Services.AddIgnitionFromTaskWithStage(
-            "postgres-container",
-            async ct => await infrastructure.StartPostgresAsync(),
-            stage: 0);
-        builder.Services.AddIgnitionFromTaskWithStage(
-            "redis-container",
-            async ct => await infrastructure.StartRedisAsync(),
-            stage: 0);
-        builder.Services.AddIgnitionFromTaskWithStage(
-            "rabbitmq-container",
-            async ct => await infrastructure.StartRabbitMqAsync(),
-            stage: 0);
-        builder.Services.AddIgnitionFromTaskWithStage(
-            "mongodb-container",
-            async ct => await infrastructure.StartMongoDbAsync(),
-            stage: 0);
-        builder.Services.AddIgnitionFromTaskWithStage(
-            "sqlserver-container",
-            async ct => await infrastructure.StartSqlServerAsync(),
-            stage: 0);
+        builder.Services.AddIgnitionStage(0, stage => stage
+            .AddTaskSignal("postgres-container", async ct => await infrastructure.StartPostgresAsync())
+            .AddTaskSignal("redis-container", async ct => await infrastructure.StartRedisAsync())
+            .AddTaskSignal("rabbitmq-container", async ct => await infrastructure.StartRabbitMqAsync())
+            .AddTaskSignal("mongodb-container", async ct => await infrastructure.StartMongoDbAsync())
+            .AddTaskSignal("sqlserver-container", async ct => await infrastructure.StartSqlServerAsync()));
 
         // Stage 1: Databases (parallel within stage)
         // Use factory-based extensions for proper DI - signals instantiated when stage executes
@@ -147,35 +133,25 @@ public class Program
 
         // Stage 4: Application Services (simulated)
         Console.WriteLine("📋 Registering Stage 4: Application Services");
-        builder.Services.AddIgnitionFromTaskWithStage(
-            "app-initialization",
-            async ct =>
+        builder.Services.AddIgnitionStage(4, stage => stage
+            .AddTaskSignal("app-initialization", async ct =>
             {
                 Console.WriteLine("   🚀 Initializing application components...");
                 await Task.Delay(500, ct);
                 Console.WriteLine("   ✅ Application components ready");
-            },
-            stage: 4);
-
-        builder.Services.AddIgnitionFromTaskWithStage(
-            "cache-warmup",
-            async ct =>
+            })
+            .AddTaskSignal("cache-warmup", async ct =>
             {
                 Console.WriteLine("   🔥 Warming up caches...");
                 await Task.Delay(800, ct);
                 Console.WriteLine("   ✅ Caches warmed");
-            },
-            stage: 4);
-
-        builder.Services.AddIgnitionFromTaskWithStage(
-            "background-services",
-            async ct =>
+            })
+            .AddTaskSignal("background-services", async ct =>
             {
                 Console.WriteLine("   ⚙️  Starting background services...");
                 await Task.Delay(300, ct);
                 Console.WriteLine("   ✅ Background services started");
-            },
-            stage: 4);
+            }));
 
         var app = builder.Build();
 
