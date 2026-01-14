@@ -14,7 +14,7 @@ public class RedisReadinessSignalTests
         var logger = Substitute.For<ILogger<RedisReadinessSignal>>();
 
         // act & assert
-        Assert.Throws<ArgumentNullException>(() => new RedisReadinessSignal(null!, options, logger));
+        Assert.Throws<ArgumentNullException>(() => new RedisReadinessSignal((IConnectionMultiplexer)null!, options, logger));
     }
 
     [Fact]

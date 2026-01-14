@@ -131,7 +131,7 @@ public sealed class RedisReadinessSignal : IIgnitionSignal
         _logger.LogDebug("Executing Redis PING command");
 
         var db = multiplexer.GetDatabase();
-        var pingResult = await db.PingAsync();
+        var pingResult = await db.PingAsync().ConfigureAwait(false);
 
         _logger.LogDebug("Redis PING completed in {Duration}ms", pingResult.TotalMilliseconds);
     }
@@ -148,14 +148,14 @@ public sealed class RedisReadinessSignal : IIgnitionSignal
         try
         {
             // Set with 60-second TTL
-            var setResult = await db.StringSetAsync(testKey, testValue, TimeSpan.FromSeconds(60));
+            var setResult = await db.StringSetAsync(testKey, testValue, TimeSpan.FromSeconds(60)).ConfigureAwait(false);
             if (!setResult)
             {
                 throw new InvalidOperationException("Failed to set test key in Redis");
             }
 
             // Get and verify
-            var getValue = await db.StringGetAsync(testKey);
+            var getValue = await db.StringGetAsync(testKey).ConfigureAwait(false);
             if (getValue.IsNullOrEmpty || getValue != testValue)
             {
                 throw new InvalidOperationException("Test key value mismatch in Redis");
@@ -166,7 +166,7 @@ public sealed class RedisReadinessSignal : IIgnitionSignal
         finally
         {
             // Clean up test key
-            await db.KeyDeleteAsync(testKey);
+            await db.KeyDeleteAsync(testKey).ConfigureAwait(false);
         }
     }
 }

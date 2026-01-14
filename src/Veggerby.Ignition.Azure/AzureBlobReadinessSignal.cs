@@ -81,7 +81,7 @@ public sealed class AzureBlobReadinessSignal : IIgnitionSignal
         {
             // Verify service connectivity by getting account info
             _logger.LogDebug("Verifying Azure Blob Storage service connection");
-            await _blobServiceClient.GetAccountInfoAsync(cancellationToken);
+            await _blobServiceClient.GetAccountInfoAsync(cancellationToken).ConfigureAwait(false);
 
             if (_options.VerifyContainerExists && !string.IsNullOrWhiteSpace(_options.ContainerName))
             {
@@ -103,14 +103,14 @@ public sealed class AzureBlobReadinessSignal : IIgnitionSignal
 
         _logger.LogDebug("Verifying Azure Blob container existence: {ContainerName}", _options.ContainerName);
 
-        var exists = await containerClient.ExistsAsync(cancellationToken);
+        var exists = await containerClient.ExistsAsync(cancellationToken).ConfigureAwait(false);
 
         if (!exists.Value)
         {
             if (_options.CreateIfNotExists)
             {
                 _logger.LogInformation("Creating Azure Blob container: {ContainerName}", _options.ContainerName);
-                await containerClient.CreateAsync(cancellationToken: cancellationToken);
+                await containerClient.CreateAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
             }
             else
             {

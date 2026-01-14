@@ -125,20 +125,31 @@ public sealed class SqlServerReadinessSignal : IIgnitionSignal
         var delay = TimeSpan.FromMilliseconds(100);
         const int maxDelay = 5000;
         const double multiplier = 1.5;
+        const int maxRetries = 3;
+        var retryCount = 0;
+        Exception? lastException = null;
 
-        while (!cancellationToken.IsCancellationRequested)
+        while (!cancellationToken.IsCancellationRequested && retryCount < maxRetries)
         {
             var connection = _connectionFactory();
             try
             {
-                await connection.OpenAsync(cancellationToken);
+                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
                 return connection;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                await connection.DisposeAsync();
-                
-                _logger.LogDebug(ex, "SQL Server connection attempt failed, retrying after {Delay}ms", delay.TotalMilliseconds);
+                await connection.DisposeAsync().ConfigureAwait(false);
+                lastException = ex;
+                retryCount++;
+
+                if (retryCount >= maxRetries)
+                {
+                    _logger.LogError(ex, "SQL Server connection failed after {MaxRetries} attempts", maxRetries);
+                    throw;
+                }
+
+                _logger.LogDebug(ex, "SQL Server connection attempt {Retry}/{MaxRetries} failed, retrying after {Delay}ms", retryCount, maxRetries, delay.TotalMilliseconds);
                 
                 await Task.Delay(delay, cancellationToken);
                 
@@ -147,7 +158,12 @@ public sealed class SqlServerReadinessSignal : IIgnitionSignal
             }
         }
 
-        throw new OperationCanceledException("Connection attempt cancelled", cancellationToken);
+        if (cancellationToken.IsCancellationRequested)
+        {
+            throw new OperationCanceledException("Connection attempt cancelled", cancellationToken);
+        }
+
+        throw lastException ?? new InvalidOperationException("Connection attempt failed");
     }
 
     private async Task ExecuteValidationQueryAsync(SqlConnection connection, CancellationToken cancellationToken)
@@ -155,7 +171,7 @@ public sealed class SqlServerReadinessSignal : IIgnitionSignal
         _logger.LogDebug("Executing validation query: {Query}", _options.ValidationQuery);
 
         using var command = new SqlCommand(_options.ValidationQuery, connection);
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
 
         _logger.LogDebug("Validation query executed successfully");
     }

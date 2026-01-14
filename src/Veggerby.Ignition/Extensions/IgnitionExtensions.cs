@@ -48,14 +48,7 @@ public static class IgnitionExtensions
             services.Configure(configure);
         }
 
-        services.TryAddSingleton<IIgnitionCoordinator>(sp =>
-        {
-            var signals = sp.GetServices<IIgnitionSignal>();
-            var graph = sp.GetService<IIgnitionGraph>();
-            var options = sp.GetRequiredService<IOptions<IgnitionOptions>>();
-            var logger = sp.GetRequiredService<ILogger<IgnitionCoordinator>>();
-            return new IgnitionCoordinator(signals, graph, options, logger);
-        });
+        services.TryAddSingleton<IIgnitionCoordinator, IgnitionCoordinator>();
 
         if (addHealthCheck)
         {
@@ -220,7 +213,11 @@ public static class IgnitionExtensions
         this IServiceCollection services,
         IIgnitionSignal signal)
     {
-        services.AddSingleton(signal);
+        ArgumentNullException.ThrowIfNull(signal);
+        
+        // Wrap signal in a factory for consistent handling
+        var factory = new DelegateIgnitionSignalFactory(signal.Name, _ => signal, signal.Timeout);
+        services.AddSingleton<IIgnitionSignalFactory>(factory);
         return services;
     }
 
@@ -233,7 +230,12 @@ public static class IgnitionExtensions
     public static IServiceCollection AddIgnitionSignal<TSignal>(
         this IServiceCollection services) where TSignal : class, IIgnitionSignal
     {
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IIgnitionSignal, TSignal>());
+        // Register as factory instead of direct signal
+        services.AddSingleton<IIgnitionSignalFactory>(sp =>
+        {
+            var signal = ActivatorUtilities.CreateInstance<TSignal>(sp);
+            return new DelegateIgnitionSignalFactory(signal.Name, _ => signal, signal.Timeout);
+        });
         return services;
     }
 
@@ -247,9 +249,11 @@ public static class IgnitionExtensions
         this IServiceCollection services,
         IEnumerable<IIgnitionSignal> signals)
     {
+        ArgumentNullException.ThrowIfNull(signals);
+        
         foreach (var s in signals)
         {
-            services.AddSingleton(s);
+            AddIgnitionSignal(services, s);
         }
 
         return services;
@@ -336,10 +340,14 @@ public static class IgnitionExtensions
             ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
         }
 
-        services.AddSingleton<IIgnitionSignal>(sp => new ServiceReadySignal<TService>(
-            sp,
-            name ?? typeof(TService).Name,
-            (svc, _) => taskSelector(svc),
+        var signalName = name ?? typeof(TService).Name;
+        services.AddSingleton<IIgnitionSignalFactory>(sp => new DelegateIgnitionSignalFactory(
+            signalName,
+            sp2 => new ServiceReadySignal<TService>(
+                sp2,
+                signalName,
+                (svc, _) => taskSelector(svc),
+                timeout),
             timeout));
 
         return services;
@@ -373,11 +381,17 @@ public static class IgnitionExtensions
             ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
         }
 
-        services.AddSingleton<IIgnitionSignal>(sp => new ServiceReadySignal<TService>(
-            sp,
-            name ?? typeof(TService).Name,
-            (svc, ct) => taskSelector(svc, ct),
-            timeout));
+        var signalName = name ?? typeof(TService).Name;
+        var factory = new DelegateIgnitionSignalFactory(
+            signalName,
+            sp => new ServiceReadySignal<TService>(
+                sp,
+                signalName,
+                (svc, ct) => taskSelector(svc, ct),
+                timeout),
+            timeout);
+
+        services.AddSingleton<IIgnitionSignalFactory>(factory);
 
         return services;
     }
@@ -398,7 +412,12 @@ public static class IgnitionExtensions
         ArgumentNullException.ThrowIfNull(taskFactory, nameof(taskFactory));
         ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
 
-        services.AddSingleton<IIgnitionSignal>(sp => new ServiceCompositeReadySignal(sp, name, taskFactory, timeout));
+        var factory = new DelegateIgnitionSignalFactory(
+            name,
+            sp => new ServiceCompositeReadySignal(sp, name, taskFactory, timeout),
+            timeout);
+
+        services.AddSingleton<IIgnitionSignalFactory>(factory);
 
         return services;
     }
@@ -439,11 +458,17 @@ public static class IgnitionExtensions
             ArgumentException.ThrowIfNullOrWhiteSpace(groupName, nameof(groupName));
         }
 
-        services.AddSingleton<IIgnitionSignal>(sp => new ServiceEnumerableReadySignal<TService>(
-            sp,
-            groupName ?? $"{typeof(TService).Name}[*]",
-            (svc, _) => taskSelector(svc),
-            timeout));
+        var signalName = groupName ?? $"{typeof(TService).Name}[*]";
+        var factory = new DelegateIgnitionSignalFactory(
+            signalName,
+            sp => new ServiceEnumerableReadySignal<TService>(
+                sp,
+                signalName,
+                (svc, _) => taskSelector(svc),
+                timeout),
+            timeout);
+
+        services.AddSingleton<IIgnitionSignalFactory>(factory);
 
         return services;
     }
@@ -473,11 +498,17 @@ public static class IgnitionExtensions
             ArgumentException.ThrowIfNullOrWhiteSpace(groupName, nameof(groupName));
         }
 
-        services.AddSingleton<IIgnitionSignal>(sp => new ServiceEnumerableReadySignal<TService>(
-            sp,
-            groupName ?? $"{typeof(TService).Name}[*]",
-            (svc, ct) => taskSelector(svc, ct),
-            timeout));
+        var signalName = groupName ?? $"{typeof(TService).Name}[*]";
+        var factory = new DelegateIgnitionSignalFactory(
+            signalName,
+            sp => new ServiceEnumerableReadySignal<TService>(
+                sp,
+                signalName,
+                (svc, ct) => taskSelector(svc, ct),
+                timeout),
+            timeout);
+
+        services.AddSingleton<IIgnitionSignalFactory>(factory);
 
         return services;
     }
@@ -512,11 +543,17 @@ public static class IgnitionExtensions
             ArgumentException.ThrowIfNullOrWhiteSpace(groupName, nameof(groupName));
         }
 
-        services.AddSingleton<IIgnitionSignal>(sp => new ScopedServiceEnumerableReadySignal<TService>(
-            sp.GetRequiredService<IServiceScopeFactory>(),
-            groupName ?? $"{typeof(TService).Name}[*]",
-            (svc, _) => taskSelector(svc),
-            timeout));
+        var signalName = groupName ?? $"{typeof(TService).Name}[*]";
+        var factory = new DelegateIgnitionSignalFactory(
+            signalName,
+            sp => new ScopedServiceEnumerableReadySignal<TService>(
+                sp.GetRequiredService<IServiceScopeFactory>(),
+                signalName,
+                (svc, _) => taskSelector(svc),
+                timeout),
+            timeout);
+
+        services.AddSingleton<IIgnitionSignalFactory>(factory);
 
         return services;
     }
@@ -546,11 +583,17 @@ public static class IgnitionExtensions
             ArgumentException.ThrowIfNullOrWhiteSpace(groupName, nameof(groupName));
         }
 
-        services.AddSingleton<IIgnitionSignal>(sp => new ScopedServiceEnumerableReadySignal<TService>(
-            sp.GetRequiredService<IServiceScopeFactory>(),
-            groupName ?? $"{typeof(TService).Name}[*]",
-            (svc, ct) => taskSelector(svc, ct),
-            timeout));
+        var signalName = groupName ?? $"{typeof(TService).Name}[*]";
+        var factory = new DelegateIgnitionSignalFactory(
+            signalName,
+            sp => new ScopedServiceEnumerableReadySignal<TService>(
+                sp.GetRequiredService<IServiceScopeFactory>(),
+                signalName,
+                (svc, ct) => taskSelector(svc, ct),
+                timeout),
+            timeout);
+
+        services.AddSingleton<IIgnitionSignalFactory>(factory);
 
         return services;
     }
@@ -916,7 +959,12 @@ public static class IgnitionExtensions
         ArgumentNullException.ThrowIfNull(scope);
 
         var scopedSignal = new ScopedSignalWrapper(signal, scope, cancelScopeOnFailure);
-        services.AddSingleton<IIgnitionSignal>(scopedSignal);
+        var factory = new DelegateIgnitionSignalFactory(
+            signal.Name,
+            _ => scopedSignal,
+            signal.Timeout);
+
+        services.AddSingleton<IIgnitionSignalFactory>(factory);
         return services;
     }
 
@@ -944,7 +992,12 @@ public static class IgnitionExtensions
 
         var signal = IgnitionSignal.FromTaskFactory(name, taskFactory, timeout);
         var scopedSignal = new ScopedSignalWrapper(signal, scope, cancelScopeOnFailure);
-        services.AddSingleton<IIgnitionSignal>(scopedSignal);
+        var factory = new DelegateIgnitionSignalFactory(
+            name,
+            _ => scopedSignal,
+            timeout);
+
+        services.AddSingleton<IIgnitionSignalFactory>(factory);
         return services;
     }
 
@@ -996,13 +1049,11 @@ public static class IgnitionExtensions
     {
         ArgumentNullException.ThrowIfNull(signal);
 
-        if (stage < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(stage), "Stage number cannot be negative.");
-        }
-
-        var stagedSignal = signal is IStagedIgnitionSignal ? signal : new StagedSignalWrapper(signal, stage);
-        services.AddSingleton<IIgnitionSignal>(stagedSignal);
+        // Wrap the signal in a factory
+        var innerFactory = new DelegateIgnitionSignalFactory(signal.Name, _ => signal, signal.Timeout);
+        var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, stage);
+        
+        services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
         return services;
     }
 
@@ -1025,14 +1076,13 @@ public static class IgnitionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(taskFactory);
 
-        if (stage < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(stage), "Stage number cannot be negative.");
-        }
-
-        var signal = IgnitionSignal.FromTaskFactory(name, taskFactory, timeout);
-        var stagedSignal = new StagedSignalWrapper(signal, stage);
-        services.AddSingleton<IIgnitionSignal>(stagedSignal);
+        var innerFactory = new DelegateIgnitionSignalFactory(
+            name,
+            _ => IgnitionSignal.FromTaskFactory(name, taskFactory, timeout),
+            timeout);
+        var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, stage);
+        
+        services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
         return services;
     }
 
@@ -1055,36 +1105,56 @@ public static class IgnitionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(readyTask);
 
-        if (stage < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(stage), "Stage number cannot be negative.");
-        }
-
-        var signal = IgnitionSignal.FromTask(name, readyTask, timeout);
-        var stagedSignal = new StagedSignalWrapper(signal, stage);
-        services.AddSingleton<IIgnitionSignal>(stagedSignal);
+        var innerFactory = new DelegateIgnitionSignalFactory(
+            name,
+            _ => IgnitionSignal.FromTask(name, readyTask, timeout),
+            timeout);
+        var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, stage);
+        
+        services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
         return services;
     }
 
     /// <summary>
-    /// Wrapper that adds stage/phase support to an existing signal.
+    /// Registers an ignition signal created from a factory delegate with a specific stage/phase number for staged execution.
     /// </summary>
-    private sealed class StagedSignalWrapper : IStagedIgnitionSignal
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="name">Name for the signal.</param>
+    /// <param name="signalFactory">Factory that creates the signal using the service provider. Invoked lazily when the signal is first accessed.</param>
+    /// <param name="stage">The stage/phase number (0 = infrastructure, 1 = services, 2 = workers, etc.).</param>
+    /// <param name="timeout">Optional per-signal timeout.</param>
+    /// <returns>The same service collection for chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// This method enables proper dependency injection for signals in staged execution by deferring signal
+    /// instantiation until the signal is actually needed (when its stage is reached).
+    /// </para>
+    /// <para>
+    /// This is particularly useful in scenarios where earlier stages produce resources (e.g., connection strings
+    /// from Testcontainers) that later stages need to consume. The factory receives the fully built service provider,
+    /// allowing it to resolve all dependencies including those registered or modified by earlier stages.
+    /// </para>
+    /// <para>
+    /// Example: Stage 0 starts containers and makes connection strings available, Stage 1 uses those connection
+    /// strings to create database readiness signals.
+    /// </para>
+    /// </remarks>
+    public static IServiceCollection AddIgnitionSignalFromFactoryWithStage(
+        this IServiceCollection services,
+        string name,
+        Func<IServiceProvider, IIgnitionSignal> signalFactory,
+        int stage,
+        TimeSpan? timeout = null)
     {
-        private readonly IIgnitionSignal _inner;
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(signalFactory);
 
-        public StagedSignalWrapper(IIgnitionSignal inner, int stage)
-        {
-            _inner = inner;
-            Stage = stage;
-        }
+        var innerFactory = new DelegateIgnitionSignalFactory(name, signalFactory, timeout);
+        var stagedFactory = new StagedIgnitionSignalFactory(innerFactory, stage);
+        
+        services.AddSingleton<IIgnitionSignalFactory>(stagedFactory);
 
-        public string Name => _inner.Name;
-        public TimeSpan? Timeout => _inner.Timeout;
-        public int Stage { get; }
-
-        public Task WaitAsync(CancellationToken cancellationToken = default)
-            => _inner.WaitAsync(cancellationToken);
+        return services;
     }
 
     /// <summary>

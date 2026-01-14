@@ -86,7 +86,7 @@ public sealed class HttpReadinessSignal : IIgnitionSignal
                 }
             }
 
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
 
             var statusCode = (int)response.StatusCode;
             activity?.SetTag("http.status_code", statusCode);

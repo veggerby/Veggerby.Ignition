@@ -16,7 +16,6 @@ public class SqlServerIntegrationTests : IAsyncLifetime
     {
         _sqlServerContainer = new MsSqlBuilder()
             .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
-            .WithWaitStrategy(Wait.ForUnixContainer())
             .Build();
 
         await _sqlServerContainer.StartAsync();

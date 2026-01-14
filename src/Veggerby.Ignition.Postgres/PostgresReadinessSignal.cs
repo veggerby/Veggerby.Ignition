@@ -169,7 +169,7 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
             // Dispose data source if we own it (created from connection string)
             if (_ownsDataSource && _dataSource != null)
             {
-                await _dataSource.DisposeAsync();
+                await _dataSource.DisposeAsync().ConfigureAwait(false);
             }
         }
     }
@@ -179,35 +179,54 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
         const int initialDelayMs = 100;
         const double multiplier = 1.5;
         const int maxDelayMs = 5000;
+        const int maxRetries = 3;
 
         var delay = initialDelayMs;
+        var retryCount = 0;
+        Exception? lastException = null;
 
-        while (true)
+        while (!cancellationToken.IsCancellationRequested && retryCount < maxRetries)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
             NpgsqlConnection? connection = null;
             try
             {
-                connection = await dataSource.OpenConnectionAsync(cancellationToken);
+                connection = await dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
                 return connection;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 if (connection != null)
                 {
-                    await connection.DisposeAsync();
+                    await connection.DisposeAsync().ConfigureAwait(false);
+                }
+
+                lastException = ex;
+                retryCount++;
+
+                if (retryCount >= maxRetries)
+                {
+                    _logger.LogError(ex, "PostgreSQL connection failed after {MaxRetries} attempts", maxRetries);
+                    throw;
                 }
 
                 _logger.LogDebug(
                     ex,
-                    "PostgreSQL connection attempt failed, retrying in {DelayMs}ms",
+                    "PostgreSQL connection attempt {Retry}/{MaxRetries} failed, retrying in {DelayMs}ms",
+                    retryCount,
+                    maxRetries,
                     delay);
 
                 await Task.Delay(delay, cancellationToken);
                 delay = Math.Min((int)(delay * multiplier), maxDelayMs);
             }
         }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            throw new OperationCanceledException("Connection attempt cancelled", cancellationToken);
+        }
+
+        throw lastException ?? new InvalidOperationException("Connection attempt failed");
     }
 
     private async Task ExecuteValidationQueryAsync(NpgsqlConnection connection, CancellationToken cancellationToken)
@@ -215,7 +234,7 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
         _logger.LogDebug("Executing validation query: {Query}", _options.ValidationQuery);
 
         using var command = new NpgsqlCommand(_options.ValidationQuery, connection);
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
 
         _logger.LogDebug("Validation query executed successfully");
     }

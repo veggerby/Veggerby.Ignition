@@ -86,7 +86,7 @@ public sealed class S3ReadinessSignal : IIgnitionSignal
             else
             {
                 _logger.LogDebug("Verifying AWS S3 service connection");
-                await _s3Client.ListBucketsAsync(cancellationToken);
+                await _s3Client.ListBucketsAsync(cancellationToken).ConfigureAwait(false);
             }
 
             _logger.LogInformation("AWS S3 readiness check completed successfully");

@@ -115,7 +115,7 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
             connection = await CreateConnectionWithRetryAsync(connectionFactory, cancellationToken);
             _logger.LogDebug("RabbitMQ connection established");
 
-            channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
+            channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
             _logger.LogDebug("RabbitMQ channel created");
 
             await VerifyTopologyAsync(channel, cancellationToken);
@@ -136,14 +136,14 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
         {
             if (channel is not null)
             {
-                await channel.CloseAsync(CancellationToken.None);
-                await channel.DisposeAsync();
+                await channel.CloseAsync(CancellationToken.None).ConfigureAwait(false);
+                await channel.DisposeAsync().ConfigureAwait(false);
             }
 
             if (connection is not null)
             {
-                await connection.CloseAsync(CancellationToken.None);
-                await connection.DisposeAsync();
+                await connection.CloseAsync(CancellationToken.None).ConfigureAwait(false);
+                await connection.DisposeAsync().ConfigureAwait(false);
             }
         }
     }
@@ -158,7 +158,7 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
             {
                 try
                 {
-                    await channel.QueueDeclarePassiveAsync(queueName, cancellationToken);
+                    await channel.QueueDeclarePassiveAsync(queueName, cancellationToken).ConfigureAwait(false);
                     _logger.LogDebug("Queue '{QueueName}' verified", queueName);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -182,7 +182,7 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
             {
                 try
                 {
-                    await channel.ExchangeDeclarePassiveAsync(exchangeName, cancellationToken);
+                    await channel.ExchangeDeclarePassiveAsync(exchangeName, cancellationToken).ConfigureAwait(false);
                     _logger.LogDebug("Exchange '{ExchangeName}' verified", exchangeName);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -262,16 +262,28 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
         var delay = TimeSpan.FromMilliseconds(100);
         const int maxDelay = 5000;
         const double multiplier = 1.5;
+        const int maxRetries = 3;
+        var retryCount = 0;
+        Exception? lastException = null;
 
-        while (!cancellationToken.IsCancellationRequested)
+        while (!cancellationToken.IsCancellationRequested && retryCount < maxRetries)
         {
             try
             {
-                return await connectionFactory.CreateConnectionAsync(cancellationToken);
+                return await connectionFactory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogDebug(ex, "RabbitMQ connection attempt failed, retrying after {Delay}ms", delay.TotalMilliseconds);
+                lastException = ex;
+                retryCount++;
+
+                if (retryCount >= maxRetries)
+                {
+                    _logger.LogError(ex, "RabbitMQ connection failed after {MaxRetries} attempts", maxRetries);
+                    throw;
+                }
+
+                _logger.LogDebug(ex, "RabbitMQ connection attempt {Retry}/{MaxRetries} failed, retrying after {Delay}ms", retryCount, maxRetries, delay.TotalMilliseconds);
                 
                 await Task.Delay(delay, cancellationToken);
                 
@@ -280,6 +292,11 @@ public sealed class RabbitMqReadinessSignal : IIgnitionSignal
             }
         }
 
-        throw new OperationCanceledException("Connection attempt cancelled", cancellationToken);
+        if (cancellationToken.IsCancellationRequested)
+        {
+            throw new OperationCanceledException("Connection attempt cancelled", cancellationToken);
+        }
+
+        throw lastException ?? new InvalidOperationException("Connection attempt failed");
     }
 }

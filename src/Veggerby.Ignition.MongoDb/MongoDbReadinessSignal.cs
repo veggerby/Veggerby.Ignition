@@ -139,7 +139,7 @@ public sealed class MongoDbReadinessSignal : IIgnitionSignal
             new ListCollectionNamesOptions { Filter = filter },
             cancellationToken);
 
-        var collectionExists = await collections.AnyAsync(cancellationToken);
+        var collectionExists = await collections.AnyAsync(cancellationToken).ConfigureAwait(false);
 
         if (!collectionExists)
         {

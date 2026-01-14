@@ -118,7 +118,7 @@ public sealed class MemcachedReadinessSignal : IIgnitionSignal
         try
         {
             // Set with 60-second expiration
-            var setResult = await _memcachedClient.SetAsync(testKey, testValue, 60);
+            var setResult = await _memcachedClient.SetAsync(testKey, testValue, 60).ConfigureAwait(false);
             if (!setResult)
             {
                 throw new InvalidOperationException("Failed to set test key in Memcached");
@@ -136,7 +136,7 @@ public sealed class MemcachedReadinessSignal : IIgnitionSignal
         finally
         {
             // Clean up test key
-            await _memcachedClient.RemoveAsync(testKey);
+            await _memcachedClient.RemoveAsync(testKey).ConfigureAwait(false);
         }
     }
 }
