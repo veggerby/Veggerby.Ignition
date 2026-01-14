@@ -231,12 +231,12 @@ public class IgnitionCoordinatorTests
         // arrange
         var counting = new CountingSignal("svc");
         var services = new ServiceCollection();
+        services.AddSingleton<ILogger<IgnitionCoordinator>>(_ => Substitute.For<ILogger<IgnitionCoordinator>>());
         services.AddIgnition();
         services.AddSingleton(counting); // service we will adapt
         services.AddIgnitionFor<CountingSignal>(svc => svc.WaitAsync(), name: "counting");
         var provider = services.BuildServiceProvider();
-        var signals = provider.GetServices<IIgnitionSignal>();
-        var coord = CreateCoordinator(signals);
+        var coord = provider.GetRequiredService<IIgnitionCoordinator>();
 
         counting.Complete();
 
@@ -257,12 +257,13 @@ public class IgnitionCoordinatorTests
         var svc1 = new CountingSignal("svc1");
         var svc2 = new CountingSignal("svc2");
         var services = new ServiceCollection();
+        services.AddSingleton<ILogger<IgnitionCoordinator>>(_ => Substitute.For<ILogger<IgnitionCoordinator>>());
         services.AddIgnition();
         services.AddSingleton(svc1);
         services.AddSingleton(svc2);
         services.AddIgnitionForAll<CountingSignal>(svc => svc.WaitAsync(), groupName: "counting[*]");
         var provider = services.BuildServiceProvider();
-        var coord = CreateCoordinator(provider.GetServices<IIgnitionSignal>());
+        var coord = provider.GetRequiredService<IIgnitionCoordinator>();
         svc1.Complete();
         svc2.Complete();
 
@@ -281,10 +282,11 @@ public class IgnitionCoordinatorTests
     {
         // arrange
         var services = new ServiceCollection();
+        services.AddSingleton<ILogger<IgnitionCoordinator>>(_ => Substitute.For<ILogger<IgnitionCoordinator>>());
         services.AddIgnition();
         services.AddIgnitionForAll<CountingSignal>(svc => svc.WaitAsync(), groupName: "none[*]");
         var provider = services.BuildServiceProvider();
-        var coord = CreateCoordinator(provider.GetServices<IIgnitionSignal>());
+        var coord = provider.GetRequiredService<IIgnitionCoordinator>();
 
         // act
         await coord.WaitAllAsync();
@@ -301,14 +303,13 @@ public class IgnitionCoordinatorTests
         var svc1 = new CountingSignal("svc1");
         var svc2 = new CountingSignal("svc2");
         var services = new ServiceCollection();
+        services.AddSingleton<ILogger<IgnitionCoordinator>>(_ => Substitute.For<ILogger<IgnitionCoordinator>>());
         services.AddIgnition();
         services.AddScoped(_ => svc1);
         services.AddScoped(_ => svc2);
         services.AddIgnitionForAllScoped<CountingSignal>(svc => svc.WaitAsync(), groupName: "scoped[*]");
         var provider = services.BuildServiceProvider();
-        using var scope = provider.CreateScope();
-        var signals = scope.ServiceProvider.GetServices<IIgnitionSignal>();
-        var coord = CreateCoordinator(signals);
+        var coord = provider.GetRequiredService<IIgnitionCoordinator>();
         svc1.Complete();
         svc2.Complete();
 

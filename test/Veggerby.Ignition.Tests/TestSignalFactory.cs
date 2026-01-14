@@ -1,3 +1,5 @@
+using Veggerby.Ignition.Stages;
+
 namespace Veggerby.Ignition.Tests;
 
 /// <summary>
@@ -7,10 +9,13 @@ internal class TestSignalFactory : IIgnitionSignalFactory
 {
     private readonly IIgnitionSignal _signal;
 
-    public TestSignalFactory(IIgnitionSignal signal, int stage = 0)
+    public TestSignalFactory(IIgnitionSignal signal, int? stage = null)
     {
         _signal = signal ?? throw new ArgumentNullException(nameof(signal));
-        Stage = stage;
+        // If stage is explicitly provided, use it
+        // Otherwise, try to extract from IStagedIgnitionSignal
+        // Otherwise, default to null (stage 0)
+        Stage = stage ?? (signal as IStagedIgnitionSignal)?.Stage;
     }
 
     public string Name => _signal.Name;
