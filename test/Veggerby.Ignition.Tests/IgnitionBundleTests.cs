@@ -19,8 +19,9 @@ public class IgnitionBundleTests
 
         // assert
         var sp = services.BuildServiceProvider();
-        var signals = sp.GetServices<IIgnitionSignal>().ToList();
-        signals.Should().HaveCount(3);
+        var factories = sp.GetServices<IIgnitionSignalFactory>().ToList();
+        factories.Should().HaveCount(3);
+        var signals = factories.Select(f => f.CreateSignal(sp)).ToList();
         signals.Should().Contain(s => s.Name == "test-bundle-signal-0");
         signals.Should().Contain(s => s.Name == "test-bundle-signal-1");
         signals.Should().Contain(s => s.Name == "test-bundle-signal-2");
@@ -41,7 +42,8 @@ public class IgnitionBundleTests
 
         // assert
         var sp = services.BuildServiceProvider();
-        var signals = sp.GetServices<IIgnitionSignal>().ToList();
+        var factories = sp.GetServices<IIgnitionSignalFactory>().ToList();
+        var signals = factories.Select(f => f.CreateSignal(sp)).ToList();
         signals.Should().AllSatisfy(s => s.Timeout.Should().Be(TimeSpan.FromSeconds(10)));
     }
 
@@ -56,8 +58,9 @@ public class IgnitionBundleTests
 
         // assert
         var sp = services.BuildServiceProvider();
-        var signals = sp.GetServices<IIgnitionSignal>().ToList();
-        signals.Should().HaveCount(2);
+        var factories = sp.GetServices<IIgnitionSignalFactory>().ToList();
+        factories.Should().HaveCount(2);
+        var signals = factories.Select(f => f.CreateSignal(sp)).ToList();
         signals.Should().Contain(s => s.Name == "default-bundle-signal-0");
         signals.Should().Contain(s => s.Name == "default-bundle-signal-1");
     }
@@ -75,8 +78,9 @@ public class IgnitionBundleTests
 
         // assert
         var sp = services.BuildServiceProvider();
-        var signals = sp.GetServices<IIgnitionSignal>().ToList();
-        signals.Should().HaveCount(5);
+        var factories = sp.GetServices<IIgnitionSignalFactory>().ToList();
+        factories.Should().HaveCount(5);
+        var signals = factories.Select(f => f.CreateSignal(sp)).ToList();
         signals.Should().Contain(s => s.Name == "bundle1-signal-0");
         signals.Should().Contain(s => s.Name == "bundle2-signal-2");
     }
@@ -93,8 +97,9 @@ public class IgnitionBundleTests
 
         // assert
         var sp = services.BuildServiceProvider();
-        var signals = sp.GetServices<IIgnitionSignal>().ToList();
-        signals.Should().HaveCount(1);
+        var factories = sp.GetServices<IIgnitionSignalFactory>().ToList();
+        factories.Should().HaveCount(1);
+        var signals = factories.Select(f => f.CreateSignal(sp)).ToList();
         signals[0].Name.Should().Be("http:https://example.com");
         signals[0].Timeout.Should().Be(TimeSpan.FromSeconds(5));
     }
@@ -112,8 +117,9 @@ public class IgnitionBundleTests
 
         // assert
         var sp = services.BuildServiceProvider();
-        var signals = sp.GetServices<IIgnitionSignal>().ToList();
-        signals.Should().HaveCount(2);
+        var factories = sp.GetServices<IIgnitionSignalFactory>().ToList();
+        factories.Should().HaveCount(2);
+        var signals = factories.Select(f => f.CreateSignal(sp)).ToList();
         signals.Should().Contain(s => s.Name == "http:https://api1.example.com");
         signals.Should().Contain(s => s.Name == "http:https://api2.example.com");
     }
@@ -150,8 +156,9 @@ public class IgnitionBundleTests
 
         // assert
         var sp = services.BuildServiceProvider();
-        var signals = sp.GetServices<IIgnitionSignal>().ToList();
-        signals.Should().HaveCount(3);
+        var factories = sp.GetServices<IIgnitionSignalFactory>().ToList();
+        factories.Should().HaveCount(3);
+        var signals = factories.Select(f => f.CreateSignal(sp)).ToList();
         signals.Should().Contain(s => s.Name == "test-db:connect");
         signals.Should().Contain(s => s.Name == "test-db:validate-schema");
         signals.Should().Contain(s => s.Name == "test-db:warmup");
@@ -174,8 +181,9 @@ public class IgnitionBundleTests
 
         // assert
         var sp = services.BuildServiceProvider();
-        var signals = sp.GetServices<IIgnitionSignal>().ToList();
-        signals.Should().HaveCount(1);
+        var factories = sp.GetServices<IIgnitionSignalFactory>().ToList();
+        factories.Should().HaveCount(1);
+        var signals = factories.Select(f => f.CreateSignal(sp)).ToList();
         signals[0].Name.Should().Be("minimal-db:connect");
     }
 
@@ -194,8 +202,9 @@ public class IgnitionBundleTests
 
         // assert
         var sp = services.BuildServiceProvider();
-        var signals = sp.GetServices<IIgnitionSignal>().ToList();
-        signals.Should().HaveCount(2);
+        var factories = sp.GetServices<IIgnitionSignalFactory>().ToList();
+        factories.Should().HaveCount(2);
+        var signals = factories.Select(f => f.CreateSignal(sp)).ToList();
         signals.Should().Contain(s => s.Name == "partial-db:connect");
         signals.Should().Contain(s => s.Name == "partial-db:warmup");
     }
@@ -281,9 +290,10 @@ public class IgnitionBundleTests
 
         // act
         var sp = services.BuildServiceProvider();
-        var signals = sp.GetServices<IIgnitionSignal>().ToList();
+        var factories = sp.GetServices<IIgnitionSignalFactory>().ToList();
 
         // assert
+        var signals = factories.Select(f => f.CreateSignal(sp)).ToList();
         signals.Should().AllSatisfy(s => s.Timeout.Should().Be(TimeSpan.FromSeconds(15)));
     }
 

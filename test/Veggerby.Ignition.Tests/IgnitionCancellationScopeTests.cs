@@ -349,10 +349,12 @@ public class IgnitionCancellationScopeTests
 
         // assert
         var sp = services.BuildServiceProvider();
-        var signals = sp.GetServices<IIgnitionSignal>();
-        signals.Should().Contain(s => s.Name == "test-signal");
+        var factories = sp.GetServices<IIgnitionSignalFactory>().ToList();
+        factories.Should().HaveCount(1);
+        factories.First().Name.Should().Be("test-signal");
 
-        var scopedSignal = signals.First() as IScopedIgnitionSignal;
+        var signal = factories.First().CreateSignal(sp);
+        var scopedSignal = signal as IScopedIgnitionSignal;
         scopedSignal.Should().NotBeNull();
         scopedSignal!.CancellationScope.Should().BeSameAs(scope);
         scopedSignal.CancelScopeOnFailure.Should().BeTrue();
@@ -375,10 +377,12 @@ public class IgnitionCancellationScopeTests
 
         // assert
         var sp = services.BuildServiceProvider();
-        var signals = sp.GetServices<IIgnitionSignal>();
-        signals.Should().Contain(s => s.Name == "task-signal");
+        var factories = sp.GetServices<IIgnitionSignalFactory>().ToList();
+        factories.Should().HaveCount(1);
+        factories.First().Name.Should().Be("task-signal");
 
-        var scopedSignal = signals.First() as IScopedIgnitionSignal;
+        var signal = factories.First().CreateSignal(sp);
+        var scopedSignal = signal as IScopedIgnitionSignal;
         scopedSignal.Should().NotBeNull();
         scopedSignal!.CancellationScope.Should().BeSameAs(scope);
         scopedSignal.CancelScopeOnFailure.Should().BeTrue();
