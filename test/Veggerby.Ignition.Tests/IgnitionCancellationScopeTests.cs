@@ -353,8 +353,8 @@ public class IgnitionCancellationScopeTests
         factories.Should().HaveCount(1);
         factories.First().Name.Should().Be("test-signal");
 
-        var signal = factories.First().CreateSignal(sp);
-        var scopedSignal = signal as IScopedIgnitionSignal;
+        var createdSignal = factories.First().CreateSignal(sp);
+        var scopedSignal = createdSignal as IScopedIgnitionSignal;
         scopedSignal.Should().NotBeNull();
         scopedSignal!.CancellationScope.Should().BeSameAs(scope);
         scopedSignal.CancelScopeOnFailure.Should().BeTrue();
@@ -381,8 +381,8 @@ public class IgnitionCancellationScopeTests
         factories.Should().HaveCount(1);
         factories.First().Name.Should().Be("task-signal");
 
-        var signal = factories.First().CreateSignal(sp);
-        var scopedSignal = signal as IScopedIgnitionSignal;
+        var createdSignal = factories.First().CreateSignal(sp);
+        var scopedSignal = createdSignal as IScopedIgnitionSignal;
         scopedSignal.Should().NotBeNull();
         scopedSignal!.CancellationScope.Should().BeSameAs(scope);
         scopedSignal.CancelScopeOnFailure.Should().BeTrue();
