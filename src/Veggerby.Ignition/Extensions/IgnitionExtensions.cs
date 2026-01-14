@@ -755,6 +755,69 @@ public static class IgnitionExtensions
     }
 
     /// <summary>
+    /// Registers an <see cref="IIgnitionGraph"/> that automatically includes all registered signal factories
+    /// and optionally applies attribute-based dependencies.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="applyAttributeDependencies">Whether to automatically discover dependencies from <see cref="SignalDependencyAttribute"/>.</param>
+    /// <param name="configure">Optional delegate to configure additional graph dependencies.</param>
+    /// <returns>The same service collection for chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// This method simplifies the common pattern of:
+    /// 1. Resolving all <see cref="IIgnitionSignalFactory"/> instances
+    /// 2. Creating signals from factories
+    /// 3. Adding signals to the graph builder
+    /// 4. Optionally applying attribute-based dependencies
+    /// </para>
+    /// <para>
+    /// The <paramref name="configure"/> delegate receives the graph builder and service provider,
+    /// allowing you to add additional explicit dependencies beyond those discovered from attributes.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// // Simple usage - just auto-discover from attributes
+    /// services.AddIgnitionGraphFromFactories(applyAttributeDependencies: true);
+    /// 
+    /// // With additional manual dependencies
+    /// services.AddIgnitionGraphFromFactories(true, (builder, sp) =>
+    /// {
+    ///     builder.AddDependency("service-a", "service-b");
+    ///     builder.AddDependency("service-b", "database");
+    /// });
+    /// </code>
+    /// </example>
+    public static IServiceCollection AddIgnitionGraphFromFactories(
+        this IServiceCollection services,
+        bool applyAttributeDependencies = true,
+        Action<IgnitionGraphBuilder, IServiceProvider>? configure = null)
+    {
+        services.AddSingleton<IIgnitionGraph>(sp =>
+        {
+            var builder = new IgnitionGraphBuilder();
+            
+            // Automatically resolve factories and create signals
+            var factories = sp.GetServices<IIgnitionSignalFactory>();
+            var signals = factories.Select(f => f.CreateSignal(sp)).ToList();
+            builder.AddSignals(signals);
+
+            // Apply attribute dependencies if requested
+            if (applyAttributeDependencies)
+            {
+                builder.ApplyAttributeDependencies();
+            }
+
+            // Allow additional configuration
+            configure?.Invoke(builder, sp);
+
+            return builder.Build();
+        });
+
+        return services;
+    }
+
+    /// <summary>
     /// Registers an <see cref="IIgnitionGraph"/> built from a configuration delegate.
     /// </summary>
     /// <param name="services">Target DI service collection.</param>
