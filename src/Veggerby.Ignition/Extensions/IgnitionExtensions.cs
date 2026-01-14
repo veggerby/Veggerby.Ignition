@@ -1100,6 +1100,64 @@ public static class IgnitionExtensions
     }
 
     /// <summary>
+    /// Registers a lifecycle hooks implementation by type, allowing DI to construct the hooks instance.
+    /// </summary>
+    /// <typeparam name="TLifecycleHooks">Concrete implementation of <see cref="IIgnitionLifecycleHooks"/>.</typeparam>
+    /// <param name="services">Target DI service collection.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// The lifecycle hooks type must have a constructor compatible with DI resolution.
+    /// The hooks instance is registered as a singleton and automatically configured in <see cref="IgnitionOptions"/>.
+    /// </para>
+    /// <para>
+    /// Use this overload when the lifecycle hooks require dependencies injected via constructor.
+    /// </para>
+    /// </remarks>
+    public static IServiceCollection AddIgnitionLifecycleHooks<TLifecycleHooks>(
+        this IServiceCollection services) where TLifecycleHooks : class, IIgnitionLifecycleHooks
+    {
+        services.AddSingleton<IIgnitionLifecycleHooks, TLifecycleHooks>();
+        services.AddOptions<IgnitionOptions>()
+            .Configure<IIgnitionLifecycleHooks>((options, hooks) => options.LifecycleHooks = hooks);
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers a lifecycle hooks implementation using a factory delegate.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="factory">Factory delegate that produces the lifecycle hooks using the service provider.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="factory"/> is <c>null</c>.</exception>
+    /// <remarks>
+    /// <para>
+    /// Use this overload when the lifecycle hooks require dependencies from the DI container.
+    /// The factory is invoked once when options are first accessed.
+    /// </para>
+    /// <para>
+    /// Lifecycle hooks enable custom logic at key execution points:
+    /// <list type="bullet">
+    ///   <item>Before/after the entire ignition process</item>
+    ///   <item>Before/after each individual signal</item>
+    /// </list>
+    /// </para>
+    /// </remarks>
+    public static IServiceCollection AddIgnitionLifecycleHooks(
+        this IServiceCollection services,
+        Func<IServiceProvider, IIgnitionLifecycleHooks> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory, nameof(factory));
+
+        services.AddSingleton(factory);
+        services.AddOptions<IgnitionOptions>()
+            .Configure<IIgnitionLifecycleHooks>((options, hooks) => options.LifecycleHooks = hooks);
+
+        return services;
+    }
+
+    /// <summary>
     /// Creates a new root cancellation scope and registers it as a singleton in the service collection.
     /// </summary>
     /// <param name="services">Target DI service collection.</param>

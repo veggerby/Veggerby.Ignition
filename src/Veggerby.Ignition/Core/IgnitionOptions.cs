@@ -210,4 +210,26 @@ public sealed class IgnitionOptions
     /// </para>
     /// </remarks>
     public IIgnitionMetrics? Metrics { get; set; }
+
+    /// <summary>
+    /// Optional lifecycle hooks for observing ignition execution stages.
+    /// When <c>null</c>, no hooks are invoked (zero overhead).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Lifecycle hooks enable custom logic at key points during ignition execution:
+    /// <list type="bullet">
+    ///   <item>Before/after the entire ignition process</item>
+    ///   <item>Before/after each individual signal</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// Hooks provide read-only observation and cannot modify ignition behavior or results.
+    /// Exceptions thrown by hooks are caught and logged but do not affect ignition outcome.
+    /// </para>
+    /// <para>
+    /// Common use cases include telemetry enrichment, logging, cleanup, and integration with external systems.
+    /// </para>
+    /// </remarks>
+    public IIgnitionLifecycleHooks? LifecycleHooks { get; set; }
 }
