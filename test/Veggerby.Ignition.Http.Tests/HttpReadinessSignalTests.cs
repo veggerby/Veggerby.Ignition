@@ -255,7 +255,10 @@ public class HttpReadinessSignalTests
     public async Task WaitAsync_ConnectionFailure_ThrowsException()
     {
         // arrange
-        var httpClient = new HttpClient();
+        var httpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(1) // Short timeout to avoid long test execution
+        };
         var options = new HttpReadinessOptions();
         var logger = Substitute.For<ILogger<HttpReadinessSignal>>();
         var signal = new HttpReadinessSignal(httpClient, "http://invalid-host-that-does-not-exist.local", options, logger);

@@ -109,6 +109,7 @@ public class GrpcReadinessSignalTests
     }
 
     [Fact]
+    [Trait("Speed", "Slow")] // Takes ~15s - properly tests gRPC connection failure to invalid host
     public async Task WaitAsync_ConnectionFailure_ThrowsException()
     {
         // arrange
@@ -122,6 +123,7 @@ public class GrpcReadinessSignalTests
     }
 
     [Fact]
+    [Trait("Speed", "Slow")] // Takes ~10s - properly tests gRPC idempotent behavior with real connection failures
     public async Task WaitAsync_Idempotent_ExecutesOnce()
     {
         // arrange - We can't easily test idempotency with real gRPC without a mock server
