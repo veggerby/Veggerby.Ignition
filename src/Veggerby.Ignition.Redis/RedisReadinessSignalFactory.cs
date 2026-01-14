@@ -44,6 +44,7 @@ public sealed class RedisReadinessSignalFactory : IIgnitionSignalFactory
         var configOptions = ConfigurationOptions.Parse(connectionString);
         // Ensure resilient connection: retry until timeout instead of failing immediately
         configOptions.AbortOnConnectFail = false;
+        configOptions.ConnectTimeout = _options.ConnectTimeout;
         var multiplexer = ConnectionMultiplexer.Connect(configOptions);
         var logger = serviceProvider.GetRequiredService<ILogger<RedisReadinessSignal>>();
         

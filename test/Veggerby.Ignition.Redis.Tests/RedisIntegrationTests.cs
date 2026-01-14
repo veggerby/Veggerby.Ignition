@@ -21,7 +21,7 @@ public class RedisIntegrationTests : IAsyncLifetime
 
         await _redisContainer.StartAsync();
 
-        _connectionString = _redisContainer.GetConnectionString() + ",abortConnect=false";
+        _connectionString = _redisContainer.GetConnectionString() + ",abortConnect=false,connectTimeout=10000";
     }
 
     public async Task DisposeAsync()
