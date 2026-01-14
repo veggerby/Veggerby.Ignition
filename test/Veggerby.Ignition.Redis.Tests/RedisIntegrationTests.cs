@@ -172,7 +172,9 @@ public class RedisIntegrationTests : IAsyncLifetime
     public async Task DI_ExistingMultiplexer_CreatesSignal()
     {
         // arrange
-        var connectionMultiplexer = await ConnectionMultiplexer.ConnectAsync(_connectionString!);
+        var configOptions = ConfigurationOptions.Parse(_connectionString!);
+        configOptions.AbortOnConnectFail = false;
+        var connectionMultiplexer = await ConnectionMultiplexer.ConnectAsync(configOptions);
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddIgnition();

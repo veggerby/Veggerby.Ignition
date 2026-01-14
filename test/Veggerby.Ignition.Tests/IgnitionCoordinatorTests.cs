@@ -208,7 +208,7 @@ public class IgnitionCoordinatorTests
     public async Task GlobalTimeout_WithCancellation_MarksTimedOut()
     {
         // arrange
-        var slow = new FakeSignal("slow", async ct => await Task.Delay(80, ct));
+        var slow = new FakeSignal("slow", async ct => await Task.Delay(500, ct));
         var coord = CreateCoordinator(new[] { slow }, o =>
         {
             o.GlobalTimeout = TimeSpan.FromMilliseconds(50);
