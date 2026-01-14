@@ -5,11 +5,39 @@
 ![NuGet](https://img.shields.io/nuget/v/Veggerby.Ignition?label=nuget&style=flat-square)
 ![License](https://img.shields.io/github/license/veggerby/Veggerby.Ignition?style=flat-square)
 
-Veggerby.Ignition is a lightweight, extensible startup readiness ("ignition") coordination library for .NET applications. Register ignition signals representing asynchronous initialization tasks (cache warmers, external connections, background services) and await them collectively with rich diagnostics, configurable policies, timeouts, tracing, and health checks.
+**Coordinate startup readiness for .NET applications with confidence.**
 
-## Simple Mode (Recommended for Most Apps)
+Veggerby.Ignition is a lightweight library for orchestrating complex initialization sequences—database connections, cache warming, external service health checks—with configurable timeouts, execution policies, dependency graphs, and rich observability. Perfect for ASP.NET Core web applications, worker services, and console applications.
 
-For 80-90% of use cases, use the **Simple Mode API** to get production-ready startup coordination in fewer than 10 lines:
+---
+
+## Features
+
+- **Simple Mode API** - Production-ready coordination in under 10 lines with pre-configured profiles
+- **Flexible Execution** - Parallel, Sequential, or Dependency-Aware (DAG) execution modes
+- **Robust Timeout Management** - Global and per-signal timeouts with soft/hard semantics
+- **Configurable Policies** - FailFast, BestEffort, or ContinueOnTimeout failure handling
+- **Dependency Graphs** - Topological sort with cycle detection and automatic parallel execution
+- **Composable Bundles** - Reusable signal packages for common infrastructure patterns
+- **Rich Diagnostics** - Timeline export, recording/replay, slow signal logging
+- **Health Check Integration** - Automatic `ignition-readiness` health check registration
+- **Activity Tracing** - OpenTelemetry-compatible distributed tracing support
+- **State Machine & Events** - Real-time lifecycle monitoring with event hooks
+- **Zero External Dependencies** - Uses only BCL and Microsoft.Extensions.*
+
+---
+
+## Quick Start
+
+### Installation
+
+```bash
+dotnet add package Veggerby.Ignition
+```
+
+### Simple Mode (Recommended)
+
+For most applications, use the Simple Mode API with pre-configured profiles:
 
 ```csharp
 // Web API Application
@@ -21,58 +49,313 @@ builder.Services.AddSimpleIgnition(ignition => ignition
 
 var app = builder.Build();
 await app.Services.GetRequiredService<IIgnitionCoordinator>().WaitAllAsync();
+await app.RunAsync();
 ```
 
-**Pre-configured Profiles:**
+**Available Profiles:**
 
-- **`.UseWebApiProfile()`**: 30s timeout, BestEffort policy, Parallel execution, Tracing enabled
-- **`.UseWorkerProfile()`**: 60s timeout, FailFast policy, Parallel execution, Tracing enabled
-- **`.UseCliProfile()`**: 15s timeout, FailFast policy, Sequential execution, Tracing disabled
+| Profile | Timeout | Policy | Execution | Tracing | Best For |
+|---------|---------|--------|-----------|---------|----------|
+| `.UseWebApiProfile()` | 30s | BestEffort | Parallel | ✓ | ASP.NET Core applications |
+| `.UseWorkerProfile()` | 60s | FailFast | Parallel | ✓ | Background workers |
+| `.UseCliProfile()` | 15s | FailFast | Sequential | ✗ | Console applications |
 
-**Customization:** Override any profile defaults or access advanced features:
+### Creating Custom Signals
+
+Implement the `IIgnitionSignal` interface:
 
 ```csharp
-services.AddSimpleIgnition(ignition => ignition
-    .UseWebApiProfile()
-    .WithGlobalTimeout(TimeSpan.FromSeconds(45))
-    .WithDefaultSignalTimeout(TimeSpan.FromSeconds(15))
-    .WithTracing(false)
-    .AddSignal("my-signal", ...)
-    .ConfigureAdvanced(options =>
+public class DatabaseConnectionSignal : IIgnitionSignal
+{
+    private readonly ILogger<DatabaseConnectionSignal> _logger;
+    
+    public string Name => "database-connection";
+    public TimeSpan? Timeout => TimeSpan.FromSeconds(10);
+    
+    public DatabaseConnectionSignal(ILogger<DatabaseConnectionSignal> logger)
     {
-        options.MaxDegreeOfParallelism = 5;
-        options.CancelOnGlobalTimeout = true;
-    }));
+        _logger = logger;
+    }
+    
+    public async Task WaitAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Establishing database connection...");
+        // Your initialization logic here
+        await Task.Delay(1000, cancellationToken);
+        _logger.LogInformation("Database connection established");
+    }
+}
+
+// Register the signal
+builder.Services.AddIgnitionSignal<DatabaseConnectionSignal>();
 ```
 
-📚 **[Simple Mode Sample](samples/SimpleMode/README.md)** | 🚀 **[Full API Documentation](#quick-start)**
+### Advanced Configuration
 
-## Features
+For full control, use the complete API:
 
-- Simple `IIgnitionSignal` abstraction (name, optional timeout, `WaitAsync`)
-- Coordinated waiting via `IIgnitionCoordinator`
-- Global timeout (soft by default) with per-signal overrides
-- Policies: FailFast, BestEffort, ContinueOnTimeout
-- Health check integration (adds `ignition-readiness` check)
-- Activity tracing (toggle via options)
-- Slow handle logging (top N longest signals)
-- Task and cancellable Task factory adapters (`IgnitionSignal.FromTask`, `FromTaskFactory`)
-- Idempotent execution (signals evaluated once, result cached)
-- Execution modes: Parallel (default), Sequential, **Dependency-Aware (DAG)**, or **Staged (multi-phase)**
-- Optional parallelism limiting via MaxDegreeOfParallelism
-- Cooperative cancellation on global or per-signal timeout
-- **Pluggable timeout strategies** via `IIgnitionTimeoutStrategy` for advanced timeout behavior
-- **Pluggable metrics adapter** via `IIgnitionMetrics` for zero-dependency observability integration
-- **Dependency-aware execution graph (DAG)** with topological sort and cycle detection
-- **Declarative dependency declaration** via `[SignalDependency]` attribute
-- **Automatic parallel execution** of independent branches in dependency graphs
-- **State machine with lifecycle events** for real-time observability (`NotStarted`, `Running`, `Completed`, `Failed`, `TimedOut`)
-- **Event hooks** for signal-level and coordinator-level progress monitoring
-- **Staged execution (multi-phase startup pipeline)** with configurable cross-stage policies
-- **Timeline export** for Gantt-like startup visualization and analysis (`result.ExportTimeline()`)
-- **Recording and replay** for diagnosing startup issues, CI regression detection, and what-if simulations (`result.ExportRecording()`, `IgnitionReplayer`)
+```csharp
+builder.Services.AddIgnition(options =>
+{
+    options.GlobalTimeout = TimeSpan.FromSeconds(30);
+    options.Policy = IgnitionPolicy.BestEffort;
+    options.ExecutionMode = IgnitionExecutionMode.Parallel;
+    options.MaxDegreeOfParallelism = 4;
+    options.EnableTracing = true;
+    options.CancelOnGlobalTimeout = false;
+});
 
-📚 **[Full Documentation](docs/README.md)** | 🚀 **[Getting Started Guide](docs/getting-started.md)** | 📖 **[Features Overview](docs/features.md)**
+// Task-based registration
+builder.Services.AddIgnitionFromTask("warmup", warmupTask, timeout: TimeSpan.FromSeconds(5));
+
+// Service adapter
+builder.Services.AddIgnitionFor<CachePrimer>(c => c.ReadyTask, name: "cache-primer");
+```
+
+---
+
+## Integration Packages
+
+Extend Ignition with ready-made signals for popular infrastructure:
+
+| Package | Purpose | Status |
+|---------|---------|--------|
+| [Veggerby.Ignition.RabbitMq](src/Veggerby.Ignition.RabbitMq) | RabbitMQ broker readiness | ✅ |
+| [Veggerby.Ignition.Redis](src/Veggerby.Ignition.Redis) | Redis cache connectivity | ✅ |
+| [Veggerby.Ignition.Postgres](src/Veggerby.Ignition.Postgres) | PostgreSQL database | ✅ |
+| [Veggerby.Ignition.SqlServer](src/Veggerby.Ignition.SqlServer) | SQL Server database | ✅ |
+| [Veggerby.Ignition.MongoDb](src/Veggerby.Ignition.MongoDb) | MongoDB document store | ✅ |
+| [Veggerby.Ignition.Http](src/Veggerby.Ignition.Http) | HTTP endpoint health checks | ✅ |
+| [Veggerby.Ignition.Grpc](src/Veggerby.Ignition.Grpc) | gRPC service health protocol | ✅ |
+| [Veggerby.Ignition.Azure](src/Veggerby.Ignition.Azure) | Azure Storage (Blob, Queue, Table) | ✅ |
+| [Veggerby.Ignition.Aws](src/Veggerby.Ignition.Aws) | AWS S3 bucket access | ✅ |
+| [Veggerby.Ignition.Orleans](src/Veggerby.Ignition.Orleans) | Microsoft Orleans | ✅ |
+| [Veggerby.Ignition.Memcached](src/Veggerby.Ignition.Memcached) | Memcached distributed cache | ✅ |
+| [Veggerby.Ignition.Marten](src/Veggerby.Ignition.Marten) | Marten document DB | ✅ |
+| [Veggerby.Ignition.MassTransit](src/Veggerby.Ignition.MassTransit) | MassTransit message bus | ✅ |
+
+---
+
+## Key Concepts
+
+### Execution Modes
+
+Choose how signals execute based on your requirements:
+
+**Parallel** (Default) - All signals run concurrently
+
+```csharp
+options.ExecutionMode = IgnitionExecutionMode.Parallel;
+options.MaxDegreeOfParallelism = 4; // Optional concurrency limit
+```
+
+**Sequential** - Signals run one-by-one in registration order
+
+```csharp
+options.ExecutionMode = IgnitionExecutionMode.Sequential;
+```
+
+**DependencyAware** - Signals execute based on dependency graph (DAG)
+
+```csharp
+options.ExecutionMode = IgnitionExecutionMode.DependencyAware;
+
+// Build dependency graph
+var graph = new IgnitionGraphBuilder()
+    .AddSignal(dbSignal)
+    .AddSignal(cacheSignal).DependsOn(dbSignal)
+    .AddSignal(apiSignal).DependsOn(cacheSignal)
+    .Build();
+
+services.AddIgnitionGraph(graph);
+```
+
+**Staged** - Multi-phase startup pipeline
+
+```csharp
+options.ExecutionMode = IgnitionExecutionMode.Staged;
+
+services.AddIgnitionSignal(dbSignal, stage: 0);    // Infrastructure
+services.AddIgnitionSignal(cacheSignal, stage: 1); // Services
+services.AddIgnitionSignal(workerSignal, stage: 2); // Workers
+```
+
+### Policies
+
+Control failure handling behavior:
+
+| Policy | Behavior | Use Case |
+|--------|----------|----------|
+| **FailFast** | Throws on first failure | Critical startup where any failure should abort |
+| **BestEffort** | Logs failures but continues | Resilient startup with optional components |
+| **ContinueOnTimeout** | Proceeds when global timeout elapses | Startup with optional slow components |
+
+### Dependency Graphs
+
+Orchestrate complex startup sequences with dependencies:
+
+```csharp
+// Attribute-based dependencies
+[SignalDependency("database")]
+[SignalDependency("configuration")]
+public class CacheSignal : IIgnitionSignal { ... }
+
+// Or programmatic
+var graph = new IgnitionGraphBuilder()
+    .AddSignal<DatabaseSignal>()
+    .AddSignal<ConfigSignal>()
+    .AddSignal<CacheSignal>()
+        .DependsOn<DatabaseSignal>()
+        .DependsOn<ConfigSignal>()
+    .Build();
+```
+
+**Features:**
+
+- Topological sort for correct execution order
+- Automatic parallel execution of independent branches
+- Cycle detection with diagnostic paths
+- Failure propagation (skips dependents when prerequisites fail)
+
+### Bundles
+
+Package related signals for reuse:
+
+```csharp
+// Built-in bundles
+services.AddIgnitionBundle(
+    new DatabaseTrioBundle("my-db", 
+        connectTimeout: TimeSpan.FromSeconds(5),
+        validateTimeout: TimeSpan.FromSeconds(2),
+        warmupTimeout: TimeSpan.FromSeconds(10)));
+
+services.AddIgnitionBundle(
+    new HttpDependencyBundle("https://api.partner.com/health"));
+
+// Custom bundle
+public class RedisStarterBundle : IIgnitionBundle
+{
+    public void Configure(IServiceCollection services)
+    {
+        services.AddIgnitionSignal(new RedisConnectSignal());
+        services.AddIgnitionSignal(new RedisHealthSignal());
+        services.AddIgnitionSignal(new RedisWarmupSignal());
+    }
+}
+```
+
+---
+
+## Diagnostics & Observability
+
+### Timeline Export
+
+Visualize startup timing with Gantt-like output:
+
+```csharp
+var result = await coordinator.GetResultAsync();
+var timeline = result.ExportTimeline();
+
+// Console output
+timeline.PrintToConsole();
+
+// JSON export for external tools
+var json = timeline.ToJson();
+File.WriteAllText("startup-timeline.json", json);
+```
+
+### Recording & Replay
+
+Capture and replay startup sequences for analysis:
+
+```csharp
+// Record execution
+var result = await coordinator.GetResultAsync();
+var recording = result.ExportRecording();
+File.WriteAllText("startup.recording.json", recording.ToJson());
+
+// Replay for what-if analysis
+var replayer = IgnitionReplayer.FromJson(json);
+var replayResult = await replayer.ReplayAsync(modifiedOptions);
+```
+
+### Health Checks
+
+Automatic health check integration:
+
+```csharp
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready")
+});
+```
+
+**Health Check Status:**
+
+- **Healthy**: All signals succeeded
+- **Degraded**: Soft global timeout elapsed without per-signal failures
+- **Unhealthy**: One or more signals failed
+
+### Activity Tracing
+
+OpenTelemetry-compatible distributed tracing:
+
+```csharp
+options.EnableTracing = true; // Emits Activity named "Ignition.WaitAll"
+```
+
+---
+
+## Documentation
+
+### Getting Started
+
+- [Getting Started Guide](docs/getting-started.md) - Installation, first signal, common patterns
+- [Integration Recipes](docs/integration-recipes.md) - Copy-paste patterns for Web API, Worker, Console
+- [Cookbook](docs/cookbook.md) - Battle-tested recipes for real startup problems
+
+### Core Topics
+
+- [Features Overview](docs/features.md) - Complete feature reference
+- [Policies](docs/policies.md) - FailFast, BestEffort, ContinueOnTimeout
+- [Timeout Management](docs/timeout-management.md) - Two-layer timeout system
+- [Dependency-Aware Execution](docs/dependency-aware-execution.md) - DAG mode guide
+- [Bundles](docs/bundles.md) - Creating and using signal bundles
+- [Observability](docs/observability.md) - Logging, tracing, health checks
+
+### Advanced
+
+- [Advanced Patterns](docs/advanced-patterns.md) - Composite signals, testing strategies
+- [Performance Guide](docs/performance.md) - Execution modes, concurrency tuning
+- [API Reference](docs/api-reference.md) - Complete API documentation
+- [Migration Guide](docs/migration.md) - Version upgrades
+
+### Samples
+
+| Sample | Focus | Complexity |
+|--------|-------|------------|
+| [Simple](samples/Simple) | Basic usage | Beginner |
+| [SimpleMode](samples/SimpleMode) | Simple Mode API | Beginner |
+| [WebApi](samples/WebApi) | ASP.NET Core integration | Intermediate |
+| [Worker](samples/Worker) | Worker Service integration | Intermediate |
+| [Bundles](samples/Bundles) | Composable bundles | Intermediate |
+| [Advanced](samples/Advanced) | Complex scenarios | Advanced |
+| [DependencyGraph](samples/DependencyGraph) | DAG execution | Advanced |
+| [TimelineExport](samples/TimelineExport) | Timeline visualization | Intermediate |
+| [Replay](samples/Replay) | Recording & replay | Advanced |
+| [TimeoutStrategies](samples/TimeoutStrategies) | Custom timeout logic | Advanced |
+
+---
+
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+---
+
+## License
+
+MIT License. See [LICENSE](LICENSE) for details.
 
 ## Integration Packages
 
@@ -612,6 +895,7 @@ if (!validation.IsValid)
 ```
 
 Validation checks include:
+
 - **Timing validation**: Negative durations, end before start, duration drift
 - **Dependency order**: Signals starting before dependencies complete
 - **Stage execution**: Correct stage ordering and timing
@@ -862,6 +1146,7 @@ services.AddIgnition(options =>
 ### Built-in Strategy
 
 The `DefaultIgnitionTimeoutStrategy` preserves backward-compatible behavior:
+
 - Returns the signal's own `Timeout` property
 - Uses the global `CancelIndividualOnTimeout` setting
 
