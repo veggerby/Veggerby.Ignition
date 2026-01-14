@@ -403,7 +403,7 @@ public class IgnitionLifecycleHooksTests
         var factories = new IIgnitionSignalFactory[]
         {
             new StagedIgnitionSignalFactory(new TestSignalFactory(stage0Signal), 0),
-            new StagedIgnationSignalFactory(new TestSignalFactory(stage1Signal), 1)
+            new StagedIgnitionSignalFactory(new TestSignalFactory(stage1Signal), 1)
         };
 
         var opts = new IgnitionOptions
@@ -602,12 +602,12 @@ public class IgnitionLifecycleHooksTests
         // Default implementation from interface
     }
 
-    private sealed class StagedIgnationSignalFactory : IIgnitionSignalFactory
+    private sealed class StagedIgnitionSignalFactory : IIgnitionSignalFactory
     {
         private readonly IIgnitionSignalFactory _innerFactory;
         private readonly int _stage;
 
-        public StagedIgnationSignalFactory(IIgnitionSignalFactory innerFactory, int stage)
+        public StagedIgnitionSignalFactory(IIgnitionSignalFactory innerFactory, int stage)
         {
             _innerFactory = innerFactory;
             _stage = stage;
