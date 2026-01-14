@@ -133,10 +133,10 @@ public class Program
                     options.GlobalTimeout = TimeSpan.FromSeconds(10);
                 });
 
-                services.AddTransient<IIgnitionSignal, DatabaseSignal>();
-                services.AddTransient<IIgnitionSignal, CacheWarmupSignal>();
-                services.AddTransient<IIgnitionSignal, ConfigurationSignal>();
-                services.AddTransient<IIgnitionSignal, ExternalServiceSignal>();
+                services.AddIgnitionSignal<DatabaseSignal>();
+                services.AddIgnitionSignal<CacheWarmupSignal>();
+                services.AddIgnitionSignal<ConfigurationSignal>();
+                services.AddIgnitionSignal<ExternalServiceSignal>();
             })
             .ConfigureLogging(logging => logging.ClearProviders())
             .Build();
@@ -283,10 +283,10 @@ public class Program
                 });
 
                 // Use slightly modified signals to simulate different run
-                services.AddTransient<IIgnitionSignal, DatabaseSignal>();
-                services.AddTransient<IIgnitionSignal, CacheWarmupSignal>();
-                services.AddTransient<IIgnitionSignal, ConfigurationSignal>();
-                services.AddTransient<IIgnitionSignal, ExternalServiceSignal>();
+                services.AddIgnitionSignal<DatabaseSignal>();
+                services.AddIgnitionSignal<CacheWarmupSignal>();
+                services.AddIgnitionSignal<ConfigurationSignal>();
+                services.AddIgnitionSignal<ExternalServiceSignal>();
             })
             .ConfigureLogging(logging => logging.ClearProviders())
             .Build();

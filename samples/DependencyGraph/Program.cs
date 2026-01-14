@@ -189,7 +189,9 @@ public class Program
                 // Build graph from attributes
                 services.AddIgnitionGraph((builder, sp) =>
                 {
-                    var signals = sp.GetServices<IIgnitionSignal>();
+                    // Get factories and create signals
+                    var factories = sp.GetServices<IIgnitionSignalFactory>();
+                    var signals = factories.Select(f => f.CreateSignal(sp)).ToList();
                     builder.AddSignals(signals);
                     builder.ApplyAttributeDependencies(); // Automatically discover dependencies from attributes
                 });
@@ -234,7 +236,9 @@ public class Program
                 // Build graph using fluent API
                 services.AddIgnitionGraph((builder, sp) =>
                 {
-                    var signals = sp.GetServices<IIgnitionSignal>().ToList();
+                    // Get factories and create signals
+                    var factories = sp.GetServices<IIgnitionSignalFactory>();
+                    var signals = factories.Select(f => f.CreateSignal(sp)).ToList();
 
                     var db = signals.First(s => s.Name == "database");
                     var cache = signals.First(s => s.Name == "cache");

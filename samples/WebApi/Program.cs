@@ -33,10 +33,10 @@ builder.Services.AddIgnition(options =>
 }, healthCheckTags: new[] { "ready" });
 
 // Register startup signals
-builder.Services.AddTransient<IIgnitionSignal, DatabaseConnectionPoolSignal>();
-builder.Services.AddTransient<IIgnitionSignal, ConfigurationValidationSignal>();
-builder.Services.AddTransient<IIgnitionSignal, ExternalDependencyCheckSignal>();
-builder.Services.AddTransient<IIgnitionSignal, BackgroundServicesSignal>();
+builder.Services.AddIgnitionSignal<DatabaseConnectionPoolSignal>();
+builder.Services.AddIgnitionSignal<ConfigurationValidationSignal>();
+builder.Services.AddIgnitionSignal<ExternalDependencyCheckSignal>();
+builder.Services.AddIgnitionSignal<BackgroundServicesSignal>();
 
 var app = builder.Build();
 

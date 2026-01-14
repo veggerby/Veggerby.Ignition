@@ -76,8 +76,8 @@ public class Program
                 services.AddIgnition();
 
                 // Register our custom signals
-                services.AddTransient<IIgnitionSignal, DatabaseConnectionSignal>();
-                services.AddTransient<IIgnitionSignal, ConfigurationLoadSignal>();
+                services.AddIgnitionSignal<DatabaseConnectionSignal>();
+                services.AddIgnitionSignal<ConfigurationLoadSignal>();
             })
             .ConfigureLogging(logging =>
             {
