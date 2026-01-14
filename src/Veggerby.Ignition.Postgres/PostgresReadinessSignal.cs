@@ -185,10 +185,8 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
         var retryCount = 0;
         Exception? lastException = null;
 
-        while (retryCount < maxRetries)
+        while (!cancellationToken.IsCancellationRequested && retryCount < maxRetries)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
             NpgsqlConnection? connection = null;
             try
             {
@@ -221,6 +219,11 @@ public sealed class PostgresReadinessSignal : IIgnitionSignal
                 await Task.Delay(delay, cancellationToken);
                 delay = Math.Min((int)(delay * multiplier), maxDelayMs);
             }
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            throw new OperationCanceledException("Connection attempt cancelled", cancellationToken);
         }
 
         throw lastException ?? new InvalidOperationException("Connection attempt failed");
