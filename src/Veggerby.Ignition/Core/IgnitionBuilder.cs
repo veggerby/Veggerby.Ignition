@@ -148,6 +148,24 @@ internal sealed class IgnitionBuilder : IIgnitionBuilder
         return this;
     }
 
+    /// <summary>
+    /// Configures lifecycle hooks for observing ignition execution using a type-based registration.
+    /// </summary>
+    /// <typeparam name="TLifecycleHooks">Concrete implementation of <see cref="IIgnitionLifecycleHooks"/>.</typeparam>
+    /// <returns>The builder for fluent chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// Lifecycle hooks are invoked at key execution points:
+    /// <list type="bullet">
+    ///   <item>Before/after the entire ignition process</item>
+    ///   <item>Before/after each individual signal</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// Hooks provide read-only observation and cannot modify ignition behavior.
+    /// Exceptions in hooks are caught and logged but do not affect execution.
+    /// </para>
+    /// </remarks>
     public IIgnitionBuilder WithLifecycleHooks<TLifecycleHooks>() where TLifecycleHooks : class, IIgnitionLifecycleHooks
     {
         _services.AddIgnitionLifecycleHooks<TLifecycleHooks>();
@@ -155,6 +173,16 @@ internal sealed class IgnitionBuilder : IIgnitionBuilder
         return this;
     }
 
+    /// <summary>
+    /// Configures lifecycle hooks using a factory delegate.
+    /// </summary>
+    /// <param name="factory">Factory delegate that produces the lifecycle hooks using the service provider.</param>
+    /// <returns>The builder for fluent chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="factory"/> is <c>null</c>.</exception>
+    /// <remarks>
+    /// Use this overload when the lifecycle hooks require dependencies from the DI container.
+    /// Common use cases include telemetry enrichment, logging, cleanup, and external system integration.
+    /// </remarks>
     public IIgnitionBuilder WithLifecycleHooks(Func<IServiceProvider, IIgnitionLifecycleHooks> factory)
     {
         ArgumentNullException.ThrowIfNull(factory, nameof(factory));

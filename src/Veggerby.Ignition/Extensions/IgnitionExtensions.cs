@@ -1130,6 +1130,7 @@ public static class IgnitionExtensions
     /// <param name="services">Target DI service collection.</param>
     /// <param name="factory">Factory delegate that produces the lifecycle hooks using the service provider.</param>
     /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="factory"/> is <c>null</c>.</exception>
     /// <remarks>
     /// <para>
     /// Use this overload when the lifecycle hooks require dependencies from the DI container.
