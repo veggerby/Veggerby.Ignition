@@ -18,6 +18,78 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 - None.
 
+## [0.5.0] - 2026-01-14
+
+### Added
+
+- **Integration Packages**: 13 new packages for common infrastructure dependencies
+  - **Databases**: `Veggerby.Ignition.Postgres`, `Veggerby.Ignition.SqlServer`, `Veggerby.Ignition.MongoDb`, `Veggerby.Ignition.Marten`
+  - **Message Brokers**: `Veggerby.Ignition.RabbitMq`, `Veggerby.Ignition.MassTransit`
+  - **Caches**: `Veggerby.Ignition.Redis`, `Veggerby.Ignition.Memcached`
+  - **Communication**: `Veggerby.Ignition.Http`, `Veggerby.Ignition.Grpc`, `Veggerby.Ignition.Orleans`
+  - **Cloud Storage**: `Veggerby.Ignition.Aws`, `Veggerby.Ignition.Azure`
+  - Each package provides readiness signals with verification strategies, retry policies, and Testcontainers integration test support
+  - All signals implement `IIgnitionSignalFactory` for consistent DI registration
+- **Staged Execution Fluent API**: New `AddIgnitionStage()` extension method with `IgnitionStageSignalBuilder` for grouping signals by stage
+  - Simplifies multi-stage configuration with fluent syntax: `services.AddIgnitionStage(0, stage => stage.AddTaskSignal(...))`
+  - `TaskSignalOptions` class with `Stage`, `Timeout`, and `ExecutionMode` properties for signal-level configuration
+  - Improved discoverability and reduced boilerplate for common staged execution patterns
+- **Graph Building Helper**: `AddIgnitionGraphFromFactories()` extension method simplifies DAG creation
+  - Automatically resolves `IIgnitionSignalFactory` instances and creates signals
+  - Optional `applyAttributeDependencies` parameter to apply `SignalDependencyAttribute` decorations
+  - Optional `configure` delegate for manual dependency configuration
+  - Reduces graph setup from ~10 lines to 1-2 lines of code
+- **Redis Resilience Configuration**: New `ConnectTimeout` property in `RedisReadinessOptions`
+  - Default 10-second timeout to handle container-ready-but-service-not-ready scenarios
+  - Configurable per-signal for different environments (low-latency vs. slow startup)
+  - Factory automatically applies `AbortOnConnectFail = false` for background retry resilience
+- **Enhanced Integration Testing**: Testcontainers support with proper wait strategies and retry configuration
+  - All integration packages include `[Trait("Category", "Integration")]` tagged tests
+  - Intentional use of `Wait.ForUnixContainer()` to demonstrate service-level vs. container-level readiness
+  - Configurable retry policies (`MaxRetries`, `RetryDelay`) to handle transient startup failures
+  - TestcontainersDemo sample demonstrating multi-stage infrastructure startup (5 containers across 4 stages)
+- **Lifecycle Hooks (`IIgnitionLifecycleHooks`)**: Extensible observation points for custom logic during ignition execution
+  - `OnBeforeIgnitionAsync()`: Invoked once before any signals execute (global setup, telemetry initialization)
+  - `OnAfterIgnitionAsync(IgnitionResult)`: Invoked once after all signals complete (cleanup, final telemetry recording)
+  - `OnBeforeSignalAsync(signalName)`: Invoked before each individual signal executes (per-signal setup, logging)
+  - `OnAfterSignalAsync(IgnitionSignalResult)`: Invoked after each individual signal completes (per-signal telemetry, conditional logging)
+  - Hooks are read-only observers and cannot modify ignition behavior or results
+  - Exceptions thrown by hooks are caught and logged without affecting execution or results
+  - Configure via `IgnitionOptions.LifecycleHooks` or `AddIgnitionLifecycleHooks()` extension method with DI factory support
+  - Common use cases: OpenTelemetry enrichment, custom metrics, cleanup operations, external system integration
+- **Documentation**: Comprehensive `AGENTS.md` for project setup, development workflow, testing patterns, and coding standards
+
+### Changed
+
+- **BREAKING**: Removed `*WithStage()` extension methods from all integration packages in favor of options-based staging
+  - Old: `services.AddRedisReadinessWithStage(connectionString, 1)`
+  - New: `services.AddRedisReadiness(connectionString, options => options.Stage = 1)`
+  - Applies to all 13 integration packages (Postgres, SqlServer, MongoDb, Marten, RabbitMq, MassTransit, Redis, Memcached, Http, Grpc, Orleans, Aws, Azure)
+  - Provides consistency with other configuration options and better extensibility
+- **BREAKING**: All `*ReadinessSignal` implementations are now `internal` and only accessible via `IIgnitionSignalFactory`
+  - Improves encapsulation and maintains abstraction boundaries between modules
+  - Test assemblies use `InternalsVisibleTo` attribute for testing
+  - Users must register signals through extension methods (e.g., `AddRedisReadiness()`)
+- **Enhanced Retry Logging**: Changed `RetryPolicy` log messages from `"not ready yet"` to `"failed (transient, attempt X/Y)"`
+  - More accurately reflects that an exception occurred while indicating it's expected behavior
+  - Helps distinguish between unexpected errors and normal startup retry conditions
+- **XML Documentation**: Improved parameter documentation for `AddIgnitionGraphFromFactories()`
+  - Clarified `applyAttributeDependencies` behavior when `true` vs. `false`
+  - Documented use cases for complete manual control and attribute scanning overhead concerns
+- **Internal Cleanup**: Removed unused `_executionMode` field from `IgnitionStageSignalBuilder` with explanatory comment for future use
+
+### Fixed
+
+- **gRPC Test Performance**: Reduced gRPC unit test execution time from 27 seconds to 0.5 seconds (54x improvement)
+  - Added `CreateFastTimeoutChannel()` helper with 1-second `ConnectTimeout` and `SocketsHttpHandler` configuration
+  - Replaced invalid hostnames with `127.0.0.1` on unlikely ports to avoid DNS resolution delays
+  - Removed `[Trait("Speed", "Slow")]` attributes as tests now complete in milliseconds
+- **Redis Integration Test Stability**: Eliminated flaky Redis integration tests in CI environments
+  - Added `abortConnect=false` and `connectTimeout=10000` to connection strings
+  - Configured `RedisReadinessSignalFactory` to set `AbortOnConnectFail = false` and use `ConnectTimeout` from options
+  - Increased integration test retry settings (`MaxRetries = 10`, `RetryDelay = 500ms`) to handle transient startup failures
+  - Tests now reliably handle the container-ready-before-service-ready window in containerized environments
+
 ## [0.4.1] - 2025-12-18
 
 ### Added
