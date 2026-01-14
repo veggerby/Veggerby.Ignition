@@ -12,7 +12,9 @@ public class IgnitionCancellationScopeTests
         configure?.Invoke(opts);
         var optionsWrapper = Options.Create(opts);
         var logger = Substitute.For<ILogger<IgnitionCoordinator>>();
-        return new IgnitionCoordinator(signals, optionsWrapper, logger);
+        var factories = signals.Select(s => new TestSignalFactory(s)).ToList();
+        var serviceProvider = new ServiceCollection().BuildServiceProvider();
+        return new IgnitionCoordinator(factories, serviceProvider, optionsWrapper, logger);
     }
 
     #region CancellationScope Tests
@@ -243,7 +245,9 @@ public class IgnitionCancellationScopeTests
         };
         var optionsWrapper = Options.Create(opts);
         var logger = Substitute.For<ILogger<IgnitionCoordinator>>();
-        var coord = new IgnitionCoordinator(new IIgnitionSignal[] { depSignal, childSignal }, graph, optionsWrapper, logger);
+        var factories = new IIgnitionSignal[] { depSignal, childSignal }.Select(s => new TestSignalFactory(s)).ToList();
+        var serviceProvider = new ServiceCollection().BuildServiceProvider();
+        var coord = new IgnitionCoordinator(factories, serviceProvider, graph, optionsWrapper, logger);
 
         // act
         await coord.WaitAllAsync();
@@ -279,7 +283,9 @@ public class IgnitionCancellationScopeTests
         };
         var optionsWrapper = Options.Create(opts);
         var logger = Substitute.For<ILogger<IgnitionCoordinator>>();
-        var coord = new IgnitionCoordinator(new IIgnitionSignal[] { depSignal, childSignal }, graph, optionsWrapper, logger);
+        var factories = new IIgnitionSignal[] { depSignal, childSignal }.Select(s => new TestSignalFactory(s)).ToList();
+        var serviceProvider = new ServiceCollection().BuildServiceProvider();
+        var coord = new IgnitionCoordinator(factories, serviceProvider, graph, optionsWrapper, logger);
 
         // act
         await coord.WaitAllAsync();

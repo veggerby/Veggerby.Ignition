@@ -381,11 +381,17 @@ public static class IgnitionExtensions
             ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
         }
 
-        services.AddSingleton<IIgnitionSignal>(sp => new ServiceReadySignal<TService>(
-            sp,
-            name ?? typeof(TService).Name,
-            (svc, ct) => taskSelector(svc, ct),
-            timeout));
+        var signalName = name ?? typeof(TService).Name;
+        var factory = new DelegateIgnitionSignalFactory(
+            signalName,
+            sp => new ServiceReadySignal<TService>(
+                sp,
+                signalName,
+                (svc, ct) => taskSelector(svc, ct),
+                timeout),
+            timeout);
+
+        services.AddSingleton<IIgnitionSignalFactory>(factory);
 
         return services;
     }
@@ -406,7 +412,12 @@ public static class IgnitionExtensions
         ArgumentNullException.ThrowIfNull(taskFactory, nameof(taskFactory));
         ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
 
-        services.AddSingleton<IIgnitionSignal>(sp => new ServiceCompositeReadySignal(sp, name, taskFactory, timeout));
+        var factory = new DelegateIgnitionSignalFactory(
+            name,
+            sp => new ServiceCompositeReadySignal(sp, name, taskFactory, timeout),
+            timeout);
+
+        services.AddSingleton<IIgnitionSignalFactory>(factory);
 
         return services;
     }
@@ -447,11 +458,17 @@ public static class IgnitionExtensions
             ArgumentException.ThrowIfNullOrWhiteSpace(groupName, nameof(groupName));
         }
 
-        services.AddSingleton<IIgnitionSignal>(sp => new ServiceEnumerableReadySignal<TService>(
-            sp,
-            groupName ?? $"{typeof(TService).Name}[*]",
-            (svc, _) => taskSelector(svc),
-            timeout));
+        var signalName = groupName ?? $"{typeof(TService).Name}[*]";
+        var factory = new DelegateIgnitionSignalFactory(
+            signalName,
+            sp => new ServiceEnumerableReadySignal<TService>(
+                sp,
+                signalName,
+                (svc, _) => taskSelector(svc),
+                timeout),
+            timeout);
+
+        services.AddSingleton<IIgnitionSignalFactory>(factory);
 
         return services;
     }
@@ -481,11 +498,17 @@ public static class IgnitionExtensions
             ArgumentException.ThrowIfNullOrWhiteSpace(groupName, nameof(groupName));
         }
 
-        services.AddSingleton<IIgnitionSignal>(sp => new ServiceEnumerableReadySignal<TService>(
-            sp,
-            groupName ?? $"{typeof(TService).Name}[*]",
-            (svc, ct) => taskSelector(svc, ct),
-            timeout));
+        var signalName = groupName ?? $"{typeof(TService).Name}[*]";
+        var factory = new DelegateIgnitionSignalFactory(
+            signalName,
+            sp => new ServiceEnumerableReadySignal<TService>(
+                sp,
+                signalName,
+                (svc, ct) => taskSelector(svc, ct),
+                timeout),
+            timeout);
+
+        services.AddSingleton<IIgnitionSignalFactory>(factory);
 
         return services;
     }
@@ -520,11 +543,17 @@ public static class IgnitionExtensions
             ArgumentException.ThrowIfNullOrWhiteSpace(groupName, nameof(groupName));
         }
 
-        services.AddSingleton<IIgnitionSignal>(sp => new ScopedServiceEnumerableReadySignal<TService>(
-            sp.GetRequiredService<IServiceScopeFactory>(),
-            groupName ?? $"{typeof(TService).Name}[*]",
-            (svc, _) => taskSelector(svc),
-            timeout));
+        var signalName = groupName ?? $"{typeof(TService).Name}[*]";
+        var factory = new DelegateIgnitionSignalFactory(
+            signalName,
+            sp => new ScopedServiceEnumerableReadySignal<TService>(
+                sp.GetRequiredService<IServiceScopeFactory>(),
+                signalName,
+                (svc, _) => taskSelector(svc),
+                timeout),
+            timeout);
+
+        services.AddSingleton<IIgnitionSignalFactory>(factory);
 
         return services;
     }
@@ -554,11 +583,17 @@ public static class IgnitionExtensions
             ArgumentException.ThrowIfNullOrWhiteSpace(groupName, nameof(groupName));
         }
 
-        services.AddSingleton<IIgnitionSignal>(sp => new ScopedServiceEnumerableReadySignal<TService>(
-            sp.GetRequiredService<IServiceScopeFactory>(),
-            groupName ?? $"{typeof(TService).Name}[*]",
-            (svc, ct) => taskSelector(svc, ct),
-            timeout));
+        var signalName = groupName ?? $"{typeof(TService).Name}[*]";
+        var factory = new DelegateIgnitionSignalFactory(
+            signalName,
+            sp => new ScopedServiceEnumerableReadySignal<TService>(
+                sp.GetRequiredService<IServiceScopeFactory>(),
+                signalName,
+                (svc, ct) => taskSelector(svc, ct),
+                timeout),
+            timeout);
+
+        services.AddSingleton<IIgnitionSignalFactory>(factory);
 
         return services;
     }
@@ -924,7 +959,12 @@ public static class IgnitionExtensions
         ArgumentNullException.ThrowIfNull(scope);
 
         var scopedSignal = new ScopedSignalWrapper(signal, scope, cancelScopeOnFailure);
-        services.AddSingleton<IIgnitionSignal>(scopedSignal);
+        var factory = new DelegateIgnitionSignalFactory(
+            signal.Name,
+            _ => scopedSignal,
+            signal.Timeout);
+
+        services.AddSingleton<IIgnitionSignalFactory>(factory);
         return services;
     }
 
@@ -952,7 +992,12 @@ public static class IgnitionExtensions
 
         var signal = IgnitionSignal.FromTaskFactory(name, taskFactory, timeout);
         var scopedSignal = new ScopedSignalWrapper(signal, scope, cancelScopeOnFailure);
-        services.AddSingleton<IIgnitionSignal>(scopedSignal);
+        var factory = new DelegateIgnitionSignalFactory(
+            name,
+            _ => scopedSignal,
+            timeout);
+
+        services.AddSingleton<IIgnitionSignalFactory>(factory);
         return services;
     }
 

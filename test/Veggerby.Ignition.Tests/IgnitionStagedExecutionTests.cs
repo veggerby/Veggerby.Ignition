@@ -14,7 +14,9 @@ public class IgnitionStagedExecutionTests
         configure?.Invoke(opts);
         var optionsWrapper = Options.Create(opts);
         var logger = Substitute.For<ILogger<IgnitionCoordinator>>();
-        return new IgnitionCoordinator(signals, optionsWrapper, logger);
+        var factories = signals.Select(s => new TestSignalFactory(s)).ToList();
+        var serviceProvider = new ServiceCollection().BuildServiceProvider();
+        return new IgnitionCoordinator(factories, serviceProvider, optionsWrapper, logger);
     }
 
     [Fact]
