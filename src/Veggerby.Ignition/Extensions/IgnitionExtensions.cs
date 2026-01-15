@@ -1461,4 +1461,102 @@ public static class IgnitionExtensions
 
         return services;
     }
+
+    /// <summary>
+    /// Configures a custom ignition policy using a concrete instance.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="policy">The policy instance to use.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// The policy is applied via <see cref="IgnitionOptions.CustomPolicy"/> configuration.
+    /// Call this method after <see cref="AddIgnition"/> to ensure the options are properly configured.
+    /// </para>
+    /// <para>
+    /// Custom policies enable domain-specific failure handling strategies such as:
+    /// <list type="bullet">
+    ///   <item>Retry strategies</item>
+    ///   <item>Circuit breakers</item>
+    ///   <item>Conditional fail-fast</item>
+    ///   <item>Percentage-based thresholds</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// When set, the custom policy overrides the <see cref="IgnitionOptions.Policy"/> enum value.
+    /// </para>
+    /// </remarks>
+    public static IServiceCollection AddIgnitionPolicy(
+        this IServiceCollection services,
+        IIgnitionPolicy policy)
+    {
+        ArgumentNullException.ThrowIfNull(policy, nameof(policy));
+
+        services.Configure<IgnitionOptions>(options => options.CustomPolicy = policy);
+
+        return services;
+    }
+
+    /// <summary>
+    /// Configures a custom ignition policy using a factory delegate.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="policyFactory">Factory delegate that produces the policy using the service provider.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// Use this overload when the policy requires dependencies from the DI container.
+    /// The factory is invoked once when options are first accessed.
+    /// </para>
+    /// <para>
+    /// Example usage:
+    /// <code>
+    /// services.AddIgnitionPolicy(sp =>
+    /// {
+    ///     var logger = sp.GetRequiredService&lt;ILogger&lt;MyPolicy&gt;&gt;();
+    ///     return new MyPolicy(logger);
+    /// });
+    /// </code>
+    /// </para>
+    /// </remarks>
+    public static IServiceCollection AddIgnitionPolicy(
+        this IServiceCollection services,
+        Func<IServiceProvider, IIgnitionPolicy> policyFactory)
+    {
+        ArgumentNullException.ThrowIfNull(policyFactory, nameof(policyFactory));
+
+        services.AddSingleton<IIgnitionPolicy>(policyFactory);
+        services.AddOptions<IgnitionOptions>()
+            .Configure<IIgnitionPolicy>((options, policy) => options.CustomPolicy = policy);
+
+        return services;
+    }
+
+    /// <summary>
+    /// Configures a custom ignition policy by type, allowing DI to construct the policy instance.
+    /// </summary>
+    /// <typeparam name="TPolicy">Concrete implementation of <see cref="IIgnitionPolicy"/>.</typeparam>
+    /// <param name="services">Target DI service collection.</param>
+    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// The policy type must have a constructor compatible with DI resolution.
+    /// Use this overload when the policy requires dependencies injected via constructor.
+    /// </para>
+    /// <para>
+    /// Example usage:
+    /// <code>
+    /// services.AddIgnitionPolicy&lt;PercentageThresholdPolicy&gt;();
+    /// </code>
+    /// </para>
+    /// </remarks>
+    public static IServiceCollection AddIgnitionPolicy<TPolicy>(
+        this IServiceCollection services) where TPolicy : class, IIgnitionPolicy
+    {
+        services.AddSingleton<IIgnitionPolicy, TPolicy>();
+        services.AddOptions<IgnitionOptions>()
+            .Configure<IIgnitionPolicy>((options, policy) => options.CustomPolicy = policy);
+
+        return services;
+    }
 }
