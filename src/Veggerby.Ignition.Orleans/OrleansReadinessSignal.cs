@@ -4,19 +4,18 @@ using System.Threading.Tasks;
 
 using Microsoft.Extensions.Logging;
 using Orleans;
+using Orleans.Runtime;
 
 #pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.Orleans;
 #pragma warning restore IDE0130 // Namespace does not match folder structure
 
 /// <summary>
-/// Ignition signal for verifying Orleans cluster client registration.
+/// Ignition signal for verifying Orleans cluster client connectivity.
 /// </summary>
 /// <remarks>
-/// This signal verifies that an <see cref="IClusterClient"/> is properly registered in the 
-/// dependency injection container. For more comprehensive cluster connectivity verification
-/// (such as testing grain activation or checking cluster membership), implement a custom
-/// signal that makes actual grain calls or uses management grain methods.
+/// This signal verifies Orleans cluster connectivity by checking active silos via the management grain.
+/// The check retrieves the list of active silos to ensure the cluster is accessible and operational.
 /// </remarks>
 internal sealed class OrleansReadinessSignal : IIgnitionSignal
 {
@@ -72,9 +71,25 @@ internal sealed class OrleansReadinessSignal : IIgnitionSignal
 
         try
         {
+            var retryPolicy = new RetryPolicy(_options.MaxRetries, _options.RetryDelay, _logger);
+
             _logger.LogDebug("Verifying Orleans cluster client connectivity");
 
-            activity?.SetTag("orleans.cluster_check", "basic_connectivity");
+            activity?.SetTag("orleans.cluster_check", "management_grain");
+
+            // Verify actual cluster connectivity by accessing the management grain
+            await retryPolicy.ExecuteAsync(async ct =>
+            {
+                var managementGrain = _clusterClient.GetGrain<IManagementGrain>(0);
+                var hosts = await managementGrain.GetHosts(onlyActive: true);
+                
+                if (hosts == null || hosts.Count == 0)
+                {
+                    throw new InvalidOperationException("No active silos found in Orleans cluster");
+                }
+                
+                _logger.LogDebug("Orleans cluster has {ActiveSilos} active silo(s)", hosts.Count);
+            }, "Orleans cluster connection", cancellationToken);
 
             _logger.LogInformation("Orleans readiness check completed successfully");
         }

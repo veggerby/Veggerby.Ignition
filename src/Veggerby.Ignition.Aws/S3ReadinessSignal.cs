@@ -79,14 +79,22 @@ internal sealed class S3ReadinessSignal : IIgnitionSignal
 
         try
         {
+            var retryPolicy = new RetryPolicy(_options.MaxRetries, _options.RetryDelay, _logger);
+
             if (_options.VerifyBucketAccess && !string.IsNullOrWhiteSpace(_options.BucketName))
             {
-                await VerifyBucketAccessAsync(cancellationToken);
+                await retryPolicy.ExecuteAsync(async ct =>
+                {
+                    await VerifyBucketAccessAsync(ct);
+                }, "AWS S3 bucket access", cancellationToken);
             }
             else
             {
                 _logger.LogDebug("Verifying AWS S3 service connection");
-                await _s3Client.ListBucketsAsync(cancellationToken).ConfigureAwait(false);
+                await retryPolicy.ExecuteAsync(async ct =>
+                {
+                    await _s3Client.ListBucketsAsync(ct).ConfigureAwait(false);
+                }, "AWS S3 connection", cancellationToken);
             }
 
             _logger.LogInformation("AWS S3 readiness check completed successfully");

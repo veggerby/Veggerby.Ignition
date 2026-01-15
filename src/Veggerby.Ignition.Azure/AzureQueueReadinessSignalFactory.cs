@@ -1,0 +1,49 @@
+using System;
+using Azure.Storage.Queues;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+#pragma warning disable IDE0130 // Namespace does not match folder structure
+namespace Veggerby.Ignition.Azure;
+#pragma warning restore IDE0130 // Namespace does not match folder structure
+
+/// <summary>
+/// Factory for creating Azure Queue Storage readiness signals with configurable connection strings.
+/// </summary>
+public sealed class AzureQueueReadinessSignalFactory : IIgnitionSignalFactory
+{
+    private readonly Func<IServiceProvider, string> _connectionStringFactory;
+    private readonly AzureQueueReadinessOptions _options;
+
+    /// <summary>
+    /// Creates a new Azure Queue Storage readiness signal factory.
+    /// </summary>
+    /// <param name="connectionStringFactory">Factory that produces the connection string using the service provider.</param>
+    /// <param name="options">Azure Queue Storage readiness options.</param>
+    public AzureQueueReadinessSignalFactory(
+        Func<IServiceProvider, string> connectionStringFactory,
+        AzureQueueReadinessOptions options)
+    {
+        _connectionStringFactory = connectionStringFactory ?? throw new ArgumentNullException(nameof(connectionStringFactory));
+        _options = options ?? throw new ArgumentNullException(nameof(options));
+    }
+
+    /// <inheritdoc/>
+    public string Name => "azure-queue-readiness";
+
+    /// <inheritdoc/>
+    public TimeSpan? Timeout => _options.Timeout;
+
+    /// <inheritdoc/>
+    public int? Stage => _options.Stage;
+
+    /// <inheritdoc/>
+    public IIgnitionSignal CreateSignal(IServiceProvider serviceProvider)
+    {
+        var connectionString = _connectionStringFactory(serviceProvider);
+        var client = new QueueServiceClient(connectionString);
+        var logger = serviceProvider.GetRequiredService<ILogger<AzureQueueReadinessSignal>>();
+        
+        return new AzureQueueReadinessSignal(client, _options, logger);
+    }
+}

@@ -70,14 +70,19 @@ internal sealed class MartenReadinessSignal : IIgnitionSignal
 
         try
         {
+            var retryPolicy = new RetryPolicy(_options.MaxRetries, _options.RetryDelay, _logger);
+
             if (_options.VerifyDocumentStore)
             {
-                using var session = _documentStore.LightweightSession();
-                
-                // Perform a simple query to verify connectivity with a guaranteed database round-trip
-                await session.QueryAsync<int>("SELECT 1", token: cancellationToken).ConfigureAwait(false);
-                
-                _logger.LogDebug("Marten document store connection verified");
+                await retryPolicy.ExecuteAsync(async ct =>
+                {
+                    using var session = _documentStore.LightweightSession();
+                    
+                    // Perform a simple query to verify connectivity with a guaranteed database round-trip
+                    await session.QueryAsync<int>("SELECT 1", token: ct).ConfigureAwait(false);
+                    
+                    _logger.LogDebug("Marten document store connection verified");
+                }, "Marten connection", cancellationToken);
             }
 
             _logger.LogInformation("Marten document store readiness check completed successfully");

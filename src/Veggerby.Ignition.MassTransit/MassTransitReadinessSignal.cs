@@ -70,32 +70,37 @@ internal sealed class MassTransitReadinessSignal : IIgnitionSignal
 
         try
         {
+            var retryPolicy = new RetryPolicy(_options.MaxRetries, _options.RetryDelay, _logger);
+
             // Cast to IBusControl to access health check methods
             if (_bus is not IBusControl busControl)
             {
                 throw new InvalidOperationException("The registered IBus instance does not implement IBusControl");
             }
 
-            var busHealth = busControl.CheckHealth();
-
-            if (busHealth.Status == BusHealthStatus.Unhealthy)
+            await retryPolicy.ExecuteAsync(async ct =>
             {
-                _logger.LogWarning("MassTransit bus is unhealthy: {Description}", busHealth.Description);
-                throw new InvalidOperationException($"MassTransit bus is unhealthy: {busHealth.Description}");
-            }
+                var busHealth = busControl.CheckHealth();
 
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(_options.BusReadyTimeout);
+                if (busHealth.Status == BusHealthStatus.Unhealthy)
+                {
+                    _logger.LogWarning("MassTransit bus is unhealthy: {Description}", busHealth.Description);
+                    throw new InvalidOperationException($"MassTransit bus is unhealthy: {busHealth.Description}");
+                }
 
-            try
-            {
-                await busControl.WaitForHealthStatus(BusHealthStatus.Healthy, timeoutCts.Token).ConfigureAwait(false);
-                _logger.LogDebug("MassTransit bus is healthy");
-            }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-                throw new TimeoutException($"MassTransit bus did not become healthy within {_options.BusReadyTimeout}");
-            }
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeoutCts.CancelAfter(_options.BusReadyTimeout);
+
+                try
+                {
+                    await busControl.WaitForHealthStatus(BusHealthStatus.Healthy, timeoutCts.Token).ConfigureAwait(false);
+                    _logger.LogDebug("MassTransit bus is healthy");
+                }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                {
+                    throw new TimeoutException($"MassTransit bus did not become healthy within {_options.BusReadyTimeout}");
+                }
+            }, "MassTransit bus", cancellationToken);
 
             _logger.LogInformation("MassTransit bus readiness check completed successfully");
         }

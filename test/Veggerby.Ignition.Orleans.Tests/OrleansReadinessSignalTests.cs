@@ -1,8 +1,11 @@
+using System.Collections.Generic;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
 using Microsoft.Extensions.Logging;
 using Orleans;
+using Orleans.Runtime;
 using Veggerby.Ignition.Orleans;
 
 namespace Veggerby.Ignition.Orleans.Tests;
@@ -87,6 +90,15 @@ public class OrleansReadinessSignalTests
     {
         // arrange
         var clusterClient = Substitute.For<IClusterClient>();
+        var managementGrain = Substitute.For<IManagementGrain>();
+        
+        // Mock GetHosts to return at least one active silo
+        var hosts = new Dictionary<SiloAddress, SiloStatus>
+        {
+            { SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11111), 0), SiloStatus.Active }
+        };
+        managementGrain.GetHosts(true).Returns(Task.FromResult(hosts));
+        clusterClient.GetGrain<IManagementGrain>(0).Returns(managementGrain);
 
         var options = new OrleansReadinessOptions();
         var logger = Substitute.For<ILogger<OrleansReadinessSignal>>();
@@ -103,6 +115,15 @@ public class OrleansReadinessSignalTests
     {
         // arrange
         var clusterClient = Substitute.For<IClusterClient>();
+        var managementGrain = Substitute.For<IManagementGrain>();
+        
+        // Mock GetHosts to return at least one active silo
+        var hosts = new Dictionary<SiloAddress, SiloStatus>
+        {
+            { SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11111), 0), SiloStatus.Active }
+        };
+        managementGrain.GetHosts(true).Returns(Task.FromResult(hosts));
+        clusterClient.GetGrain<IManagementGrain>(0).Returns(managementGrain);
 
         var options = new OrleansReadinessOptions();
         var logger = Substitute.For<ILogger<OrleansReadinessSignal>>();

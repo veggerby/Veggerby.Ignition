@@ -76,46 +76,51 @@ internal sealed class HttpReadinessSignal : IIgnitionSignal
 
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, _url);
+            var retryPolicy = new RetryPolicy(_options.MaxRetries, _options.RetryDelay, _logger);
 
-            if (_options.CustomHeaders is not null)
+            await retryPolicy.ExecuteAsync(async ct =>
             {
-                foreach (var header in _options.CustomHeaders)
+                using var request = new HttpRequestMessage(HttpMethod.Get, _url);
+
+                if (_options.CustomHeaders is not null)
                 {
-                    request.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                    foreach (var header in _options.CustomHeaders)
+                    {
+                        request.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                    }
                 }
-            }
 
-            using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+                using var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
 
-            var statusCode = (int)response.StatusCode;
-            activity?.SetTag("http.status_code", statusCode);
+                var statusCode = (int)response.StatusCode;
+                activity?.SetTag("http.status_code", statusCode);
 
-            _logger.LogDebug("HTTP response received with status code {StatusCode}", statusCode);
+                _logger.LogDebug("HTTP response received with status code {StatusCode}", statusCode);
 
-            if (!_options.ExpectedStatusCodes.Contains(statusCode))
-            {
-                var message = $"HTTP endpoint returned unexpected status code {statusCode}. Expected: {string.Join(", ", _options.ExpectedStatusCodes)}";
-                _logger.LogError(message);
-                throw new InvalidOperationException(message);
-            }
-
-            if (_options.ValidateResponse is not null)
-            {
-                activity?.SetTag("http.custom_validation", "true");
-                _logger.LogDebug("Executing custom response validation");
-
-                var isValid = await _options.ValidateResponse(response);
-
-                if (!isValid)
+                if (!_options.ExpectedStatusCodes.Contains(statusCode))
                 {
-                    var message = "HTTP response validation failed";
+                    var message = $"HTTP endpoint returned unexpected status code {statusCode}. Expected: {string.Join(", ", _options.ExpectedStatusCodes)}";
                     _logger.LogError(message);
                     throw new InvalidOperationException(message);
                 }
 
-                _logger.LogDebug("Custom response validation succeeded");
-            }
+                if (_options.ValidateResponse is not null)
+                {
+                    activity?.SetTag("http.custom_validation", "true");
+                    _logger.LogDebug("Executing custom response validation");
+
+                    var isValid = await _options.ValidateResponse(response);
+
+                    if (!isValid)
+                    {
+                        var message = "HTTP response validation failed";
+                        _logger.LogError(message);
+                        throw new InvalidOperationException(message);
+                    }
+
+                    _logger.LogDebug("Custom response validation succeeded");
+                }
+            }, "HTTP request", cancellationToken);
 
             _logger.LogInformation("HTTP readiness check completed successfully");
         }

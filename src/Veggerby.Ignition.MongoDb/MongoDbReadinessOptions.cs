@@ -54,6 +54,19 @@ public sealed class MongoDbReadinessOptions
     }
 
     /// <summary>
+    /// Maximum number of retry attempts for transient connection failures.
+    /// Default is 3 attempts.
+    /// </summary>
+    public int MaxRetries { get; set; } = 3;
+
+    /// <summary>
+    /// Initial delay between retry attempts.
+    /// Subsequent delays use exponential backoff (doubled each retry).
+    /// Default is 100 milliseconds.
+    /// </summary>
+    public TimeSpan RetryDelay { get; set; } = TimeSpan.FromMilliseconds(100);
+
+    /// <summary>
     /// Optional stage/phase number for staged execution.
     /// If <c>null</c>, the signal belongs to stage 0 (default/unstaged).
     /// </summary>

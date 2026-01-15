@@ -80,9 +80,14 @@ internal sealed class AzureTableReadinessSignal : IIgnitionSignal
 
         try
         {
+            var retryPolicy = new RetryPolicy(_options.MaxRetries, _options.RetryDelay, _logger);
+
             // Verify service connectivity by querying service properties
             _logger.LogDebug("Verifying Azure Table Storage service connection");
-            await _tableServiceClient.GetPropertiesAsync(cancellationToken).ConfigureAwait(false);
+            await retryPolicy.ExecuteAsync(async ct =>
+            {
+                await _tableServiceClient.GetPropertiesAsync(ct).ConfigureAwait(false);
+            }, "Azure Table Storage connection", cancellationToken);
 
             if (_options.VerifyTableExists && !string.IsNullOrWhiteSpace(_options.TableName))
             {
