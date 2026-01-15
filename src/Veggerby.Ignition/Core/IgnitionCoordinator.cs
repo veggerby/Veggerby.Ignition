@@ -302,25 +302,57 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                 _logger.LogError(f.Exception, "Startup handle '{Name}' failed after {Ms} ms.", f.Name, f.Duration.TotalMilliseconds);
             }
 
-            if (_options.Policy == IgnitionPolicy.FailFast && _options.ExecutionMode == IgnitionExecutionMode.Parallel)
+            // Check policy to determine if we should throw on failures in parallel mode
+            if (_options.ExecutionMode == IgnitionExecutionMode.Parallel)
             {
-                // In parallel mode we aggregate and throw.
-                var exceptions = new List<Exception>();
+                var policy = _options.GetEffectivePolicy();
+
+                // In parallel mode, we check the policy for each failed signal to determine if we should aggregate and throw
+                // For backward compatibility, we aggregate all failures and check if any should stop execution
+                bool shouldStopExecution = false;
                 foreach (var f in failed)
                 {
-                    if (f.Exception is not null)
+                    var context = new IgnitionPolicyContext
                     {
-                        exceptions.Add(f.Exception);
+                        SignalResult = f,
+                        CompletedSignals = results,
+                        TotalSignalCount = results.Count,
+                        ElapsedTime = swGlobal.Elapsed,
+                        GlobalTimeoutElapsed = globalTimedOut,
+                        ExecutionMode = _options.ExecutionMode
+                    };
+
+                    if (!policy.ShouldContinue(context))
+                    {
+                        shouldStopExecution = true;
+                        break;
                     }
                 }
 
-                // Transition to final state and raise CoordinatorCompleted before throwing.
-                // This allows observers to receive the complete result even when FailFast causes an exception.
-                var failedResult = IgnitionResult.FromResults(results, swGlobal.Elapsed);
-                TransitionToFinalState(failedResult);
+                if (shouldStopExecution)
+                {
+                    // In parallel mode we aggregate and throw.
+                    var exceptions = new List<Exception>();
+                    foreach (var f in failed)
+                    {
+                        if (f.Exception is not null)
+                        {
+                            exceptions.Add(f.Exception);
+                        }
+                    }
 
-                // Throw AggregateException for FailFast
-                throw new AggregateException(exceptions);
+                    // Transition to final state and raise CoordinatorCompleted before throwing.
+                    // This allows observers to receive the complete result even when the policy causes an exception.
+                    var failedResult = IgnitionResult.FromResults(results, swGlobal.Elapsed);
+                    TransitionToFinalState(failedResult);
+
+                    _logger.LogInformation(
+                        "Policy determined to stop execution after parallel completion with {FailedCount} failure(s).",
+                        failed.Count);
+
+                    // Throw AggregateException when policy stops execution
+                    throw new AggregateException(exceptions);
+                }
             }
         }
 
@@ -375,15 +407,43 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                 RaiseSignalCompleted(t.Result);
             }
 
-            if (_options.Policy == IgnitionPolicy.FailFast && t.IsCompleted && t.Result.Status == IgnitionSignalStatus.Failed)
+            // Check if policy allows continuing after signal completion
+            if (t.IsCompleted)
             {
-                _logger.LogError(t.Result.Exception, "Ignition signal '{Name}' failed in sequential mode; aborting.", h.Name);
-                // Transition to final state and raise CoordinatorCompleted before throwing.
-                // This allows observers to receive the complete result even when FailFast causes an exception.
-                var failedResult = IgnitionResult.FromResults(list.Select(task => task.Result).ToList(), swGlobal.Elapsed);
-                TransitionToFinalState(failedResult);
-                // Fail-fast sequential semantics: throw immediately with the single failure.
-                throw new AggregateException(t.Result.Exception!);
+                var policy = _options.GetEffectivePolicy();
+                var completedResults = list.Where(task => task.IsCompleted).Select(task => task.Result).ToList();
+
+                var context = new IgnitionPolicyContext
+                {
+                    SignalResult = t.Result,
+                    CompletedSignals = completedResults,
+                    TotalSignalCount = handles.Count,
+                    ElapsedTime = swGlobal.Elapsed,
+                    GlobalTimeoutElapsed = globalTimeoutTask.IsCompleted,
+                    ExecutionMode = _options.ExecutionMode
+                };
+
+                if (!policy.ShouldContinue(context))
+                {
+                    _logger.LogInformation(
+                        "Policy determined to stop execution after signal '{Name}' ({Status}) in sequential mode.",
+                        h.Name,
+                        t.Result.Status);
+
+                    // Transition to final state and raise CoordinatorCompleted before throwing.
+                    // This allows observers to receive the complete result even when the policy stops execution.
+                    var stoppedResult = IgnitionResult.FromResults(completedResults, swGlobal.Elapsed);
+                    TransitionToFinalState(stoppedResult);
+
+                    // For failed signals, throw AggregateException to maintain backward compatibility
+                    if (t.Result.Status == IgnitionSignalStatus.Failed && t.Result.Exception is not null)
+                    {
+                        throw new AggregateException(t.Result.Exception);
+                    }
+
+                    // For other statuses, break out of the loop without throwing
+                    break;
+                }
             }
         }
         return (list, false);
@@ -618,9 +678,26 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                                 {
                                     failed.Add(signal);
 
-                                    if (_options.Policy == IgnitionPolicy.FailFast)
+                                    // Check policy to determine if execution should stop
+                                    var policy = _options.GetEffectivePolicy();
+                                    var completedResults = completed.Values.ToList();
+
+                                    var context = new IgnitionPolicyContext
                                     {
-                                        _logger.LogError(result.Exception, "Signal '{Name}' failed in dependency-aware mode; aborting per FailFast policy.", signal.Name);
+                                        SignalResult = result,
+                                        CompletedSignals = completedResults,
+                                        TotalSignalCount = _graph.Signals.Count,
+                                        ElapsedTime = swGlobal.Elapsed,
+                                        GlobalTimeoutElapsed = globalTimeoutTask.IsCompleted,
+                                        ExecutionMode = _options.ExecutionMode
+                                    };
+
+                                    if (!policy.ShouldContinue(context))
+                                    {
+                                        _logger.LogInformation(
+                                            "Policy determined to stop execution after signal '{Name}' ({Status}) in dependency-aware mode.",
+                                            signal.Name,
+                                            result.Status);
                                         globalCts.Cancel();
                                     }
                                 }
