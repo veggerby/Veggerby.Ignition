@@ -309,8 +309,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
 
                 // In parallel mode, we check the policy for each failed signal to determine if we should aggregate and throw
                 // For backward compatibility, we aggregate all failures and check if any should stop execution
-                bool shouldStopExecution = false;
-                foreach (var f in failed)
+                bool shouldStopExecution = failed.Any(f =>
                 {
                     var context = new IgnitionPolicyContext
                     {
@@ -322,24 +321,16 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                         ExecutionMode = _options.ExecutionMode
                     };
 
-                    if (!policy.ShouldContinue(context))
-                    {
-                        shouldStopExecution = true;
-                        break;
-                    }
-                }
+                    return !policy.ShouldContinue(context);
+                });
 
                 if (shouldStopExecution)
                 {
                     // In parallel mode we aggregate and throw.
-                    var exceptions = new List<Exception>();
-                    foreach (var f in failed)
-                    {
-                        if (f.Exception is not null)
-                        {
-                            exceptions.Add(f.Exception);
-                        }
-                    }
+                    var exceptions = failed
+                        .Where(f => f.Exception is not null)
+                        .Select(f => f.Exception!)
+                        .ToList();
 
                     // Transition to final state and raise CoordinatorCompleted before throwing.
                     // This allows observers to receive the complete result even when the policy causes an exception.
