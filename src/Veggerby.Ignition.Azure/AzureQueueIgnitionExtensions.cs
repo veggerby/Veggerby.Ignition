@@ -103,9 +103,8 @@ public static class AzureQueueIgnitionExtensions
     /// to share a client instance across multiple components.
     /// </para>
     /// <para>
-    /// For staged execution, set <c>options.Stage</c> in the configuration delegate, but note
-    /// that this overload requires an existing <see cref="QueueServiceClient"/> in DI and cannot
-    /// properly support staged factory-based scenarios. Use the connection string factory overload instead.
+    /// <strong>Note:</strong> This overload does not support staged execution. For staged execution
+    /// scenarios (e.g., with Testcontainers), use the overload that accepts a connection string factory.
     /// </para>
     /// </remarks>
     /// <example>
@@ -128,14 +127,6 @@ public static class AzureQueueIgnitionExtensions
     {
         var options = new AzureQueueReadinessOptions();
         configure?.Invoke(options);
-
-        // If Stage is specified, this method cannot be used (need connection string factory for proper DI)
-        if (options.Stage.HasValue)
-        {
-            throw new InvalidOperationException(
-                "Staged execution with AddAzureQueueReadiness() requires a connection string factory. " +
-                "Use the overload that accepts Func<IServiceProvider, string> connectionStringFactory parameter.");
-        }
 
         services.AddSingleton<IIgnitionSignal>(sp =>
         {

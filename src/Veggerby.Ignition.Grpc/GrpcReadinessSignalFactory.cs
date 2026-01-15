@@ -44,6 +44,7 @@ public sealed class GrpcReadinessSignalFactory : IIgnitionSignalFactory
         var channel = GrpcChannel.ForAddress(serviceUrl);
         var logger = serviceProvider.GetRequiredService<ILogger<GrpcReadinessSignal>>();
         
-        return new GrpcReadinessSignal(channel, serviceUrl, _options, logger);
+        // Signal owns the channel and will dispose it
+        return new GrpcReadinessSignal(channel, serviceUrl, _options, logger, ownsChannel: true);
     }
 }

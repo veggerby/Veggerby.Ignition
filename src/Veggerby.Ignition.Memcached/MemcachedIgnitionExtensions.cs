@@ -73,14 +73,12 @@ public static class MemcachedIgnitionExtensions
             // Register Memcached client if not already registered
             services.AddEnyimMemcached(opts =>
             {
-                foreach (var server in serverList)
+                // Parse and add each server from the list
+                serverList.Select(server =>
                 {
-                    // Parse host:port format
                     var parts = server.Split(':');
-                    var host = parts[0];
-                    var port = parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : 11211;
-                    opts.AddServer(host, port);
-                }
+                    return (Host: parts[0], Port: parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : 11211);
+                }).ToList().ForEach(server => opts.AddServer(server.Host, server.Port));
             });
 
             var innerFactory = new MemcachedReadinessSignalFactory(options);
@@ -99,14 +97,12 @@ public static class MemcachedIgnitionExtensions
         // Register Memcached client as singleton if not already registered
         services.AddEnyimMemcached(opts =>
         {
-            foreach (var server in serverList)
+            // Parse and add each server from the list
+            serverList.Select(server =>
             {
-                // Parse host:port format
                 var parts = server.Split(':');
-                var host = parts[0];
-                var port = parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : 11211;
-                opts.AddServer(host, port);
-            }
+                return (Host: parts[0], Port: parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : 11211);
+            }).ToList().ForEach(server => opts.AddServer(server.Host, server.Port));
         });
 
         services.AddSingleton<IIgnitionSignal>(sp =>

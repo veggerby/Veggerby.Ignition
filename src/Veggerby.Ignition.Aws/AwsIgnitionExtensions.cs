@@ -117,9 +117,8 @@ public static class AwsIgnitionExtensions
     /// to share a client instance across multiple components.
     /// </para>
     /// <para>
-    /// For staged execution, set <c>options.Stage</c> in the configuration delegate, but note
-    /// that this overload requires an existing <see cref="IAmazonS3"/> in DI and cannot
-    /// properly support staged factory-based scenarios. Use the client factory overload instead.
+    /// <strong>Note:</strong> This overload does not support staged execution. For staged execution
+    /// scenarios (e.g., with Testcontainers), use the overload that accepts a client factory.
     /// </para>
     /// </remarks>
     /// <example>
@@ -142,14 +141,6 @@ public static class AwsIgnitionExtensions
     {
         var options = new S3ReadinessOptions();
         configure?.Invoke(options);
-
-        // If Stage is specified, this method cannot be used (need client factory for proper DI)
-        if (options.Stage.HasValue)
-        {
-            throw new InvalidOperationException(
-                "Staged execution with AddS3Readiness() requires a client factory. " +
-                "Use the overload that accepts Func<IServiceProvider, IAmazonS3> clientFactory parameter.");
-        }
 
         services.AddSingleton<IIgnitionSignal>(sp =>
         {

@@ -14,9 +14,10 @@ namespace Veggerby.Ignition.Grpc;
 /// <summary>
 /// Ignition signal for verifying gRPC service readiness via health check protocol.
 /// </summary>
-internal sealed class GrpcReadinessSignal : IIgnitionSignal
+internal sealed class GrpcReadinessSignal : IIgnitionSignal, IDisposable
 {
     private readonly GrpcChannel _channel;
+    private readonly bool _ownsChannel;
     private readonly string _serviceUrl;
     private readonly GrpcReadinessOptions _options;
     private readonly ILogger<GrpcReadinessSignal> _logger;
@@ -30,17 +31,20 @@ internal sealed class GrpcReadinessSignal : IIgnitionSignal
     /// <param name="serviceUrl">Target service URL for diagnostics.</param>
     /// <param name="options">Configuration options for readiness verification.</param>
     /// <param name="logger">Logger for diagnostic output.</param>
+    /// <param name="ownsChannel">Whether this signal owns the channel and should dispose it.</param>
     public GrpcReadinessSignal(
         GrpcChannel channel,
         string serviceUrl,
         GrpcReadinessOptions options,
-        ILogger<GrpcReadinessSignal> logger)
+        ILogger<GrpcReadinessSignal> logger,
+        bool ownsChannel = false)
     {
         _channel = channel ?? throw new ArgumentNullException(nameof(channel));
         ArgumentException.ThrowIfNullOrWhiteSpace(serviceUrl, nameof(serviceUrl));
         _serviceUrl = serviceUrl;
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _ownsChannel = ownsChannel;
     }
 
     /// <inheritdoc/>
@@ -114,6 +118,17 @@ internal sealed class GrpcReadinessSignal : IIgnitionSignal
         {
             _logger.LogError(ex, "gRPC readiness check failed");
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Disposes the gRPC channel if owned by this signal.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_ownsChannel)
+        {
+            _channel?.Dispose();
         }
     }
 }
