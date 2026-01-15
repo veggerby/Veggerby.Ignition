@@ -907,4 +907,5 @@ await app.RunAsync();
 - [Getting Started](getting-started.md) - Basic logging setup
 - [Timeout Management](timeout-management.md) - Timeout diagnostics
 - [Policies](policies.md) - Policy outcome inspection
+- [Metrics Integration](metrics-integration.md) - Production monitoring and alerting
 - [Performance Guide](performance.md) - Performance profiling
