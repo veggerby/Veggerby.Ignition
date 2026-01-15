@@ -34,10 +34,38 @@ public sealed class IgnitionOptions
         }
     }
 
+    private IIgnitionPolicy? _customPolicy;
+
     /// <summary>
     /// Policy determining how failures or timeouts influence startup continuation.
     /// </summary>
+    /// <remarks>
+    /// For custom behavior, use <see cref="CustomPolicy"/> instead.
+    /// When <see cref="CustomPolicy"/> is set, this property is ignored.
+    /// </remarks>
     public IgnitionPolicy Policy { get; set; } = IgnitionPolicy.BestEffort;
+
+    /// <summary>
+    /// Gets or sets a custom policy implementation.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// When set, this overrides the <see cref="Policy"/> property, enabling custom failure handling strategies
+    /// beyond the built-in policies (FailFast, BestEffort, ContinueOnTimeout).
+    /// </para>
+    /// <para>
+    /// Custom policies enable domain-specific logic such as retry strategies, circuit breakers,
+    /// conditional fail-fast, and percentage-based thresholds.
+    /// </para>
+    /// <para>
+    /// When <c>null</c>, the <see cref="Policy"/> enum value is used to select a built-in policy implementation.
+    /// </para>
+    /// </remarks>
+    public IIgnitionPolicy? CustomPolicy
+    {
+        get => _customPolicy;
+        set => _customPolicy = value;
+    }
 
     /// <summary>
     /// Enables Activity tracing for ignition execution when true.
@@ -232,4 +260,42 @@ public sealed class IgnitionOptions
     /// </para>
     /// </remarks>
     public IIgnitionLifecycleHooks? LifecycleHooks { get; set; }
+
+    /// <summary>
+    /// Gets the effective policy to use for ignition execution.
+    /// </summary>
+    /// <returns>
+    /// The custom policy if <see cref="CustomPolicy"/> is set; otherwise, a built-in policy implementation
+    /// corresponding to the <see cref="Policy"/> enum value.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// This method provides backward compatibility by mapping the <see cref="Policy"/> enum to
+    /// <see cref="IIgnitionPolicy"/> implementations:
+    /// <list type="bullet">
+    ///   <item><see cref="IgnitionPolicy.FailFast"/> maps to <see cref="FailFastPolicy"/></item>
+    ///   <item><see cref="IgnitionPolicy.BestEffort"/> maps to <see cref="BestEffortPolicy"/></item>
+    ///   <item><see cref="IgnitionPolicy.ContinueOnTimeout"/> maps to <see cref="ContinueOnTimeoutPolicy"/></item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// When <see cref="CustomPolicy"/> is set, it takes precedence over the <see cref="Policy"/> enum value.
+    /// </para>
+    /// </remarks>
+    internal IIgnitionPolicy GetEffectivePolicy()
+    {
+        if (_customPolicy is not null)
+        {
+            return _customPolicy;
+        }
+
+        // Map built-in enum to IIgnitionPolicy implementation
+        return Policy switch
+        {
+            IgnitionPolicy.FailFast => new FailFastPolicy(),
+            IgnitionPolicy.BestEffort => new BestEffortPolicy(),
+            IgnitionPolicy.ContinueOnTimeout => new ContinueOnTimeoutPolicy(),
+            _ => new BestEffortPolicy()
+        };
+    }
 }

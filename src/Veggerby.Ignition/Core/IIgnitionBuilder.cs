@@ -166,4 +166,48 @@ public interface IIgnitionBuilder
     /// Common use cases include telemetry enrichment, logging, cleanup, and external system integration.
     /// </remarks>
     IIgnitionBuilder WithLifecycleHooks(Func<IServiceProvider, IIgnitionLifecycleHooks> factory);
+
+    /// <summary>
+    /// Configures a custom ignition policy using a concrete instance.
+    /// </summary>
+    /// <param name="policy">The policy instance to use.</param>
+    /// <returns>The builder for fluent chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// Custom policies enable domain-specific failure handling strategies beyond the built-in policies
+    /// (FailFast, BestEffort, ContinueOnTimeout).
+    /// </para>
+    /// <para>
+    /// Common use cases include:
+    /// <list type="bullet">
+    ///   <item>Retry strategies</item>
+    ///   <item>Circuit breakers</item>
+    ///   <item>Conditional fail-fast based on signal importance</item>
+    ///   <item>Percentage-based success thresholds</item>
+    /// </list>
+    /// </para>
+    /// </remarks>
+    IIgnitionBuilder WithCustomPolicy(IIgnitionPolicy policy);
+
+    /// <summary>
+    /// Configures a custom ignition policy by type, allowing DI to construct the policy instance.
+    /// </summary>
+    /// <typeparam name="TPolicy">Concrete implementation of <see cref="IIgnitionPolicy"/>.</typeparam>
+    /// <returns>The builder for fluent chaining.</returns>
+    /// <remarks>
+    /// The policy type must have a constructor compatible with DI resolution.
+    /// Use this overload when the policy requires dependencies injected via constructor.
+    /// </remarks>
+    IIgnitionBuilder WithCustomPolicy<TPolicy>() where TPolicy : class, IIgnitionPolicy;
+
+    /// <summary>
+    /// Configures a custom ignition policy using a factory delegate.
+    /// </summary>
+    /// <param name="policyFactory">Factory delegate that produces the policy using the service provider.</param>
+    /// <returns>The builder for fluent chaining.</returns>
+    /// <remarks>
+    /// Use this overload when the policy requires dependencies from the DI container or
+    /// when you need to configure the policy with specific parameters.
+    /// </remarks>
+    IIgnitionBuilder WithCustomPolicy(Func<IServiceProvider, IIgnitionPolicy> policyFactory);
 }

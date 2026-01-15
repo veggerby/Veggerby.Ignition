@@ -193,6 +193,69 @@ internal sealed class IgnitionBuilder : IIgnitionBuilder
     }
 
     /// <summary>
+    /// Configures a custom ignition policy using a concrete instance.
+    /// </summary>
+    /// <param name="policy">The policy instance to use.</param>
+    /// <returns>The builder for fluent chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// Custom policies enable domain-specific failure handling strategies beyond the built-in policies
+    /// (FailFast, BestEffort, ContinueOnTimeout).
+    /// </para>
+    /// <para>
+    /// Common use cases include:
+    /// <list type="bullet">
+    ///   <item>Retry strategies</item>
+    ///   <item>Circuit breakers</item>
+    ///   <item>Conditional fail-fast based on signal importance</item>
+    ///   <item>Percentage-based success thresholds</item>
+    /// </list>
+    /// </para>
+    /// </remarks>
+    public IIgnitionBuilder WithCustomPolicy(IIgnitionPolicy policy)
+    {
+        ArgumentNullException.ThrowIfNull(policy, nameof(policy));
+
+        _services.AddIgnitionPolicy(policy);
+
+        return this;
+    }
+
+    /// <summary>
+    /// Configures a custom ignition policy by type, allowing DI to construct the policy instance.
+    /// </summary>
+    /// <typeparam name="TPolicy">Concrete implementation of <see cref="IIgnitionPolicy"/>.</typeparam>
+    /// <returns>The builder for fluent chaining.</returns>
+    /// <remarks>
+    /// The policy type must have a constructor compatible with DI resolution.
+    /// Use this overload when the policy requires dependencies injected via constructor.
+    /// </remarks>
+    public IIgnitionBuilder WithCustomPolicy<TPolicy>() where TPolicy : class, IIgnitionPolicy
+    {
+        _services.AddIgnitionPolicy<TPolicy>();
+
+        return this;
+    }
+
+    /// <summary>
+    /// Configures a custom ignition policy using a factory delegate.
+    /// </summary>
+    /// <param name="policyFactory">Factory delegate that produces the policy using the service provider.</param>
+    /// <returns>The builder for fluent chaining.</returns>
+    /// <remarks>
+    /// Use this overload when the policy requires dependencies from the DI container or
+    /// when you need to configure the policy with specific parameters.
+    /// </remarks>
+    public IIgnitionBuilder WithCustomPolicy(Func<IServiceProvider, IIgnitionPolicy> policyFactory)
+    {
+        ArgumentNullException.ThrowIfNull(policyFactory, nameof(policyFactory));
+
+        _services.AddIgnitionPolicy(policyFactory);
+
+        return this;
+    }
+
+    /// <summary>
     /// Internal method to finalize registration by applying all configurations to the service collection.
     /// </summary>
     internal void Build()
