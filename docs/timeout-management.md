@@ -679,6 +679,380 @@ builder.Services.AddIgnition(options =>
 });
 ```
 
+## Category-Based Timeout Strategies
+
+Group signals by category and apply category-specific timeout strategies using `IIgnitionTimeoutStrategy`.
+
+### Timeout Strategy Interface
+
+```csharp
+public interface IIgnitionTimeoutStrategy
+{
+    /// <summary>
+    /// Determines the effective timeout and cancellation behavior for a signal.
+    /// </summary>
+    /// <param name="signal">The signal to evaluate.</param>
+    /// <returns>A tuple of (timeout duration, whether to cancel on timeout).</returns>
+    (TimeSpan? timeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal);
+}
+```
+
+### Example: Category-Based Strategy
+
+```csharp
+using Veggerby.Ignition;
+
+public sealed class CategoryBasedTimeoutStrategy : IIgnitionTimeoutStrategy
+{
+    private readonly Dictionary<string, (TimeSpan timeout, bool cancel)> _categoryTimeouts;
+    private readonly (TimeSpan timeout, bool cancel) _defaultTimeout;
+
+    public CategoryBasedTimeoutStrategy()
+    {
+        _categoryTimeouts = new Dictionary<string, (TimeSpan, bool)>
+        {
+            ["critical"] = (TimeSpan.FromSeconds(5), true),       // Short, hard cancel
+            ["infrastructure"] = (TimeSpan.FromSeconds(15), true), // Medium, hard cancel
+            ["warmup"] = (TimeSpan.FromSeconds(30), false),        // Long, soft timeout
+            ["optional"] = (TimeSpan.FromMinutes(2), false)        // Very long, soft
+        };
+
+        _defaultTimeout = (TimeSpan.FromSeconds(10), true);
+    }
+
+    public (TimeSpan? timeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal)
+    {
+        // Categorize by signal name prefix
+        var category = GetCategory(signal.Name);
+
+        if (_categoryTimeouts.TryGetValue(category, out var config))
+        {
+            return (config.timeout, config.cancel);
+        }
+
+        // Fall back to signal's own timeout if specified
+        if (signal.Timeout.HasValue)
+        {
+            return (signal.Timeout, true);
+        }
+
+        // Use default
+        return (_defaultTimeout.timeout, _defaultTimeout.cancel);
+    }
+
+    private string GetCategory(string signalName)
+    {
+        if (signalName.StartsWith("critical-") || signalName.EndsWith("-critical"))
+        {
+            return "critical";
+        }
+
+        if (signalName.Contains("database") || signalName.Contains("auth"))
+        {
+            return "critical";
+        }
+
+        if (signalName.Contains("cache") || signalName.Contains("redis"))
+        {
+            return "infrastructure";
+        }
+
+        if (signalName.Contains("warmup") || signalName.Contains("preload"))
+        {
+            return "warmup";
+        }
+
+        if (signalName.Contains("optional") || signalName.Contains("analytics"))
+        {
+            return "optional";
+        }
+
+        return "infrastructure"; // Default category
+    }
+}
+
+// Usage
+builder.Services.AddIgnition(opts =>
+{
+    opts.TimeoutStrategy = new CategoryBasedTimeoutStrategy();
+    opts.GlobalTimeout = TimeSpan.FromSeconds(60);
+});
+```
+
+### Example: Attribute-Based Strategy
+
+```csharp
+[AttributeUsage(AttributeTargets.Class)]
+public sealed class SignalCategoryAttribute : Attribute
+{
+    public string Category { get; }
+
+    public SignalCategoryAttribute(string category)
+    {
+        Category = category ?? throw new ArgumentNullException(nameof(category));
+    }
+}
+
+[SignalCategory("critical")]
+public sealed class DatabaseSignal : IIgnitionSignal
+{
+    public string Name => "database";
+    public TimeSpan? Timeout => null; // Defer to strategy
+
+    public async Task WaitAsync(CancellationToken ct)
+    {
+        // Implementation
+    }
+}
+
+public sealed class AttributeBasedTimeoutStrategy : IIgnitionTimeoutStrategy
+{
+    private readonly Dictionary<string, (TimeSpan timeout, bool cancel)> _categoryTimeouts;
+
+    public AttributeBasedTimeoutStrategy()
+    {
+        _categoryTimeouts = new Dictionary<string, (TimeSpan, bool)>
+        {
+            ["critical"] = (TimeSpan.FromSeconds(5), true),
+            ["infrastructure"] = (TimeSpan.FromSeconds(15), true),
+            ["warmup"] = (TimeSpan.FromSeconds(30), false),
+            ["optional"] = (TimeSpan.FromMinutes(2), false)
+        };
+    }
+
+    public (TimeSpan? timeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal)
+    {
+        var attribute = signal.GetType().GetCustomAttribute<SignalCategoryAttribute>();
+        if (attribute != null && _categoryTimeouts.TryGetValue(attribute.Category, out var config))
+        {
+            return (config.timeout, config.cancel);
+        }
+
+        return (signal.Timeout, true);
+    }
+}
+```
+
+## Environment-Specific Timeout Strategies
+
+Adapt timeouts based on deployment environment (Development, Staging, Production).
+
+### Development vs Production
+
+```csharp
+public sealed class EnvironmentAwareTimeoutStrategy : IIgnitionTimeoutStrategy
+{
+    private readonly IWebHostEnvironment _environment;
+    private readonly double _developmentMultiplier;
+    private readonly double _productionMultiplier;
+
+    public EnvironmentAwareTimeoutStrategy(
+        IWebHostEnvironment environment,
+        double developmentMultiplier = 2.0,
+        double productionMultiplier = 1.0)
+    {
+        _environment = environment ?? throw new ArgumentNullException(nameof(environment));
+        _developmentMultiplier = developmentMultiplier;
+        _productionMultiplier = productionMultiplier;
+    }
+
+    public (TimeSpan? timeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal)
+    {
+        var baseTimeout = signal.Timeout ?? TimeSpan.FromSeconds(10);
+
+        var multiplier = _environment.IsDevelopment()
+            ? _developmentMultiplier
+            : _productionMultiplier;
+
+        var adjustedTimeout = TimeSpan.FromMilliseconds(baseTimeout.TotalMilliseconds * multiplier);
+
+        // Production: hard cancel; Development: soft timeout for debugging
+        var cancelImmediately = _environment.IsProduction();
+
+        return (adjustedTimeout, cancelImmediately);
+    }
+}
+
+// Usage
+builder.Services.AddIgnition(opts =>
+{
+    opts.TimeoutStrategy = new EnvironmentAwareTimeoutStrategy(
+        builder.Environment,
+        developmentMultiplier: 3.0,  // 3x longer in dev
+        productionMultiplier: 1.0);  // Normal in prod
+
+    opts.GlobalTimeout = builder.Environment.IsDevelopment()
+        ? TimeSpan.FromMinutes(5)
+        : TimeSpan.FromSeconds(30);
+});
+```
+
+### Configuration-Based Strategy
+
+Load timeout configuration from `appsettings.json`:
+
+**appsettings.Development.json:**
+
+```json
+{
+  "Ignition": {
+    "Timeouts": {
+      "database": "00:00:30",
+      "cache": "00:01:00",
+      "messaging": "00:00:45",
+      "default": "00:00:20"
+    },
+    "CancelOnTimeout": false
+  }
+}
+```
+
+**appsettings.Production.json:**
+
+```json
+{
+  "Ignition": {
+    "Timeouts": {
+      "database": "00:00:10",
+      "cache": "00:00:15",
+      "messaging": "00:00:12",
+      "default": "00:00:10"
+    },
+    "CancelOnTimeout": true
+  }
+}
+```
+
+**Strategy Implementation:**
+
+```csharp
+public sealed class ConfigurationBasedTimeoutStrategy : IIgnitionTimeoutStrategy
+{
+    private readonly IConfiguration _configuration;
+
+    public ConfigurationBasedTimeoutStrategy(IConfiguration configuration)
+    {
+        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+    }
+
+    public (TimeSpan? timeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal)
+    {
+        var timeoutSection = _configuration.GetSection("Ignition:Timeouts");
+        var cancelOnTimeout = _configuration.GetValue<bool>("Ignition:CancelOnTimeout", true);
+
+        // Try signal-specific timeout
+        var timeoutStr = timeoutSection[signal.Name];
+        if (!string.IsNullOrEmpty(timeoutStr) && TimeSpan.TryParse(timeoutStr, out var timeout))
+        {
+            return (timeout, cancelOnTimeout);
+        }
+
+        // Fall back to default
+        var defaultTimeoutStr = timeoutSection["default"];
+        if (!string.IsNullOrEmpty(defaultTimeoutStr) && TimeSpan.TryParse(defaultTimeoutStr, out var defaultTimeout))
+        {
+            return (defaultTimeout, cancelOnTimeout);
+        }
+
+        // Use signal's own timeout
+        return (signal.Timeout, cancelOnTimeout);
+    }
+}
+
+// Usage
+builder.Services.AddIgnition(opts =>
+{
+    opts.TimeoutStrategy = new ConfigurationBasedTimeoutStrategy(builder.Configuration);
+});
+```
+
+## Per-Signal vs Global Timeout Interaction Diagrams
+
+### Diagram 1: Soft Global Timeout (Default)
+
+```text
+Timeline (seconds):  0----5----10----15----20----25----30----35----40
+Global Timeout (30s, soft): [=====================================|
+Signal A (5s):             [====]
+Signal B (10s):            [=========]
+Signal C (no timeout):     [========================================]
+
+Outcome:
+- Signal A: Succeeded (completed at 5s)
+- Signal B: Succeeded (completed at 10s)
+- Signal C: Succeeded (completed at 40s, exceeds global but soft)
+- Result.TimedOut: false (all signals succeeded despite global timeout elapse)
+```
+
+### Diagram 2: Hard Global Timeout
+
+```text
+Timeline (seconds):  0----5----10----15----20----25----30----35----40
+Global Timeout (30s, hard): [============================X
+Signal A (5s):             [====]
+Signal B (10s):            [=========]
+Signal C (no timeout):     [===========================X (cancelled)
+
+Outcome:
+- Signal A: Succeeded (completed at 5s)
+- Signal B: Succeeded (completed at 10s)
+- Signal C: TimedOut (cancelled at 30s by global timeout)
+- Result.TimedOut: true (global timeout triggered)
+```
+
+### Diagram 3: Per-Signal Timeout Only
+
+```text
+Timeline (seconds):  0----5----10----15----20----25----30
+Global Timeout (60s, soft): [==============================...
+Signal A (timeout=5s):    [====]
+Signal B (timeout=10s):   [==X (timed out, not cancelled)
+Signal C (no timeout):    [==============================]
+
+Outcome:
+- Signal A: Succeeded (completed at 5s)
+- Signal B: TimedOut (exceeded 10s timeout but not cancelled)
+- Signal C: Succeeded (completed at 30s)
+- Result.TimedOut: true (Signal B timed out)
+```
+
+### Diagram 4: Combined Global + Per-Signal Timeout
+
+```text
+Timeline (seconds):  0----5----10----15----20----25----30----35
+Global Timeout (30s, hard): [============================X
+Per-signal timeout enabled (CancelIndividualOnTimeout=true)
+Signal A (timeout=5s):    [====]
+Signal B (timeout=10s):   [==X (cancelled at 10s)
+Signal C (timeout=40s):   [===========================X (cancelled at 30s by global)
+
+Outcome:
+- Signal A: Succeeded (completed at 5s)
+- Signal B: TimedOut (exceeded 10s, cancelled immediately)
+- Signal C: TimedOut (global timeout at 30s < signal timeout 40s)
+- Result.TimedOut: true (both B and C timed out)
+```
+
+### Diagram 5: Best-Effort Policy with Mixed Timeouts
+
+```text
+Timeline (seconds):  0----5----10----15----20----25----30
+Global Timeout (30s, soft): [==============================|
+Policy: BestEffort
+Signal A (timeout=5s):    [====]
+Signal B (timeout=8s):    [=====X (times out, continues)
+Signal C (no timeout):    [==============================]
+Signal D (timeout=15s):   [==============]
+
+Outcome:
+- Signal A: Succeeded (5s)
+- Signal B: TimedOut (exceeded 8s but continued, completed at 25s)
+- Signal C: Succeeded (30s)
+- Signal D: Succeeded (15s)
+- Result.TimedOut: true (Signal B timed out)
+- Application continues (BestEffort policy)
+```
+
 ## Troubleshooting Timeout Issues
 
 ### Signal Always Times Out

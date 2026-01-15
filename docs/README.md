@@ -72,6 +72,13 @@ Welcome to the comprehensive documentation for Veggerby.Ignition, a lightweight 
   - Creating custom bundles
   - Testing and publishing bundles
 
+- [Cancellation Scopes](cancellation-scopes.md)
+  - ICancellationScope and IScopedIgnitionSignal usage
+  - Bundle-scoped cancellation patterns
+  - Dependency-triggered cancellation
+  - Hierarchical cancellation trees
+  - CancelDependentsOnFailure option
+
 - [Advanced Patterns](advanced-patterns.md)
   - Composite signals
   - Custom signal factories
@@ -87,6 +94,14 @@ Welcome to the comprehensive documentation for Veggerby.Ignition, a lightweight 
   - Activity tracing with OpenTelemetry
   - Health check integration
   - Monitoring and alerting
+
+- [Metrics Integration](metrics-integration.md)
+  - IIgnitionMetrics interface overview
+  - OpenTelemetry integration
+  - Prometheus.NET integration
+  - Custom metrics backend patterns
+  - Metrics emitted by coordinator
+  - Production monitoring and alerting
 
 - [Performance Guide](performance.md)
   - Concurrency limiting
@@ -107,6 +122,15 @@ Welcome to the comprehensive documentation for Veggerby.Ignition, a lightweight 
   - Interfaces, classes, and enums
   - Extension methods
   - Configuration options
+
+- [Creating Integration Packages](creating-integration-packages.md)
+  - Package structure and naming conventions
+  - Retry policy integration patterns
+  - Factory pattern implementation
+  - Testing with Testcontainers
+  - XML documentation standards
+  - Directory.Build.props integration
+  - README template
 
 ## Additional Resources
 
