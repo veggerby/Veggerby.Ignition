@@ -596,6 +596,45 @@ public async Task FailFast_Sequential_StopsOnFirstFailure()
 - `docs/integration-recipes.md`: Integration package recipes
 - `docs/new-features.md`: Feature epics and roadmap
 
+### CHANGELOG Maintenance
+
+**When to Update CHANGELOG.md:**
+
+- User-visible changes (new features, API changes, bug fixes, performance improvements)
+- **Do NOT update** for: internal refactoring, unit test changes, documentation-only updates without behavior changes, build/CI configuration changes
+- Update `[Unreleased]` section during development, which will be converted to a version tag at release time
+
+**Format Guidelines:**
+
+- Follow [Keep a Changelog](https://keepachangelog.com/) format with Added/Changed/Fixed/Removed sections
+- **Only include important topics**: Focus on user-impacting changes
+- **Consolidate related changes**: If multiple commits modify the same feature before release, combine them into a single entry representing the net change
+  - Example: "Added A" → "Changed A to B" → "Moved B to C" consolidates to "Added C"
+  - Rationale: Users only care about the final state vs. the last release, not intermediate steps
+- Be specific about what changed and why it matters to users
+- Include package names when changes apply to integration packages
+- Link to issues/PRs when relevant for context
+
+**Consolidation Examples:**
+
+✅ **Good (consolidated):**
+
+- "PostgreSQL: Added factory tests for `PostgresReadinessSignalFactory` with DI resolution support"
+
+❌ **Bad (unconsolidated):**
+
+- "Added `PostgresReadinessSignalFactory` tests"
+- "Fixed PostgreSQL test compilation errors"
+- "Added Microsoft.Extensions.Logging to Postgres tests"
+- "Fixed ambiguous constructor in Postgres tests"
+
+**Entry Format:**
+
+- Use present tense: "Add feature" not "Added feature"
+- Start with affected component when applicable: "PostgreSQL: ...", "RabbitMQ: ...", "Core: ..."
+- Group related changes under the same section (Added/Changed/Fixed)
+- Use bullet points with sub-bullets for details when needed
+
 ## Debugging and Troubleshooting
 
 **Common Issues:**

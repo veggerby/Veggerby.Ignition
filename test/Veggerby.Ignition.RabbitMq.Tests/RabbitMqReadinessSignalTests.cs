@@ -1,6 +1,10 @@
+using AwesomeAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using NSubstitute;
 using RabbitMQ.Client;
 using Veggerby.Ignition.RabbitMq;
+using Xunit;
 
 namespace Veggerby.Ignition.RabbitMq.Tests;
 
@@ -319,5 +323,204 @@ public class RabbitMqReadinessSignalTests
 
         // assert - should complete without throwing
         await connectionFactory.Received(1).CreateConnectionAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void RabbitMqReadinessOptions_DefaultValues_AreCorrect()
+    {
+        // arrange & act
+        var options = new RabbitMqReadinessOptions();
+
+        // assert
+        options.MaxRetries.Should().Be(3);
+        options.RetryDelay.Should().Be(TimeSpan.FromMilliseconds(100));
+        options.VerifyQueues.Should().BeEmpty();
+        options.VerifyExchanges.Should().BeEmpty();
+        options.FailOnMissingTopology.Should().BeTrue();
+        options.PerformRoundTripTest.Should().BeFalse();
+        options.RoundTripTestTimeout.Should().Be(TimeSpan.FromSeconds(5));
+        options.Timeout.Should().BeNull();
+    }
+
+    [Fact]
+    public void RabbitMqReadinessOptions_WithQueue_AddsQueueToCollection()
+    {
+        // arrange
+        var options = new RabbitMqReadinessOptions();
+
+        // act
+        var result = options.WithQueue("queue1");
+
+        // assert
+        result.Should().BeSameAs(options);
+        options.VerifyQueues.Should().Contain("queue1");
+    }
+
+    [Fact]
+    public void RabbitMqReadinessOptions_WithExchange_AddsExchangeToCollection()
+    {
+        // arrange
+        var options = new RabbitMqReadinessOptions();
+
+        // act
+        var result = options.WithExchange("exchange1");
+
+        // assert
+        result.Should().BeSameAs(options);
+        options.VerifyExchanges.Should().Contain("exchange1");
+    }
+
+    [Fact]
+    public void RabbitMqReadinessSignalFactory_NullConnectionStringFactory_ThrowsArgumentNullException()
+    {
+        // arrange
+        var options = new RabbitMqReadinessOptions();
+
+        // act & assert
+        Assert.Throws<ArgumentNullException>(() => new RabbitMqReadinessSignalFactory(null!, options));
+    }
+
+    [Fact]
+    public void RabbitMqReadinessSignalFactory_NullOptions_ThrowsArgumentNullException()
+    {
+        // arrange
+        Func<IServiceProvider, string> factory = _ => "amqp://localhost";
+
+        // act & assert
+        Assert.Throws<ArgumentNullException>(() => new RabbitMqReadinessSignalFactory(factory, null!));
+    }
+
+    [Fact]
+    public void RabbitMqReadinessSignalFactory_Name_ReturnsExpectedValue()
+    {
+        // arrange
+        var options = new RabbitMqReadinessOptions();
+        var factory = new RabbitMqReadinessSignalFactory(_ => "amqp://localhost", options);
+
+        // act & assert
+        factory.Name.Should().Be("rabbitmq-readiness");
+    }
+
+    [Fact]
+    public void RabbitMqReadinessSignalFactory_Timeout_ReturnsOptionsTimeout()
+    {
+        // arrange
+        var timeout = TimeSpan.FromSeconds(20);
+        var options = new RabbitMqReadinessOptions { Timeout = timeout };
+        var factory = new RabbitMqReadinessSignalFactory(_ => "amqp://localhost", options);
+
+        // act & assert
+        factory.Timeout.Should().Be(timeout);
+    }
+
+    [Fact]
+    public void RabbitMqReadinessSignalFactory_Stage_ReturnsOptionsStage()
+    {
+        // arrange
+        var options = new RabbitMqReadinessOptions { Stage = 3 };
+        var factory = new RabbitMqReadinessSignalFactory(_ => "amqp://localhost", options);
+
+        // act & assert
+        factory.Stage.Should().Be(3);
+    }
+
+    [Fact]
+    public void RabbitMqReadinessSignalFactory_CreateSignal_ReturnsSignalWithCorrectConnectionFactory()
+    {
+        // arrange
+        var connectionString = "amqp://testhost:5672/vhost";
+        var options = new RabbitMqReadinessOptions();
+        var factory = new RabbitMqReadinessSignalFactory(_ => connectionString, options);
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var sp = services.BuildServiceProvider();
+
+        // act
+        var signal = factory.CreateSignal(sp);
+
+        // assert
+        signal.Should().NotBeNull();
+        signal.Name.Should().Be("rabbitmq-readiness");
+        signal.Timeout.Should().Be(options.Timeout);
+    }
+
+    [Fact]
+    public void RabbitMqReadinessSignalFactory_CreateSignal_ResolvesConnectionStringFromServiceProvider()
+    {
+        // arrange
+        var options = new RabbitMqReadinessOptions();
+        var expectedConnectionString = "amqp://dynamic-host";
+        
+        var factory = new RabbitMqReadinessSignalFactory(sp =>
+        {
+            // Simulate resolving from configuration
+            return sp.GetService<string>() ?? expectedConnectionString;
+        }, options);
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton("amqp://from-di");
+        var sp = services.BuildServiceProvider();
+
+        // act
+        var signal = factory.CreateSignal(sp);
+
+        // assert
+        signal.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void RabbitMqReadinessSignalFactory_MultipleCreateSignal_ReturnsNewInstances()
+    {
+        // arrange
+        var options = new RabbitMqReadinessOptions();
+        var factory = new RabbitMqReadinessSignalFactory(_ => "amqp://localhost", options);
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var sp = services.BuildServiceProvider();
+
+        // act
+        var signal1 = factory.CreateSignal(sp);
+        var signal2 = factory.CreateSignal(sp);
+
+        // assert
+        signal1.Should().NotBeNull();
+        signal2.Should().NotBeNull();
+        signal1.Should().NotBeSameAs(signal2);
+    }
+
+    [Fact]
+    public void Constructor_NullConnectionFactory_ThrowsArgumentNullException()
+    {
+        // arrange
+        var options = new RabbitMqReadinessOptions();
+        var logger = Substitute.For<ILogger<RabbitMqReadinessSignal>>();
+
+        // act & assert
+        Assert.Throws<ArgumentNullException>(() => new RabbitMqReadinessSignal((IConnectionFactory)null!, options, logger));
+    }
+
+    [Fact]
+    public void Constructor_NullOptions_ThrowsArgumentNullException()
+    {
+        // arrange
+        var connectionFactory = Substitute.For<IConnectionFactory>();
+        var logger = Substitute.For<ILogger<RabbitMqReadinessSignal>>();
+
+        // act & assert
+        Assert.Throws<ArgumentNullException>(() => new RabbitMqReadinessSignal(connectionFactory, null!, logger));
+    }
+
+    [Fact]
+    public void Constructor_NullLogger_ThrowsArgumentNullException()
+    {
+        // arrange
+        var connectionFactory = Substitute.For<IConnectionFactory>();
+        var options = new RabbitMqReadinessOptions();
+
+        // act & assert
+        Assert.Throws<ArgumentNullException>(() => new RabbitMqReadinessSignal(connectionFactory, options, null!));
     }
 }

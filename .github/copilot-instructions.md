@@ -126,7 +126,12 @@ public async Task FailFast_Sequential_StopsOnFirstFailure()
 
 * All public types/members require XML docs describing semantics, especially timeout/cancellation interactions and policy behaviors.
 * Update `README.md` for any new public policy, execution mode, health check semantics, or classification logic changes.
-* Add CHANGELOG entry for user-visible changes (new option, behavioral shift, performance improvement) when a changelog exists.
+* Add CHANGELOG entry for user-visible changes following consolidation rules:
+  - Only include important, user-impacting changes (skip internal refactoring, unit test changes, documentation-only updates)
+  - Consolidate related changes: if multiple commits modify the same feature before release, combine into one entry representing the net change from last release
+  - Example: "Added A" + "Changed A to B" + "Moved B to C" = "Added C" (users don't need intermediate steps)
+  - Format: Follow [Keep a Changelog](https://keepachangelog.com/) with Added/Changed/Fixed sections under `[Unreleased]`
+  - Be specific: include package names for integration changes, describe what changed and why it matters
 * Keep examples deterministic and concise.
 * Remove stale roadmap items once implemented; do not leave completed items lingering.
 

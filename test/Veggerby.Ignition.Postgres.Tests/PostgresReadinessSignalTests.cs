@@ -1,6 +1,10 @@
+using AwesomeAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Npgsql;
+using NSubstitute;
 using Veggerby.Ignition.Postgres;
+using Xunit;
 
 namespace Veggerby.Ignition.Postgres.Tests;
 
@@ -156,4 +160,159 @@ public class PostgresReadinessSignalTests
         var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => signal.WaitAsync(cts.Token));
         exception.Should().NotBeNull();
     }
-}
+
+    [Fact]
+    public void PostgresReadinessOptions_DefaultValues_AreCorrect()
+    {
+        // arrange & act
+        var options = new PostgresReadinessOptions();
+
+        // assert
+        options.MaxRetries.Should().Be(3);
+        options.RetryDelay.Should().Be(TimeSpan.FromMilliseconds(100));
+        options.ValidationQuery.Should().BeNull();
+        options.Timeout.Should().BeNull();
+        options.Stage.Should().BeNull();
+    }
+
+    [Fact]
+    public void PostgresReadinessOptions_CustomValues_ArePreserved()
+    {
+        // arrange & act
+        var options = new PostgresReadinessOptions
+        {
+            MaxRetries = 10,
+            RetryDelay = TimeSpan.FromSeconds(1),
+            ValidationQuery = "SELECT version();",
+            Timeout = TimeSpan.FromSeconds(30),
+            Stage = 2
+        };
+
+        // assert
+        options.MaxRetries.Should().Be(10);
+        options.RetryDelay.Should().Be(TimeSpan.FromSeconds(1));
+        options.ValidationQuery.Should().Be("SELECT version();");
+        options.Timeout.Should().Be(TimeSpan.FromSeconds(30));
+        options.Stage.Should().Be(2);
+    }
+
+    [Fact]
+    public void PostgresReadinessSignalFactory_NullConnectionStringFactory_ThrowsArgumentNullException()
+    {
+        // arrange
+        var options = new PostgresReadinessOptions();
+
+        // act & assert
+        Assert.Throws<ArgumentNullException>(() => new PostgresReadinessSignalFactory(null!, options));
+    }
+
+    [Fact]
+    public void PostgresReadinessSignalFactory_NullOptions_ThrowsArgumentNullException()
+    {
+        // arrange
+        Func<IServiceProvider, string> factory = _ => "Host=localhost;";
+
+        // act & assert
+        Assert.Throws<ArgumentNullException>(() => new PostgresReadinessSignalFactory(factory, null!));
+    }
+
+    [Fact]
+    public void PostgresReadinessSignalFactory_Name_ReturnsExpectedValue()
+    {
+        // arrange
+        var options = new PostgresReadinessOptions();
+        var factory = new PostgresReadinessSignalFactory(_ => "Host=localhost;", options);
+
+        // act & assert
+        factory.Name.Should().Be("postgres-readiness");
+    }
+
+    [Fact]
+    public void PostgresReadinessSignalFactory_Timeout_ReturnsOptionsTimeout()
+    {
+        // arrange
+        var timeout = TimeSpan.FromSeconds(20);
+        var options = new PostgresReadinessOptions { Timeout = timeout };
+        var factory = new PostgresReadinessSignalFactory(_ => "Host=localhost;", options);
+
+        // act & assert
+        factory.Timeout.Should().Be(timeout);
+    }
+
+    [Fact]
+    public void PostgresReadinessSignalFactory_Stage_ReturnsOptionsStage()
+    {
+        // arrange
+        var options = new PostgresReadinessOptions { Stage = 3 };
+        var factory = new PostgresReadinessSignalFactory(_ => "Host=localhost;", options);
+
+        // act & assert
+        factory.Stage.Should().Be(3);
+    }
+
+    [Fact]
+    public void PostgresReadinessSignalFactory_CreateSignal_ReturnsSignalWithCorrectConnectionString()
+    {
+        // arrange
+        var connectionString = "Host=testhost;Database=testdb;Username=user;";
+        var options = new PostgresReadinessOptions();
+        var factory = new PostgresReadinessSignalFactory(_ => connectionString, options);
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var sp = services.BuildServiceProvider();
+
+        // act
+        var signal = factory.CreateSignal(sp);
+
+        // assert
+        signal.Should().NotBeNull();
+        signal.Name.Should().Be("postgres-readiness");
+        signal.Timeout.Should().Be(options.Timeout);
+    }
+
+    [Fact]
+    public void PostgresReadinessSignalFactory_CreateSignal_ResolvesConnectionStringFromServiceProvider()
+    {
+        // arrange
+        var options = new PostgresReadinessOptions();
+        var expectedConnectionString = "Host=dynamic-host;";
+        
+        var factory = new PostgresReadinessSignalFactory(sp =>
+        {
+            // Simulate resolving from configuration
+            return sp.GetService<string>() ?? expectedConnectionString;
+        }, options);
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton("Host=from-di;");
+        var sp = services.BuildServiceProvider();
+
+        // act
+        var signal = factory.CreateSignal(sp);
+
+        // assert
+        signal.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void PostgresReadinessSignalFactory_MultipleCreateSignal_ReturnsNewInstances()
+    {
+        // arrange
+        var options = new PostgresReadinessOptions();
+        var factory = new PostgresReadinessSignalFactory(_ => "Host=localhost;", options);
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var sp = services.BuildServiceProvider();
+
+        // act
+        var signal1 = factory.CreateSignal(sp);
+        var signal2 = factory.CreateSignal(sp);
+
+        // assert
+        signal1.Should().NotBeNull();
+        signal2.Should().NotBeNull();
+        signal1.Should().NotBeSameAs(signal2);
+    }}
