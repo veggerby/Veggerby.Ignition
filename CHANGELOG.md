@@ -8,7 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
-- None.
+- **Custom Policy Support (`IIgnitionPolicy`)**: Extensible policy system for custom failure handling strategies
+  - `IIgnitionPolicy` interface with `ShouldContinue(IgnitionPolicyContext)` method for policy decisions
+  - `IgnitionPolicyContext` class providing signal result, completed signals, total count, elapsed time, and execution mode
+  - Built-in policy implementations: `FailFastPolicy`, `BestEffortPolicy`, `ContinueOnTimeoutPolicy`
+  - `IgnitionOptions.CustomPolicy` property to override built-in `Policy` enum
+  - `GetEffectivePolicy()` method for backward-compatible policy resolution
+  - DI registration methods: `AddIgnitionPolicy(instance)`, `AddIgnitionPolicy(factory)`, `AddIgnitionPolicy<TPolicy>()`
+  - Simple Mode API methods: `WithCustomPolicy(instance)`, `WithCustomPolicy(factory)`, `WithCustomPolicy<TPolicy>()`
+  - Enables custom logic: retry strategies, circuit breakers, conditional fail-fast, percentage-based thresholds
+  - Comprehensive test coverage: 18 new tests covering custom policies, DI integration, and Simple Mode API
+- **Documentation Updates**: AGENTS.md and copilot-instructions.md enhanced with CHANGELOG maintenance guidelines
+  - Only include user-impacting changes (exclude unit test changes, internal refactoring, build/CI configuration)
+  - Consolidate related changes into single entries representing net change from last release
+  - Follow Keep a Changelog format with Added/Changed/Fixed sections
 
 ### Changed
 
@@ -16,7 +29,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
-- None.
+- **FailFastPolicy Semantics**: Changed to only stop execution on `Failed` status
+  - `TimedOut`, `Skipped`, and `Cancelled` statuses now treated as non-failures
+  - Aligns implementation with documentation and expected behavior
 
 ## [0.5.0] - 2026-01-14
 
