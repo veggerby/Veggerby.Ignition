@@ -80,23 +80,28 @@ internal sealed class GrpcReadinessSignal : IIgnitionSignal
 
         try
         {
-            var client = new Health.HealthClient(_channel);
+            var retryPolicy = new RetryPolicy(_options.MaxRetries, _options.RetryDelay, _logger);
 
-            var request = new HealthCheckRequest
+            await retryPolicy.ExecuteAsync(async ct =>
             {
-                Service = _options.ServiceName ?? string.Empty
-            };
+                var client = new Health.HealthClient(_channel);
 
-            var response = await client.CheckAsync(request, cancellationToken: cancellationToken).ConfigureAwait(false);
+                var request = new HealthCheckRequest
+                {
+                    Service = _options.ServiceName ?? string.Empty
+                };
 
-            activity?.SetTag("grpc.health_status", response.Status.ToString());
+                var response = await client.CheckAsync(request, cancellationToken: ct).ConfigureAwait(false);
 
-            if (response.Status != HealthCheckResponse.Types.ServingStatus.Serving)
-            {
-                var message = $"gRPC service health check returned non-serving status: {response.Status}";
-                _logger.LogError(message);
-                throw new InvalidOperationException(message);
-            }
+                activity?.SetTag("grpc.health_status", response.Status.ToString());
+
+                if (response.Status != HealthCheckResponse.Types.ServingStatus.Serving)
+                {
+                    var message = $"gRPC service health check returned non-serving status: {response.Status}";
+                    _logger.LogError(message);
+                    throw new InvalidOperationException(message);
+                }
+            }, "gRPC health check", cancellationToken);
 
             _logger.LogInformation("gRPC readiness check completed successfully");
         }

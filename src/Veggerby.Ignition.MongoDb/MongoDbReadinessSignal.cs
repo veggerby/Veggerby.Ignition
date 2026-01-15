@@ -104,12 +104,16 @@ internal sealed class MongoDbReadinessSignal : IIgnitionSignal
             // Resolve client from factory if needed
             var client = _client ?? _clientFactory!();
 
+            var retryPolicy = new RetryPolicy(_options.MaxRetries, _options.RetryDelay, _logger);
+
             // Ping the cluster to verify connectivity
-            var database = client.GetDatabase("admin");
-            var command = new BsonDocument("ping", 1);
-            await database.RunCommandAsync<BsonDocument>(command, cancellationToken: cancellationToken);
-            
-            _logger.LogDebug("MongoDB cluster ping successful");
+            await retryPolicy.ExecuteAsync(async ct =>
+            {
+                var database = client.GetDatabase("admin");
+                var command = new BsonDocument("ping", 1);
+                await database.RunCommandAsync<BsonDocument>(command, cancellationToken: ct).ConfigureAwait(false);
+                _logger.LogDebug("MongoDB cluster ping successful");
+            }, "MongoDB connection", cancellationToken);
 
             // Verify collection if specified
             if (!string.IsNullOrWhiteSpace(_options.DatabaseName) && !string.IsNullOrWhiteSpace(_options.VerifyCollection))

@@ -73,17 +73,22 @@ internal sealed class MemcachedReadinessSignal : IIgnitionSignal
 
         try
         {
+            var retryPolicy = new RetryPolicy(_options.MaxRetries, _options.RetryDelay, _logger);
+
             _logger.LogDebug("Memcached client initialized");
 
-            if (_options.VerificationStrategy == MemcachedVerificationStrategy.Stats)
+            await retryPolicy.ExecuteAsync(async ct =>
             {
-                await ExecuteStatsAsync(cancellationToken);
-            }
+                if (_options.VerificationStrategy == MemcachedVerificationStrategy.Stats)
+                {
+                    await ExecuteStatsAsync(ct);
+                }
 
-            if (_options.VerificationStrategy == MemcachedVerificationStrategy.TestKey)
-            {
-                await ExecuteTestKeyRoundTripAsync(cancellationToken);
-            }
+                if (_options.VerificationStrategy == MemcachedVerificationStrategy.TestKey)
+                {
+                    await ExecuteTestKeyRoundTripAsync(ct);
+                }
+            }, "Memcached connection", cancellationToken);
 
             _logger.LogInformation("Memcached readiness check completed successfully");
         }

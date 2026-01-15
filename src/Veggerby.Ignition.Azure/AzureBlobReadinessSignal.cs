@@ -79,9 +79,14 @@ internal sealed class AzureBlobReadinessSignal : IIgnitionSignal
 
         try
         {
+            var retryPolicy = new RetryPolicy(_options.MaxRetries, _options.RetryDelay, _logger);
+
             // Verify service connectivity by getting account info
             _logger.LogDebug("Verifying Azure Blob Storage service connection");
-            await _blobServiceClient.GetAccountInfoAsync(cancellationToken).ConfigureAwait(false);
+            await retryPolicy.ExecuteAsync(async ct =>
+            {
+                await _blobServiceClient.GetAccountInfoAsync(ct).ConfigureAwait(false);
+            }, "Azure Blob Storage connection", cancellationToken);
 
             if (_options.VerifyContainerExists && !string.IsNullOrWhiteSpace(_options.ContainerName))
             {
