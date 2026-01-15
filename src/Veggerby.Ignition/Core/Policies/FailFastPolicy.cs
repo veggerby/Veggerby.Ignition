@@ -26,7 +26,8 @@ public sealed class FailFastPolicy : IIgnitionPolicy
     /// </summary>
     /// <param name="context">Context containing signal result and global state.</param>
     /// <returns>
-    /// <c>true</c> if the signal succeeded; <c>false</c> if the signal failed.
+    /// <c>true</c> if the signal did not fail (succeeded, timed out, skipped, or cancelled);
+    /// <c>false</c> if the signal failed.
     /// </returns>
     /// <remarks>
     /// This policy returns <c>false</c> only when <see cref="IgnitionSignalResult.Status"/> is <see cref="IgnitionSignalStatus.Failed"/>.
@@ -36,6 +37,6 @@ public sealed class FailFastPolicy : IIgnitionPolicy
     {
         ArgumentNullException.ThrowIfNull(context, nameof(context));
 
-        return context.SignalResult.Status == IgnitionSignalStatus.Succeeded;
+        return context.SignalResult.Status != IgnitionSignalStatus.Failed;
     }
 }
