@@ -18,7 +18,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
   - Simple Mode API methods: `WithCustomPolicy(instance)`, `WithCustomPolicy(factory)`, `WithCustomPolicy<TPolicy>()`
   - Enables custom logic: retry strategies, circuit breakers, conditional fail-fast, percentage-based thresholds
   - Comprehensive test coverage: 18 new tests covering custom policies, DI integration, and Simple Mode API
-- **Documentation Updates**: AGENTS.md and copilot-instructions.md enhanced with CHANGELOG maintenance guidelines
+- **Retry Policy Standardization**: All 13 integration packages now include consistent retry policy support
+  - New `MaxRetries` and `RetryDelay` properties in all `*ReadinessOptions` classes (default: 3 retries with 1-second delay)
+  - Graceful handling of transient startup failures with configurable retry behavior
+  - Enhanced logging: Changed from "not ready yet" to "failed (transient, attempt X/Y)" for clarity
+  - Factory pattern (`IIgnitionSignalFactory`) implementations for all integration packages enabling DI-based configuration
+  - Factory-based extension method overloads supporting staged execution across all packages
+  - Packages affected: Postgres, SqlServer, MongoDb, Marten, RabbitMq, MassTransit, Redis, Memcached, Http, Grpc, Orleans, Aws (S3), Azure (Blob, Queue, Table)
+- **Comprehensive Documentation Guides**: Three major new documentation resources for advanced features
+  - `docs/cancellation-scopes.md`: Hierarchical cancellation patterns, bundle-scoped cancellation, dependency-triggered cancellation (696 lines)
+  - `docs/metrics-integration.md`: Production observability integration with OpenTelemetry, Prometheus, custom backends (755 lines)
+  - `docs/creating-integration-packages.md`: Authoring guide for integration package developers with best practices, patterns, and testing strategies (809 lines)
+  - Enhanced existing documentation: `docs/performance.md` with detailed scaling characteristics and `docs/timeout-management.md` with timeout strategy patterns
+- **Documentation Standards**: AGENTS.md and copilot-instructions.md enhanced with CHANGELOG maintenance guidelines
   - Only include user-impacting changes (exclude unit test changes, internal refactoring, build/CI configuration)
   - Consolidate related changes into single entries representing net change from last release
   - Follow Keep a Changelog format with Added/Changed/Fixed sections
