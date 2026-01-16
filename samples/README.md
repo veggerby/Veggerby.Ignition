@@ -173,6 +173,102 @@ Demonstrates:
 
 Best for understanding how to integrate Ignition in background workers and long-running services.
 
+### [Messaging Application](./Messaging/)
+
+**Complexity**: Advanced
+**Type**: Console Application
+**Focus**: Message queue integration patterns
+
+Demonstrates using Ignition with message queue systems and MassTransit for service bus coordination.
+
+### [Cloud Application](./Cloud/)
+
+**Complexity**: Advanced
+**Type**: Console Application
+**Focus**: Cloud provider integration
+
+Demonstrates integrating Ignition with cloud services (AWS, Azure) for cloud-native application readiness.
+
+### [Custom Integration](./CustomIntegration/)
+
+**Complexity**: Intermediate
+**Type**: Console Application
+**Focus**: Building custom integration packages from scratch
+
+Demonstrates:
+
+- Custom `IIgnitionSignal` implementation
+- Factory pattern for DI registration
+- Two integration approaches (simple task-based and full signal class)
+- Extension method patterns for clean APIs
+- XML documentation best practices
+
+Perfect for developers building custom integration packages or third-party libraries.
+
+### [Cancellation Scopes](./CancellationScopes/)
+
+**Complexity**: Advanced
+**Type**: Console Application
+**Focus**: Hierarchical cancellation with scoped signals
+
+Demonstrates:
+
+- Creating hierarchical cancellation scopes
+- Parent-child scope relationships
+- Scope-based signal registration using `AddIgnitionSignalWithScope`
+- Cancellation propagation when critical signals fail
+- Database cluster scenario (primary failure cancels replicas)
+
+Ideal for complex startup scenarios where failure in critical components should cancel dependent initialization.
+
+### [Metrics Integration](./Metrics/)
+
+**Complexity**: Intermediate
+**Type**: Console Application
+**Focus**: Observability integration with OpenTelemetry and Prometheus
+
+Demonstrates:
+
+- Implementing `IIgnitionMetrics` interface
+- OpenTelemetry metrics with console exporter
+- Prometheus.NET integration
+- Custom in-memory metrics backend
+- Recording signal durations and statuses
+
+Perfect for understanding how to integrate Ignition metrics with enterprise observability platforms.
+
+### [Kubernetes Application](./Kubernetes/)
+
+**Complexity**: Advanced
+**Type**: ASP.NET Core Web API
+**Focus**: Kubernetes-specific deployment patterns
+
+Demonstrates:
+
+- Kubernetes health check integration (liveness, readiness, startup probes)
+- Multi-stage Docker builds
+- Kubernetes manifests (Deployment, Service)
+- ConfigMap and environment-based configuration
+- Production-ready containerization
+
+Best for deploying Ignition applications to Kubernetes clusters with proper health check semantics.
+
+### [Multi-Environment Configuration](./MultiEnvironment/)
+
+**Complexity**: Intermediate
+**Type**: Console Application
+**Focus**: Environment-based configuration patterns
+
+Demonstrates:
+
+- Development vs Production timeout strategies
+- Environment-specific signal registration (conditional features)
+- Configuration-driven Ignition options
+- Feature flags and conditional initialization
+- Override patterns (command-line, environment variables)
+
+Ideal for applications that need different readiness behavior across development, staging, and production environments.
+
 ## Quick Start
 
 Each sample includes its own README with detailed instructions. To run any sample:
@@ -191,12 +287,16 @@ We recommend exploring the samples in this order:
 
 1. **Start with Simple** - Learn the basic concepts and API
 2. **Explore Bundles** - Understand composable signal packages
-3. **Move to Advanced** - Deep dive into configuration options and policies
-4. **Try TimelineExport** - Visualize and analyze startup timing
-5. **Try Replay** - Learn recording, replay, and what-if analysis
-6. **Study DependencyGraph** - Master dependency-aware execution (DAG mode)
-7. **Review WebApi** - See real-world web application integration patterns
-8. **Review Worker** - See real-world background worker integration patterns
+3. **Try CustomIntegration** - Learn how to build custom integration packages
+4. **Move to Advanced** - Deep dive into configuration options and policies
+5. **Try TimelineExport** - Visualize and analyze startup timing
+6. **Try Replay** - Learn recording, replay, and what-if analysis
+7. **Study DependencyGraph** - Master dependency-aware execution (DAG mode)
+8. **Explore CancellationScopes** - Understand hierarchical cancellation patterns
+9. **Try Metrics** - Integrate with observability platforms
+10. **Try MultiEnvironment** - Learn environment-based configuration
+11. **Review WebApi or Kubernetes** - See real-world web/cloud application patterns
+12. **Review Worker** - See real-world background worker integration patterns
 
 ## Key Concepts Demonstrated
 
