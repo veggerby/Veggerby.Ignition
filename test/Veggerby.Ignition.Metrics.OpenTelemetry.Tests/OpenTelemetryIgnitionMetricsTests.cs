@@ -1,5 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
-
+using Microsoft.Extensions.Options;
 using Veggerby.Ignition.Metrics;
 
 namespace Veggerby.Ignition.Metrics.OpenTelemetry.Tests;
@@ -105,6 +105,39 @@ public class OpenTelemetryIgnitionMetricsTests
     }
 
     [Fact]
+    public void RecordSignalDuration_AfterDispose_ThrowsObjectDisposedException()
+    {
+        // arrange
+        var metrics = new OpenTelemetryIgnitionMetrics();
+        metrics.Dispose();
+
+        // act & assert
+        Assert.Throws<ObjectDisposedException>(() => metrics.RecordSignalDuration("test", TimeSpan.FromSeconds(1)));
+    }
+
+    [Fact]
+    public void RecordSignalStatus_AfterDispose_ThrowsObjectDisposedException()
+    {
+        // arrange
+        var metrics = new OpenTelemetryIgnitionMetrics();
+        metrics.Dispose();
+
+        // act & assert
+        Assert.Throws<ObjectDisposedException>(() => metrics.RecordSignalStatus("test", IgnitionSignalStatus.Succeeded));
+    }
+
+    [Fact]
+    public void RecordTotalDuration_AfterDispose_ThrowsObjectDisposedException()
+    {
+        // arrange
+        var metrics = new OpenTelemetryIgnitionMetrics();
+        metrics.Dispose();
+
+        // act & assert
+        Assert.Throws<ObjectDisposedException>(() => metrics.RecordTotalDuration(TimeSpan.FromSeconds(1)));
+    }
+
+    [Fact]
     public void AddOpenTelemetryIgnitionMetrics_RegistersMetrics()
     {
         // arrange
@@ -118,6 +151,22 @@ public class OpenTelemetryIgnitionMetricsTests
         var metrics = provider.GetService<IIgnitionMetrics>();
         metrics.Should().NotBeNull();
         metrics.Should().BeOfType<OpenTelemetryIgnitionMetrics>();
+    }
+
+    [Fact]
+    public void AddOpenTelemetryIgnitionMetrics_ConfiguresIgnitionOptions()
+    {
+        // arrange
+        var services = new ServiceCollection();
+
+        // act
+        services.AddOpenTelemetryIgnitionMetrics();
+        var provider = services.BuildServiceProvider();
+
+        // assert
+        var options = provider.GetRequiredService<IOptions<IgnitionOptions>>().Value;
+        options.Metrics.Should().NotBeNull();
+        options.Metrics.Should().BeOfType<OpenTelemetryIgnitionMetrics>();
     }
 
     [Fact]

@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-
 using Veggerby.Ignition.Metrics;
 
 namespace Veggerby.Ignition.Metrics.Prometheus;
@@ -17,8 +16,8 @@ public static class PrometheusIgnitionExtensions
     /// <remarks>
     /// <para>
     /// This method registers <see cref="PrometheusIgnitionMetrics"/> as the singleton
-    /// implementation of <see cref="IIgnitionMetrics"/> and configures it in the
-    /// <see cref="IgnitionOptions"/>.
+    /// implementation of <see cref="IIgnitionMetrics"/>. The registered metrics implementation
+    /// will be used by Ignition to publish readiness-related metrics to Prometheus.
     /// </para>
     /// <para>
     /// After calling this method, ensure you expose the Prometheus metrics endpoint
@@ -39,6 +38,9 @@ public static class PrometheusIgnitionExtensions
         ArgumentNullException.ThrowIfNull(services, nameof(services));
 
         services.AddSingleton<IIgnitionMetrics, PrometheusIgnitionMetrics>();
+        services.AddOptions<IgnitionOptions>()
+            .Configure<IIgnitionMetrics>((options, metrics) => options.Metrics = metrics);
+
         return services;
     }
 }

@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-
 using Veggerby.Ignition.Metrics;
 
 namespace Veggerby.Ignition.Metrics.OpenTelemetry;
@@ -17,8 +16,8 @@ public static class OpenTelemetryIgnitionExtensions
     /// <remarks>
     /// <para>
     /// This method registers <see cref="OpenTelemetryIgnitionMetrics"/> as the singleton
-    /// implementation of <see cref="IIgnitionMetrics"/> and configures it in the
-    /// <see cref="IgnitionOptions"/>.
+    /// implementation of <see cref="IIgnitionMetrics"/> so that Ignition can emit metrics
+    /// via OpenTelemetry.
     /// </para>
     /// <para>
     /// After calling this method, ensure you configure OpenTelemetry to collect metrics
@@ -42,6 +41,9 @@ public static class OpenTelemetryIgnitionExtensions
         ArgumentNullException.ThrowIfNull(services, nameof(services));
 
         services.AddSingleton<IIgnitionMetrics, OpenTelemetryIgnitionMetrics>();
+        services.AddOptions<IgnitionOptions>()
+            .Configure<IIgnitionMetrics>((options, metrics) => options.Metrics = metrics);
+
         return services;
     }
 }

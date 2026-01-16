@@ -1,5 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
-
+using Microsoft.Extensions.Options;
 using Veggerby.Ignition.Metrics;
 
 namespace Veggerby.Ignition.Metrics.Prometheus.Tests;
@@ -107,6 +107,22 @@ public class PrometheusIgnitionMetricsTests
         var metrics = provider.GetService<IIgnitionMetrics>();
         metrics.Should().NotBeNull();
         metrics.Should().BeOfType<PrometheusIgnitionMetrics>();
+    }
+
+    [Fact]
+    public void AddPrometheusIgnitionMetrics_ConfiguresIgnitionOptions()
+    {
+        // arrange
+        var services = new ServiceCollection();
+
+        // act
+        services.AddPrometheusIgnitionMetrics();
+        var provider = services.BuildServiceProvider();
+
+        // assert
+        var options = provider.GetRequiredService<IOptions<IgnitionOptions>>().Value;
+        options.Metrics.Should().NotBeNull();
+        options.Metrics.Should().BeOfType<PrometheusIgnitionMetrics>();
     }
 
     [Fact]

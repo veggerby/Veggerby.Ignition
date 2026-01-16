@@ -32,6 +32,7 @@ public sealed class OpenTelemetryIgnitionMetrics : IIgnitionMetrics, IDisposable
     private readonly Histogram<double> _signalDuration;
     private readonly Counter<long> _signalStatus;
     private readonly Histogram<double> _totalDuration;
+    private bool _disposed;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="OpenTelemetryIgnitionMetrics"/> class.
@@ -58,6 +59,7 @@ public sealed class OpenTelemetryIgnitionMetrics : IIgnitionMetrics, IDisposable
     /// <inheritdoc/>
     public void RecordSignalDuration(string name, TimeSpan duration)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
 
         _signalDuration.Record(duration.TotalSeconds,
@@ -67,6 +69,7 @@ public sealed class OpenTelemetryIgnitionMetrics : IIgnitionMetrics, IDisposable
     /// <inheritdoc/>
     public void RecordSignalStatus(string name, IgnitionSignalStatus status)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
 
         _signalStatus.Add(1,
@@ -77,6 +80,8 @@ public sealed class OpenTelemetryIgnitionMetrics : IIgnitionMetrics, IDisposable
     /// <inheritdoc/>
     public void RecordTotalDuration(TimeSpan duration)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
         _totalDuration.Record(duration.TotalSeconds);
     }
 
@@ -85,6 +90,12 @@ public sealed class OpenTelemetryIgnitionMetrics : IIgnitionMetrics, IDisposable
     /// </summary>
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         _meter.Dispose();
+        _disposed = true;
     }
 }
