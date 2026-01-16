@@ -781,4 +781,5 @@ public class DataLayerBundle : IIgnitionBundle { }
 - [Timeout Management](timeout-management.md) - Handling timeouts in DAG mode
 - [Policies](policies.md) - Failure handling with dependencies
 - [Bundles](bundles.md) - Creating dependency graphs in bundles
+- [Cancellation Scopes](cancellation-scopes.md) - Dependency-triggered cancellation propagation
 - [Performance Guide](performance.md) - Optimizing DAG execution

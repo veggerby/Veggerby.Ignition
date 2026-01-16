@@ -850,4 +850,6 @@ public MyBundle(Func<CancellationToken, Task> connectFactory) { }
 - [Getting Started](getting-started.md) - Basic signal registration
 - [Dependency-Aware Execution](dependency-aware-execution.md) - Creating dependency graphs in bundles
 - [Advanced Patterns](advanced-patterns.md) - Complex bundle scenarios
+- [Cancellation Scopes](cancellation-scopes.md) - Bundle-scoped cancellation patterns
+- [Creating Integration Packages](creating-integration-packages.md) - Publishing reusable bundles
 - [API Reference](api-reference.md) - IIgnitionBundle interface details
