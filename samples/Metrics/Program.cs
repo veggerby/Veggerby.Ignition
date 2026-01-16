@@ -236,14 +236,12 @@ public class Program
         // Filter to only show ignition metrics
         var ignitionMetrics = metricsText.Split('\n')
             .Where(line => line.Contains("ignition_") || line.StartsWith("# "))
-            .Take(20);
+            .Take(20)
+            .Where(line => !string.IsNullOrWhiteSpace(line));
 
         foreach (var line in ignitionMetrics)
         {
-            if (!string.IsNullOrWhiteSpace(line))
-            {
-                Console.WriteLine(line);
-            }
+            Console.WriteLine(line);
         }
     }
 

@@ -25,7 +25,7 @@ This sample demonstrates how to integrate Veggerby.Ignition with observability p
 
 ## Prerequisites
 
-- .NET 10.0 SDK or later
+- .NET 10.0 SDK
 - No external services required
 
 ## How to Run

@@ -27,7 +27,7 @@ This pattern prevents wasted initialization work when critical dependencies fail
 
 ## Prerequisites
 
-- .NET 10.0 SDK or later
+- .NET 10.0 SDK
 - No external services required (uses simulated delays)
 
 ## How to Run

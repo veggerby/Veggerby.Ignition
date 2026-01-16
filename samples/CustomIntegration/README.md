@@ -29,7 +29,7 @@ The sample builds a complete integration for a fictional caching service called 
 
 ## Prerequisites
 
-- .NET 10.0 SDK or later
+- .NET 10.0 SDK
 - No external services required (uses simulated delays)
 
 ## How to Run
