@@ -692,8 +692,9 @@ public interface IIgnitionTimeoutStrategy
     /// Determines the effective timeout and cancellation behavior for a signal.
     /// </summary>
     /// <param name="signal">The signal to evaluate.</param>
+    /// <param name="options">The current ignition options providing global configuration context.</param>
     /// <returns>A tuple of (timeout duration, whether to cancel on timeout).</returns>
-    (TimeSpan? timeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal);
+    (TimeSpan? timeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionOptions options);
 }
 ```
 
@@ -720,7 +721,7 @@ public sealed class CategoryBasedTimeoutStrategy : IIgnitionTimeoutStrategy
         _defaultTimeout = (TimeSpan.FromSeconds(10), true);
     }
 
-    public (TimeSpan? timeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal)
+    public (TimeSpan? timeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionOptions options)
     {
         // Categorize by signal name prefix
         var category = GetCategory(signal.Name);
@@ -733,7 +734,7 @@ public sealed class CategoryBasedTimeoutStrategy : IIgnitionTimeoutStrategy
         // Fall back to signal's own timeout if specified
         if (signal.Timeout.HasValue)
         {
-            return (signal.Timeout, true);
+            return (signal.Timeout, options.CancelIndividualOnTimeout);
         }
 
         // Use default
@@ -820,7 +821,7 @@ public sealed class AttributeBasedTimeoutStrategy : IIgnitionTimeoutStrategy
         };
     }
 
-    public (TimeSpan? timeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal)
+    public (TimeSpan? timeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionOptions options)
     {
         var attribute = signal.GetType().GetCustomAttribute<SignalCategoryAttribute>();
         if (attribute != null && _categoryTimeouts.TryGetValue(attribute.Category, out var config))
@@ -828,7 +829,49 @@ public sealed class AttributeBasedTimeoutStrategy : IIgnitionTimeoutStrategy
             return (config.timeout, config.cancel);
         }
 
-        return (signal.Timeout, true);
+        return (signal.Timeout, options.CancelIndividualOnTimeout);
+    }
+}
+```
+
+**Performance Warning**: This example uses reflection (`GetCustomAttribute`) in the `GetTimeout` method which may be invoked for every signal. For production use, consider caching attribute lookups in a dictionary during strategy initialization, or use a name-based categorization strategy instead to avoid reflection overhead in the hot path.
+
+```csharp
+// Production-optimized version with cached attributes
+public sealed class CachedAttributeBasedTimeoutStrategy : IIgnitionTimeoutStrategy
+{
+    private readonly Dictionary<Type, string> _signalCategories = new();
+    private readonly Dictionary<string, (TimeSpan timeout, bool cancel)> _categoryTimeouts;
+
+    public CachedAttributeBasedTimeoutStrategy()
+    {
+        _categoryTimeouts = new Dictionary<string, (TimeSpan, bool)>
+        {
+            ["critical"] = (TimeSpan.FromSeconds(5), true),
+            ["infrastructure"] = (TimeSpan.FromSeconds(15), true),
+            ["warmup"] = (TimeSpan.FromSeconds(30), false),
+            ["optional"] = (TimeSpan.FromMinutes(2), false)
+        };
+    }
+
+    public (TimeSpan? timeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionOptions options)
+    {
+        var signalType = signal.GetType();
+        
+        // Cache lookup on first encounter of this signal type
+        if (!_signalCategories.TryGetValue(signalType, out var category))
+        {
+            var attribute = signalType.GetCustomAttribute<SignalCategoryAttribute>();
+            category = attribute?.Category ?? "default";
+            _signalCategories[signalType] = category;
+        }
+
+        if (_categoryTimeouts.TryGetValue(category, out var config))
+        {
+            return (config.timeout, config.cancel);
+        }
+
+        return (signal.Timeout, options.CancelIndividualOnTimeout);
     }
 }
 ```
@@ -856,7 +899,7 @@ public sealed class EnvironmentAwareTimeoutStrategy : IIgnitionTimeoutStrategy
         _productionMultiplier = productionMultiplier;
     }
 
-    public (TimeSpan? timeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal)
+    public (TimeSpan? timeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionOptions options)
     {
         var baseTimeout = signal.Timeout ?? TimeSpan.FromSeconds(10);
 
@@ -935,7 +978,7 @@ public sealed class ConfigurationBasedTimeoutStrategy : IIgnitionTimeoutStrategy
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
     }
 
-    public (TimeSpan? timeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal)
+    public (TimeSpan? timeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionOptions options)
     {
         var timeoutSection = _configuration.GetSection("Ignition:Timeouts");
         var cancelOnTimeout = _configuration.GetValue<bool>("Ignition:CancelOnTimeout", true);

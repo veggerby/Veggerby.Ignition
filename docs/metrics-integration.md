@@ -168,14 +168,14 @@ builder.Services.AddOpenTelemetry()
             });
     });
 
-// Register ignition metrics adapter
-builder.Services.AddSingleton<IIgnitionMetrics, OpenTelemetryIgnitionMetrics>();
+// Register ignition metrics adapter using the built-in helper
+builder.Services.AddIgnitionMetrics<OpenTelemetryIgnitionMetrics>();
 
-// Configure ignition with metrics
+// Configure ignition
 builder.Services.AddIgnition(opts =>
 {
     opts.GlobalTimeout = TimeSpan.FromSeconds(30);
-    opts.Metrics = builder.Services.BuildServiceProvider().GetRequiredService<IIgnitionMetrics>();
+    // Metrics will be automatically injected via DI
 });
 ```
 
@@ -214,19 +214,14 @@ builder.Services.AddOpenTelemetry()
             .AddPrometheusExporter(); // Expose /metrics endpoint
     });
 
-// Ignition metrics adapter
-builder.Services.AddSingleton<IIgnitionMetrics, OpenTelemetryIgnitionMetrics>();
+// Ignition metrics adapter using the built-in helper
+builder.Services.AddIgnitionMetrics<OpenTelemetryIgnitionMetrics>();
 
 // Ignition configuration
 builder.Services.AddIgnition(opts =>
 {
     opts.GlobalTimeout = TimeSpan.FromSeconds(30);
-});
-
-// Configure metrics from DI
-builder.Services.Configure<IgnitionOptions>(opts =>
-{
-    opts.Metrics = builder.Services.BuildServiceProvider().GetRequiredService<IIgnitionMetrics>();
+    // Metrics will be automatically injected via DI
 });
 
 var app = builder.Build();
@@ -309,18 +304,14 @@ using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Register Prometheus metrics adapter
-builder.Services.AddSingleton<IIgnitionMetrics, PrometheusIgnitionMetrics>();
+// Register Prometheus metrics adapter using the built-in helper
+builder.Services.AddIgnitionMetrics<PrometheusIgnitionMetrics>();
 
 // Configure ignition
 builder.Services.AddIgnition(opts =>
 {
     opts.GlobalTimeout = TimeSpan.FromSeconds(30);
-});
-
-builder.Services.Configure<IgnitionOptions>(opts =>
-{
-    opts.Metrics = builder.Services.BuildServiceProvider().GetRequiredService<IIgnitionMetrics>();
+    // Metrics will be automatically injected via DI
 });
 
 var app = builder.Build();
@@ -668,17 +659,28 @@ public void RecordSignalDuration(string name, TimeSpan duration)
 }
 ```
 
-### 5. Configure Metrics via Options
+### 5. Configure Metrics via AddIgnitionMetrics
 
-Decouple metrics from coordinator registration:
+Use the built-in helper to avoid the anti-pattern of calling `BuildServiceProvider()` during service registration:
 
 ```csharp
-builder.Services.AddSingleton<IIgnitionMetrics, OpenTelemetryIgnitionMetrics>();
+// Correct: Use AddIgnitionMetrics helper
+builder.Services.AddIgnitionMetrics<OpenTelemetryIgnitionMetrics>();
 
-builder.Services.Configure<IgnitionOptions>(opts =>
+builder.Services.AddIgnition(opts =>
 {
     opts.GlobalTimeout = TimeSpan.FromSeconds(30);
-    opts.Metrics = opts.ServiceProvider.GetRequiredService<IIgnitionMetrics>();
+    // Metrics automatically injected via DI
+});
+```
+
+**Anti-pattern to avoid**:
+
+```csharp
+// ❌ Wrong: Don't call BuildServiceProvider during registration
+builder.Services.AddIgnition(opts =>
+{
+    opts.Metrics = builder.Services.BuildServiceProvider().GetRequiredService<IIgnitionMetrics>();
 });
 ```
 

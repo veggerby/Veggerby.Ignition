@@ -94,11 +94,12 @@ public interface ICancellationScope : IDisposable
 public enum CancellationReason
 {
     None,                 // Not cancelled
-    GlobalTimeout,        // Global timeout elapsed
-    SignalTimeout,        // Per-signal timeout elapsed
-    SignalFailure,        // Signal failed/threw exception
-    DependencyFailure,    // Dependency failed (DAG mode)
-    ManualCancellation    // Explicitly cancelled
+    GlobalTimeout,        // Global coordinator timeout elapsed
+    PerSignalTimeout,     // Per-signal timeout elapsed
+    DependencyFailed,     // Cancelled because a dependency failed
+    ScopeCancelled,       // Cancelled due to parent scope cancellation
+    BundleCancelled,      // Cancelled because another signal in the bundle failed or timed out
+    ExternalCancellation  // Cancelled due to external request (e.g., host shutdown token)
 }
 ```
 
