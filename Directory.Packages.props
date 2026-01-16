@@ -72,6 +72,11 @@
     <PackageVersion Include="AWSSDK.S3" Version="3.7.410.11" />
     <PackageVersion Include="Testcontainers.Azurite" Version="4.4.0" />
 
+    <!-- Observability -->
+    <PackageVersion Include="OpenTelemetry" Version="1.14.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.Console" Version="1.14.0" />
+    <PackageVersion Include="prometheus-net" Version="8.2.1" />
+
   </ItemGroup>
 
 </Project>
