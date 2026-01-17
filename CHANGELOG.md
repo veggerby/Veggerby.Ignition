@@ -8,6 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+- **Official Metrics Packages (Prometheus & OpenTelemetry)**: Production-ready metrics integration packages
+  - `Veggerby.Ignition.Metrics.Prometheus`: Prometheus metrics implementation using prometheus-net library
+    - Exposes `ignition_signal_duration_seconds` (histogram), `ignition_signal_total` (counter), `ignition_total_duration_seconds` (histogram)
+    - Extension method: `AddPrometheusIgnitionMetrics()`
+    - Comprehensive README with Grafana PromQL examples
+  - `Veggerby.Ignition.Metrics.OpenTelemetry`: OpenTelemetry metrics implementation using System.Diagnostics.Metrics
+    - Exposes `ignition.signal.duration` (histogram), `ignition.signal.status` (counter), `ignition.total.duration` (histogram)
+    - Extension method: `AddOpenTelemetryIgnitionMetrics()`
+    - Compatible with all standard OTEL exporters (Prometheus, Console, OTLP, Jaeger, Zipkin)
+  - Both packages maintain zero-dependency principle for core library
+  - Thread-safe implementations optimized for low overhead
+  - 26 comprehensive unit tests (12 Prometheus + 14 OpenTelemetry)
 - **Custom Policy Support (`IIgnitionPolicy`)**: Extensible policy system for custom failure handling strategies
   - `IIgnitionPolicy` interface with `ShouldContinue(IgnitionPolicyContext)` method for policy decisions
   - `IgnitionPolicyContext` class providing signal result, completed signals, total count, elapsed time, and execution mode
