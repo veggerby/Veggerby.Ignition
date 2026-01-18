@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+- **Kafka Integration Package (`Veggerby.Ignition.Kafka`)**: Enterprise event streaming platform readiness verification
+  - Supports multiple verification strategies: `ClusterMetadata` (fast broker connectivity), `TopicMetadata` (topic existence), `ProducerTest` (end-to-end message delivery), `ConsumerGroupCheck` (consumer group registration)
+  - Configurable retry policies with exponential backoff (default: 3 retries, 200ms initial delay)
+  - Optional Schema Registry verification for Confluent Platform deployments
+  - Factory pattern support for Testcontainers and staged execution scenarios
+  - Extension methods: `AddKafkaReadiness(bootstrapServers)`, `AddKafkaReadiness(producerConfig)`, `AddKafkaReadiness(bootstrapServersFactory)`
+  - 26 unit tests and 10 integration tests with Testcontainers.Kafka
+  - Comprehensive README with examples for all verification strategies
+  - Dependencies: Confluent.Kafka 2.8.0 (official .NET client)
 - **Official Metrics Packages (Prometheus & OpenTelemetry)**: Production-ready metrics integration packages
   - `Veggerby.Ignition.Metrics.Prometheus`: Prometheus metrics implementation using prometheus-net library
     - Exposes `ignition_signal_duration_seconds` (histogram), `ignition_signal_total` (counter), `ignition_total_duration_seconds` (histogram)
