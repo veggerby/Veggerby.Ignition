@@ -162,8 +162,6 @@ internal sealed class KafkaReadinessSignal : IIgnitionSignal
             "Cluster metadata retrieved successfully: {BrokerCount} brokers, {TopicCount} topics",
             metadata.Brokers.Count,
             metadata.Topics?.Count ?? 0);
-
-        await Task.CompletedTask;
     }
 
     private async Task VerifyTopicMetadataAsync(ProducerConfig producerConfig, CancellationToken cancellationToken)
@@ -205,8 +203,6 @@ internal sealed class KafkaReadinessSignal : IIgnitionSignal
                     topicMetadata.Partitions?.Count ?? 0);
             }
         }
-
-        await Task.CompletedTask;
     }
 
     private async Task PerformProducerTestAsync(ProducerConfig producerConfig, CancellationToken cancellationToken)
@@ -293,8 +289,6 @@ internal sealed class KafkaReadinessSignal : IIgnitionSignal
                 _options.VerifyConsumerGroup,
                 group.ProtocolType);
         }
-
-        await Task.CompletedTask;
     }
 
     private async Task VerifySchemaRegistryAsync(CancellationToken cancellationToken)
