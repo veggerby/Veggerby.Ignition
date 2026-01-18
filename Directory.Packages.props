@@ -40,7 +40,9 @@
     <PackageVersion Include="RabbitMQ.Client" Version="7.0.0" />
     <PackageVersion Include="MassTransit" Version="8.3.5" />
     <PackageVersion Include="MassTransit.RabbitMQ" Version="8.3.5" />
+    <PackageVersion Include="Confluent.Kafka" Version="2.8.0" />
     <PackageVersion Include="Testcontainers.RabbitMq" Version="4.4.0" />
+    <PackageVersion Include="Testcontainers.Kafka" Version="4.4.0" />
 
     <!-- Database Providers -->
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.0.2" />
