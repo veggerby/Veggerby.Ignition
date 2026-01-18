@@ -1,4 +1,7 @@
 using Confluent.Kafka;
+
+using DotNet.Testcontainers.Builders;
+
 using Testcontainers.Kafka;
 using Xunit;
 
@@ -19,11 +22,7 @@ public class KafkaContainerFixture : IAsyncLifetime
     {
         _kafkaContainer = new KafkaBuilder()
             .WithImage("confluentinc/cp-kafka:8.0.0")
-            .WithStartupCallback(async (container, ct) =>
-            {
-                // Add a small delay to ensure Kafka is fully ready
-                await Task.Delay(TimeSpan.FromSeconds(5), ct);
-            })
+            .WithWaitStrategy(Wait.ForUnixContainer())
             .Build();
 
         await _kafkaContainer.StartAsync();

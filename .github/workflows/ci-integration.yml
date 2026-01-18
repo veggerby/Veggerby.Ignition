@@ -11,6 +11,7 @@ on:
 env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
   DOTNET_NOLOGO: true
+  # TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
 
 jobs:
   integration-tests:
@@ -18,25 +19,25 @@ jobs:
     timeout-minutes: 30
     # Skip if PR is in draft mode
     if: github.event.pull_request.draft == false || github.event_name != 'pull_request'
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      
+
       - name: Restore
         run: dotnet restore Veggerby.Ignition.sln
-      
+
       - name: Build
         run: dotnet build Veggerby.Ignition.sln --configuration Release --no-restore
-      
+
       - name: Run Integration Tests
         run: dotnet test Veggerby.Ignition.sln --configuration Release --no-build --filter "Category=Integration" --logger "console;verbosity=normal"
-      
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
