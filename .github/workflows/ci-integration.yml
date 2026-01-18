@@ -15,6 +15,7 @@ env:
 jobs:
   integration-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     # Skip if PR is in draft mode
     if: github.event.pull_request.draft == false || github.event_name != 'pull_request'
     

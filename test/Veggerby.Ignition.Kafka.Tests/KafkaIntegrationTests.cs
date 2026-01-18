@@ -2,36 +2,21 @@ using Confluent.Kafka;
 using Confluent.Kafka.Admin;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using Testcontainers.Kafka;
 using Veggerby.Ignition.Kafka;
+using Xunit;
 
 namespace Veggerby.Ignition.Kafka.Tests;
 
-public class KafkaIntegrationTests : IAsyncLifetime
+[Collection("Kafka Integration Tests")]
+public class KafkaIntegrationTests
 {
-    private KafkaContainer? _kafkaContainer;
-    private ProducerConfig? _producerConfig;
+    private readonly KafkaContainerFixture _fixture;
+    private readonly ProducerConfig _producerConfig;
 
-    public async Task InitializeAsync()
+    public KafkaIntegrationTests(KafkaContainerFixture fixture)
     {
-        _kafkaContainer = new KafkaBuilder()
-            .WithImage("confluentinc/cp-kafka:8.0.0")
-            .Build();
-
-        await _kafkaContainer.StartAsync();
-
-        _producerConfig = new ProducerConfig
-        {
-            BootstrapServers = _kafkaContainer.GetBootstrapAddress()
-        };
-    }
-
-    public async Task DisposeAsync()
-    {
-        if (_kafkaContainer != null)
-        {
-            await _kafkaContainer.DisposeAsync();
-        }
+        _fixture = fixture;
+        _producerConfig = fixture.ProducerConfig!;
     }
 
     [Fact]
@@ -45,7 +30,7 @@ public class KafkaIntegrationTests : IAsyncLifetime
             Timeout = TimeSpan.FromSeconds(30)
         };
         var logger = Substitute.For<ILogger<KafkaReadinessSignal>>();
-        var signal = new KafkaReadinessSignal(_producerConfig!, options, logger);
+        var signal = new KafkaReadinessSignal(_producerConfig, options, logger);
 
         // act & assert
         await signal.WaitAsync();
@@ -59,7 +44,7 @@ public class KafkaIntegrationTests : IAsyncLifetime
         var topicName = $"test-topic-{Guid.NewGuid():N}";
         
         // Create topic first
-        using var adminClient = new AdminClientBuilder(_producerConfig!).Build();
+        using var adminClient = new AdminClientBuilder(_producerConfig).Build();
         await adminClient.CreateTopicsAsync(new[]
         {
             new TopicSpecification
@@ -77,7 +62,7 @@ public class KafkaIntegrationTests : IAsyncLifetime
         };
         options.WithTopic(topicName);
         var logger = Substitute.For<ILogger<KafkaReadinessSignal>>();
-        var signal = new KafkaReadinessSignal(_producerConfig!, options, logger);
+        var signal = new KafkaReadinessSignal(_producerConfig, options, logger);
 
         // act
         await signal.WaitAsync();
@@ -99,7 +84,7 @@ public class KafkaIntegrationTests : IAsyncLifetime
         };
         options.WithTopic("nonexistent-topic");
         var logger = Substitute.For<ILogger<KafkaReadinessSignal>>();
-        var signal = new KafkaReadinessSignal(_producerConfig!, options, logger);
+        var signal = new KafkaReadinessSignal(_producerConfig, options, logger);
 
         // act & assert
         await Assert.ThrowsAsync<InvalidOperationException>(() => signal.WaitAsync());
@@ -118,7 +103,7 @@ public class KafkaIntegrationTests : IAsyncLifetime
         };
         options.WithTopic("nonexistent-topic");
         var logger = Substitute.For<ILogger<KafkaReadinessSignal>>();
-        var signal = new KafkaReadinessSignal(_producerConfig!, options, logger);
+        var signal = new KafkaReadinessSignal(_producerConfig, options, logger);
 
         // act & assert
         await signal.WaitAsync();
@@ -135,7 +120,7 @@ public class KafkaIntegrationTests : IAsyncLifetime
             Timeout = TimeSpan.FromSeconds(60)
         };
         var logger = Substitute.For<ILogger<KafkaReadinessSignal>>();
-        var signal = new KafkaReadinessSignal(_producerConfig!, options, logger);
+        var signal = new KafkaReadinessSignal(_producerConfig, options, logger);
 
         // act & assert
         await signal.WaitAsync();
@@ -153,7 +138,7 @@ public class KafkaIntegrationTests : IAsyncLifetime
             Timeout = TimeSpan.FromSeconds(30)
         };
         var logger = Substitute.For<ILogger<KafkaReadinessSignal>>();
-        var signal = new KafkaReadinessSignal(_producerConfig!, options, logger);
+        var signal = new KafkaReadinessSignal(_producerConfig, options, logger);
 
         // act & assert
         await signal.WaitAsync();
@@ -170,7 +155,7 @@ public class KafkaIntegrationTests : IAsyncLifetime
             Timeout = TimeSpan.FromSeconds(30)
         };
         var logger = Substitute.For<ILogger<KafkaReadinessSignal>>();
-        var signal = new KafkaReadinessSignal(_producerConfig!, options, logger);
+        var signal = new KafkaReadinessSignal(_producerConfig, options, logger);
 
         // act & assert
         await Assert.ThrowsAsync<InvalidOperationException>(() => signal.WaitAsync());
@@ -187,7 +172,7 @@ public class KafkaIntegrationTests : IAsyncLifetime
             Timeout = TimeSpan.FromSeconds(30)
         };
         var logger = Substitute.For<ILogger<KafkaReadinessSignal>>();
-        var signal = new KafkaReadinessSignal(_producerConfig!, options, logger);
+        var signal = new KafkaReadinessSignal(_producerConfig, options, logger);
 
         // act
         await signal.WaitAsync();
@@ -208,7 +193,7 @@ public class KafkaIntegrationTests : IAsyncLifetime
             Timeout = TimeSpan.FromSeconds(30)
         };
         var logger = Substitute.For<ILogger<KafkaReadinessSignal>>();
-        var signal = new KafkaReadinessSignal(_producerConfig!, options, logger);
+        var signal = new KafkaReadinessSignal(_producerConfig, options, logger);
 
         // act & assert
         await signal.WaitAsync();
@@ -223,7 +208,7 @@ public class KafkaIntegrationTests : IAsyncLifetime
         var topic2 = $"topic2-{Guid.NewGuid():N}";
         
         // Create topics
-        using var adminClient = new AdminClientBuilder(_producerConfig!).Build();
+        using var adminClient = new AdminClientBuilder(_producerConfig).Build();
         await adminClient.CreateTopicsAsync(new[]
         {
             new TopicSpecification { Name = topic1, NumPartitions = 1, ReplicationFactor = 1 },
@@ -238,7 +223,7 @@ public class KafkaIntegrationTests : IAsyncLifetime
         options.WithTopic(topic1);
         options.WithTopic(topic2);
         var logger = Substitute.For<ILogger<KafkaReadinessSignal>>();
-        var signal = new KafkaReadinessSignal(_producerConfig!, options, logger);
+        var signal = new KafkaReadinessSignal(_producerConfig, options, logger);
 
         // act
         await signal.WaitAsync();
