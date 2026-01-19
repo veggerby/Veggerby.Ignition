@@ -18,7 +18,7 @@ public class ElasticsearchIntegrationTests : IAsyncLifetime
 
         await _elasticsearchContainer.StartAsync();
 
-        var settings = new ElasticsearchClientSettings(new Uri(_elasticsearchContainer.GetConnectionString()))
+        using var settings = new ElasticsearchClientSettings(new Uri(_elasticsearchContainer.GetConnectionString()))
             .ServerCertificateValidationCallback((o, cert, chain, errors) => true);
 
         _client = new ElasticsearchClient(settings);
@@ -276,11 +276,14 @@ public class ElasticsearchIntegrationTests : IAsyncLifetime
             RetryDelay = TimeSpan.FromMilliseconds(500)
         };
 
+        IDisposable? disposableSettings = null;
+
         var factory = new ElasticsearchReadinessSignalFactory(
             sp =>
             {
-                return new ElasticsearchClientSettings(new Uri(_elasticsearchContainer!.GetConnectionString()))
-                    .ServerCertificateValidationCallback((o, cert, chain, errors) => true);
+                var settings = new ElasticsearchClientSettings(new Uri(_elasticsearchContainer!.GetConnectionString()));
+                disposableSettings = settings;
+                return settings.ServerCertificateValidationCallback((o, cert, chain, errors) => true);
             },
             options);
 
@@ -294,5 +297,7 @@ public class ElasticsearchIntegrationTests : IAsyncLifetime
         // assert
         signal.Name.Should().Be("elasticsearch-readiness");
         await signal.WaitAsync();
+
+        disposableSettings?.Dispose();
     }
 }

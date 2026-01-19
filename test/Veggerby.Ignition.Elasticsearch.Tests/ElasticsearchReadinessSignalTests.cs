@@ -23,7 +23,7 @@ public class ElasticsearchReadinessSignalTests
     public void Constructor_WithClient_ThrowsOnNullOptions()
     {
         // arrange
-        var settings = new ElasticsearchClientSettings(new Uri("http://localhost:9200"));
+        using var settings = new ElasticsearchClientSettings(new Uri("http://localhost:9200"));
         var client = new ElasticsearchClient(settings);
         ElasticsearchReadinessOptions options = null!;
         var logger = Substitute.For<ILogger<ElasticsearchReadinessSignal>>();
@@ -37,7 +37,7 @@ public class ElasticsearchReadinessSignalTests
     public void Constructor_WithClient_ThrowsOnNullLogger()
     {
         // arrange
-        var settings = new ElasticsearchClientSettings(new Uri("http://localhost:9200"));
+        using var settings = new ElasticsearchClientSettings(new Uri("http://localhost:9200"));
         var client = new ElasticsearchClient(settings);
         var options = new ElasticsearchReadinessOptions();
         ILogger<ElasticsearchReadinessSignal> logger = null!;
@@ -64,7 +64,7 @@ public class ElasticsearchReadinessSignalTests
     public void Name_ReturnsCorrectValue()
     {
         // arrange
-        var settings = new ElasticsearchClientSettings(new Uri("http://localhost:9200"));
+        using var settings = new ElasticsearchClientSettings(new Uri("http://localhost:9200"));
         var client = new ElasticsearchClient(settings);
         var options = new ElasticsearchReadinessOptions();
         var logger = Substitute.For<ILogger<ElasticsearchReadinessSignal>>();
@@ -81,7 +81,7 @@ public class ElasticsearchReadinessSignalTests
     public void Timeout_ReturnsConfiguredValue()
     {
         // arrange
-        var settings = new ElasticsearchClientSettings(new Uri("http://localhost:9200"));
+        using var settings = new ElasticsearchClientSettings(new Uri("http://localhost:9200"));
         var client = new ElasticsearchClient(settings);
         var options = new ElasticsearchReadinessOptions
         {
