@@ -13,8 +13,9 @@ public sealed class KafkaReadinessOptions
 {
     /// <summary>
     /// Optional per-signal timeout. If <c>null</c>, the global timeout configured via <see cref="IgnitionOptions"/> applies.
+    /// Default is 30 seconds to accommodate slow Kafka broker initialization in CI environments.
     /// </summary>
-    public TimeSpan? Timeout { get; set; } = TimeSpan.FromSeconds(10);
+    public TimeSpan? Timeout { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
     /// Optional stage/phase number for staged execution.
@@ -34,16 +35,17 @@ public sealed class KafkaReadinessOptions
 
     /// <summary>
     /// Maximum number of retry attempts for transient connection failures.
-    /// Default is 5 attempts to accommodate Kafka broker startup time.
+    /// Default is 8 attempts to accommodate Kafka broker startup time in CI environments.
+    /// With exponential backoff starting at 500ms: 500ms + 1s + 2s + 4s + 8s = ~15.5s retry window.
     /// </summary>
-    public int MaxRetries { get; set; } = 5;
+    public int MaxRetries { get; set; } = 8;
 
     /// <summary>
     /// Initial delay between retry attempts.
     /// Subsequent delays use exponential backoff (doubled each retry).
-    /// Default is 200 milliseconds.
+    /// Default is 500 milliseconds to reduce noise during Kafka broker initialization.
     /// </summary>
-    public TimeSpan RetryDelay { get; set; } = TimeSpan.FromMilliseconds(200);
+    public TimeSpan RetryDelay { get; set; } = TimeSpan.FromMilliseconds(500);
 
     /// <summary>
     /// Verification strategy to use for readiness checks.

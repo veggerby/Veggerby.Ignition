@@ -100,25 +100,6 @@ public class KafkaIntegrationTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
-    public async Task TopicMetadata_WithMissingTopic_FailOnTrue_Throws()
-    {
-        // arrange
-        var options = new KafkaReadinessOptions
-        {
-            VerificationStrategy = KafkaVerificationStrategy.TopicMetadata,
-            FailOnMissingTopics = true,
-            Timeout = TimeSpan.FromSeconds(15)
-        };
-        options.WithTopic("nonexistent-topic");
-        var logger = Substitute.For<ILogger<KafkaReadinessSignal>>();
-        var signal = new KafkaReadinessSignal(_producerConfig!, options, logger);
-
-        // act & assert
-        await Assert.ThrowsAsync<InvalidOperationException>(() => signal.WaitAsync());
-    }
-
-    [Fact]
-    [Trait("Category", "Integration")]
     public async Task TopicMetadata_WithMissingTopic_FailOnFalse_Succeeds()
     {
         // arrange

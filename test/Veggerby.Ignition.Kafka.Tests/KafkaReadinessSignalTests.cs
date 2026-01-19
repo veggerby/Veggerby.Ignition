@@ -90,9 +90,9 @@ public class KafkaReadinessSignalTests
         var options = new KafkaReadinessOptions();
 
         // assert
-        options.Timeout.Should().Be(TimeSpan.FromSeconds(10));
-        options.MaxRetries.Should().Be(5);
-        options.RetryDelay.Should().Be(TimeSpan.FromMilliseconds(200));
+        options.Timeout.Should().Be(TimeSpan.FromSeconds(30));
+        options.MaxRetries.Should().Be(8);
+        options.RetryDelay.Should().Be(TimeSpan.FromMilliseconds(500));
         options.VerificationStrategy.Should().Be(KafkaVerificationStrategy.ClusterMetadata);
         options.VerifyTopics.Should().BeEmpty();
         options.FailOnMissingTopics.Should().BeTrue();
