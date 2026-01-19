@@ -208,6 +208,14 @@ jobs:
         with:
           name: build-output
 
+      - name: Restore dependencies
+        if: steps.should-run.outputs.run == 'true'
+        run: dotnet restore test/${{ matrix.package.project }}/${{ matrix.package.project }}.csproj
+
+      - name: Build ${{ matrix.package.name }} test project
+        if: steps.should-run.outputs.run == 'true'
+        run: dotnet build test/${{ matrix.package.project }}/${{ matrix.package.project }}.csproj --configuration Release --no-restore
+
       - name: Run ${{ matrix.package.name }} Integration Tests
         if: steps.should-run.outputs.run == 'true'
         run: |
