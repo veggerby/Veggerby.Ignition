@@ -89,7 +89,7 @@ public sealed class RetryPolicy
                     
                     return;
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException && attempt < _maxRetries)
+                catch (Exception ex) when (ex is not OperationCanceledException && ex is not InvalidOperationException && attempt < _maxRetries)
                 {
                     _logger?.LogWarning(
                         ex,

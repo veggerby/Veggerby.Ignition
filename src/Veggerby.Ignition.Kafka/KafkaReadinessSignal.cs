@@ -97,6 +97,9 @@ internal sealed class KafkaReadinessSignal : IIgnitionSignal
             producerConfig.BootstrapServers,
             _options.VerificationStrategy);
 
+        // Validate configuration before attempting connection
+        ValidateConfiguration();
+
         var retryPolicy = new RetryPolicy(_options.MaxRetries, _options.RetryDelay, _logger);
 
         await retryPolicy.ExecuteAsync(
@@ -106,6 +109,16 @@ internal sealed class KafkaReadinessSignal : IIgnitionSignal
             _options.Timeout);
 
         _logger.LogInformation("Kafka readiness check completed successfully");
+    }
+
+    private void ValidateConfiguration()
+    {
+        if (_options.VerificationStrategy == KafkaVerificationStrategy.ConsumerGroupCheck
+            && string.IsNullOrWhiteSpace(_options.VerifyConsumerGroup))
+        {
+            throw new InvalidOperationException(
+                "ConsumerGroupCheck strategy requires VerifyConsumerGroup to be set");
+        }
     }
 
     private async Task PerformVerificationAsync(ProducerConfig producerConfig, CancellationToken cancellationToken)
@@ -258,12 +271,6 @@ internal sealed class KafkaReadinessSignal : IIgnitionSignal
 
     private async Task VerifyConsumerGroupAsync(ProducerConfig producerConfig, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_options.VerifyConsumerGroup))
-        {
-            throw new InvalidOperationException(
-                "ConsumerGroupCheck strategy requires VerifyConsumerGroup to be set");
-        }
-
         _logger.LogDebug("Verifying consumer group '{GroupId}'", _options.VerifyConsumerGroup);
 
         using var adminClient = new AdminClientBuilder(producerConfig).Build();
