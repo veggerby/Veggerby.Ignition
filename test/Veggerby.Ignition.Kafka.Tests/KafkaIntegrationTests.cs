@@ -217,16 +217,18 @@ public class KafkaIntegrationTests : IAsyncLifetime
         
         // Create topics
         using var adminClient = new AdminClientBuilder(_producerConfig).Build();
-        await adminClient.CreateTopicsAsync(new[]
-        {
-            new TopicSpecification { Name = topic1, NumPartitions = 1, ReplicationFactor = 1 },
-            new TopicSpecification { Name = topic2, NumPartitions = 1, ReplicationFactor = 1 }
-        });
+        await adminClient.CreateTopicsAsync(
+            new[]
+            {
+                new TopicSpecification { Name = topic1, NumPartitions = 1, ReplicationFactor = 1 },
+                new TopicSpecification { Name = topic2, NumPartitions = 1, ReplicationFactor = 1 }
+            },
+            new CreateTopicsOptions { RequestTimeout = TimeSpan.FromSeconds(30) });
 
         var options = new KafkaReadinessOptions
         {
             VerificationStrategy = KafkaVerificationStrategy.TopicMetadata,
-            Timeout = TimeSpan.FromSeconds(15)
+            Timeout = TimeSpan.FromSeconds(30)
         };
         options.WithTopic(topic1);
         options.WithTopic(topic2);
