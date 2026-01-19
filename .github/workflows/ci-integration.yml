@@ -147,12 +147,15 @@ jobs:
               echo "packages-to-test=[]" >> $GITHUB_OUTPUT
             else
               # Filter to only changed packages
-              FILTERED=$(echo "$ALL_PACKAGES" | jq --arg changed "$CHANGED" '
+              FILTERED=$(echo "$ALL_PACKAGES" | jq -c --arg changed "$CHANGED" '
                 map(select(
-                  ("," + $changed + ",") | contains("," + .filter + ",")
+                  . as $pkg |
+                  ($changed | split(",")) as $filters |
+                  $filters | map(. == $pkg.filter) | any
                 ))
               ')
               echo "packages-to-test=$FILTERED" >> $GITHUB_OUTPUT
+              echo "Filtered packages: $FILTERED"
             fi
           fi
 
@@ -197,8 +200,6 @@ jobs:
     name: Test ${{ matrix.package.name }}
     
     steps:
-      - uses: actions/checkout@v4
-
       - uses: actions/checkout@v4
 
       - name: Setup .NET
