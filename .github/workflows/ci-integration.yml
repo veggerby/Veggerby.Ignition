@@ -3,10 +3,16 @@ name: Integration Tests
 on:
   pull_request:
     branches: [ main ]
-    types: [opened, reopened, synchronize, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review, labeled]
   push:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      test_filter:
+        description: 'Test filter (e.g., Category=Integration or FullyQualifiedName~Kafka)'
+        required: false
+        default: 'Category=Integration&SkipInCI!=true'
+        type: string
 
 env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
@@ -14,15 +20,125 @@ env:
   # TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
 
 jobs:
-  integration-tests:
+  # Detect which integration test projects need to run based on changed files
+  detect-changes:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    # Skip if PR is in draft mode
-    if: github.event.pull_request.draft == false || github.event_name != 'pull_request'
-
+    outputs:
+      run-all: ${{ steps.detect.outputs.run-all }}
+      aws: ${{ steps.detect.outputs.aws }}
+      azure: ${{ steps.detect.outputs.azure }}
+      grpc: ${{ steps.detect.outputs.grpc }}
+      http: ${{ steps.detect.outputs.http }}
+      kafka: ${{ steps.detect.outputs.kafka }}
+      marten: ${{ steps.detect.outputs.marten }}
+      masstransit: ${{ steps.detect.outputs.masstransit }}
+      memcached: ${{ steps.detect.outputs.memcached }}
+      mongodb: ${{ steps.detect.outputs.mongodb }}
+      orleans: ${{ steps.detect.outputs.orleans }}
+      postgres: ${{ steps.detect.outputs.postgres }}
+      rabbitmq: ${{ steps.detect.outputs.rabbitmq }}
+      redis: ${{ steps.detect.outputs.redis }}
+      sqlserver: ${{ steps.detect.outputs.sqlserver }}
+      metrics-otel: ${{ steps.detect.outputs.metrics-otel }}
+      metrics-prom: ${{ steps.detect.outputs.metrics-prom }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            core:
+              - 'src/Veggerby.Ignition/**'
+              - 'test/Veggerby.Ignition.Tests/**'
+            aws:
+              - 'src/Veggerby.Ignition.Aws/**'
+              - 'test/Veggerby.Ignition.Aws.Tests/**'
+            azure:
+              - 'src/Veggerby.Ignition.Azure/**'
+              - 'test/Veggerby.Ignition.Azure.Tests/**'
+            grpc:
+              - 'src/Veggerby.Ignition.Grpc/**'
+              - 'test/Veggerby.Ignition.Grpc.Tests/**'
+            http:
+              - 'src/Veggerby.Ignition.Http/**'
+              - 'test/Veggerby.Ignition.Http.Tests/**'
+            kafka:
+              - 'src/Veggerby.Ignition.Kafka/**'
+              - 'test/Veggerby.Ignition.Kafka.Tests/**'
+            marten:
+              - 'src/Veggerby.Ignition.Marten/**'
+              - 'test/Veggerby.Ignition.Marten.Tests/**'
+            masstransit:
+              - 'src/Veggerby.Ignition.MassTransit/**'
+              - 'test/Veggerby.Ignition.MassTransit.Tests/**'
+            memcached:
+              - 'src/Veggerby.Ignition.Memcached/**'
+              - 'test/Veggerby.Ignition.Memcached.Tests/**'
+            mongodb:
+              - 'src/Veggerby.Ignition.MongoDb/**'
+              - 'test/Veggerby.Ignition.MongoDb.Tests/**'
+            orleans:
+              - 'src/Veggerby.Ignition.Orleans/**'
+              - 'test/Veggerby.Ignition.Orleans.Tests/**'
+            postgres:
+              - 'src/Veggerby.Ignition.Postgres/**'
+              - 'test/Veggerby.Ignition.Postgres.Tests/**'
+            rabbitmq:
+              - 'src/Veggerby.Ignition.RabbitMq/**'
+              - 'test/Veggerby.Ignition.RabbitMq.Tests/**'
+            redis:
+              - 'src/Veggerby.Ignition.Redis/**'
+              - 'test/Veggerby.Ignition.Redis.Tests/**'
+            sqlserver:
+              - 'src/Veggerby.Ignition.SqlServer/**'
+              - 'test/Veggerby.Ignition.SqlServer.Tests/**'
+            metrics-otel:
+              - 'src/Veggerby.Ignition.Metrics.OpenTelemetry/**'
+              - 'test/Veggerby.Ignition.Metrics.OpenTelemetry.Tests/**'
+            metrics-prom:
+              - 'src/Veggerby.Ignition.Metrics.Prometheus/**'
+              - 'test/Veggerby.Ignition.Metrics.Prometheus.Tests/**'
+
+      - name: Determine test scope
+        id: detect
+        run: |
+          # Run all tests if: manual trigger, push to main, label present, or core package changed
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
+             [[ "${{ github.event_name }}" == "push" ]] || \
+             [[ "${{ contains(github.event.pull_request.labels.*.name, 'run-integration-tests') }}" == "true" ]] || \
+             [[ "${{ steps.filter.outputs.core }}" == "true" ]]; then
+            echo "run-all=true" >> $GITHUB_OUTPUT
+          else
+            echo "run-all=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # Set individual package flags (run if run-all OR package changed)
+          echo "aws=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.aws == 'true' }}" >> $GITHUB_OUTPUT
+          echo "azure=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.azure == 'true' }}" >> $GITHUB_OUTPUT
+          echo "grpc=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.grpc == 'true' }}" >> $GITHUB_OUTPUT
+          echo "http=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.http == 'true' }}" >> $GITHUB_OUTPUT
+          echo "kafka=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.kafka == 'true' }}" >> $GITHUB_OUTPUT
+          echo "marten=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.marten == 'true' }}" >> $GITHUB_OUTPUT
+          echo "masstransit=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.masstransit == 'true' }}" >> $GITHUB_OUTPUT
+          echo "memcached=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.memcached == 'true' }}" >> $GITHUB_OUTPUT
+          echo "mongodb=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.mongodb == 'true' }}" >> $GITHUB_OUTPUT
+          echo "orleans=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.orleans == 'true' }}" >> $GITHUB_OUTPUT
+          echo "postgres=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.postgres == 'true' }}" >> $GITHUB_OUTPUT
+          echo "rabbitmq=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.rabbitmq == 'true' }}" >> $GITHUB_OUTPUT
+          echo "redis=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.redis == 'true' }}" >> $GITHUB_OUTPUT
+          echo "sqlserver=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.sqlserver == 'true' }}" >> $GITHUB_OUTPUT
+          echo "metrics-otel=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.metrics-otel == 'true' }}" >> $GITHUB_OUTPUT
+          echo "metrics-prom=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.metrics-prom == 'true' }}" >> $GITHUB_OUTPUT
+
+  # Build once, run tests as matrix
+  build:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -35,15 +151,96 @@ jobs:
       - name: Build
         run: dotnet build Veggerby.Ignition.sln --configuration Release --no-restore
 
-      - name: Run Integration Tests
-        run: dotnet test Veggerby.Ignition.sln --configuration Release --no-build --filter "Category=Integration&SkipInCI!=true" --logger "console;verbosity=normal"
-
-      - name: Upload test results
-        if: always()
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: integration-test-results
+          name: build-output
           path: |
-            test/**/TestResults/**/*.trx
-            test/**/TestResults/**/*.xml
+            src/**/bin/Release/**
+            test/**/bin/Release/**
+          retention-days: 1
+
+  # Run integration tests for each package
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, build]
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - { name: 'Aws', project: 'Veggerby.Ignition.Aws.Tests', enabled: '${{ needs.detect-changes.outputs.aws }}' }
+          - { name: 'Azure', project: 'Veggerby.Ignition.Azure.Tests', enabled: '${{ needs.detect-changes.outputs.azure }}' }
+          - { name: 'Grpc', project: 'Veggerby.Ignition.Grpc.Tests', enabled: '${{ needs.detect-changes.outputs.grpc }}' }
+          - { name: 'Http', project: 'Veggerby.Ignition.Http.Tests', enabled: '${{ needs.detect-changes.outputs.http }}' }
+          - { name: 'Kafka', project: 'Veggerby.Ignition.Kafka.Tests', enabled: '${{ needs.detect-changes.outputs.kafka }}' }
+          - { name: 'Marten', project: 'Veggerby.Ignition.Marten.Tests', enabled: '${{ needs.detect-changes.outputs.marten }}' }
+          - { name: 'MassTransit', project: 'Veggerby.Ignition.MassTransit.Tests', enabled: '${{ needs.detect-changes.outputs.masstransit }}' }
+          - { name: 'Memcached', project: 'Veggerby.Ignition.Memcached.Tests', enabled: '${{ needs.detect-changes.outputs.memcached }}' }
+          - { name: 'MongoDb', project: 'Veggerby.Ignition.MongoDb.Tests', enabled: '${{ needs.detect-changes.outputs.mongodb }}' }
+          - { name: 'Orleans', project: 'Veggerby.Ignition.Orleans.Tests', enabled: '${{ needs.detect-changes.outputs.orleans }}' }
+          - { name: 'Postgres', project: 'Veggerby.Ignition.Postgres.Tests', enabled: '${{ needs.detect-changes.outputs.postgres }}' }
+          - { name: 'RabbitMq', project: 'Veggerby.Ignition.RabbitMq.Tests', enabled: '${{ needs.detect-changes.outputs.rabbitmq }}' }
+          - { name: 'Redis', project: 'Veggerby.Ignition.Redis.Tests', enabled: '${{ needs.detect-changes.outputs.redis }}' }
+          - { name: 'SqlServer', project: 'Veggerby.Ignition.SqlServer.Tests', enabled: '${{ needs.detect-changes.outputs.sqlserver }}' }
+          - { name: 'Metrics.OpenTelemetry', project: 'Veggerby.Ignition.Metrics.OpenTelemetry.Tests', enabled: '${{ needs.detect-changes.outputs.metrics-otel }}' }
+          - { name: 'Metrics.Prometheus', project: 'Veggerby.Ignition.Metrics.Prometheus.Tests', enabled: '${{ needs.detect-changes.outputs.metrics-prom }}' }
+
+    name: Test ${{ matrix.package.name }}
+    
+    steps:
+      - name: Skip if not needed
+        if: matrix.package.enabled != 'true'
+        run: echo "Skipping ${{ matrix.package.name }} - no changes detected"
+
+      - uses: actions/checkout@v4
+        if: matrix.package.enabled == 'true'
+
+      - name: Setup .NET
+        if: matrix.package.enabled == 'true'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download build artifacts
+        if: matrix.package.enabled == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+
+      - name: Run ${{ matrix.package.name }} Integration Tests
+        if: matrix.package.enabled == 'true'
+        run: |
+          dotnet test test/${{ matrix.package.project }}/${{ matrix.package.project }}.csproj \
+            --configuration Release \
+            --no-build \
+            --filter "Category=Integration&SkipInCI!=true" \
+            --logger "console;verbosity=normal"
+
+      - name: Upload test results for ${{ matrix.package.name }}
+        if: always() && matrix.package.enabled == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results-${{ matrix.package.name }}
+          path: |
+            test/${{ matrix.package.project }}/TestResults/**/*.trx
+            test/${{ matrix.package.project }}/TestResults/**/*.xml
           retention-days: 30
+
+  # Summary job that's required for branch protection
+  integration-summary:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, integration-tests]
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          if [[ "${{ needs.integration-tests.result }}" == "failure" ]]; then
+            echo "❌ Integration tests failed"
+            exit 1
+          elif [[ "${{ needs.integration-tests.result }}" == "cancelled" ]]; then
+            echo "⚠️ Integration tests were cancelled"
+            exit 1
+          else
+            echo "✅ Integration tests passed or were skipped appropriately"
+          fi
