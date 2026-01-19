@@ -100,7 +100,7 @@ internal sealed class MassTransitReadinessSignal : IIgnitionSignal
                 {
                     throw new TimeoutException($"MassTransit bus did not become healthy within {_options.BusReadyTimeout}");
                 }
-            }, "MassTransit bus", cancellationToken);
+            }, "MassTransit bus", cancellationToken, _options.Timeout);
 
             _logger.LogInformation("MassTransit bus readiness check completed successfully");
         }

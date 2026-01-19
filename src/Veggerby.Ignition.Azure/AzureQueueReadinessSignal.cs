@@ -86,7 +86,7 @@ internal sealed class AzureQueueReadinessSignal : IIgnitionSignal
             await retryPolicy.ExecuteAsync(async ct =>
             {
                 await _queueServiceClient.GetPropertiesAsync(ct).ConfigureAwait(false);
-            }, "Azure Queue Storage connection", cancellationToken);
+            }, "Azure Queue Storage connection", cancellationToken, _options.Timeout);
 
             if (_options.VerifyQueueExists && !string.IsNullOrWhiteSpace(_options.QueueName))
             {

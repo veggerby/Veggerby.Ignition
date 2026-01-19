@@ -95,7 +95,7 @@ internal sealed class SqlServerReadinessSignal : IIgnitionSignal
             var conn = _connectionFactory();
             await conn.OpenAsync(ct).ConfigureAwait(false);
             return conn;
-        }, "SQL Server connection", cancellationToken);
+        }, "SQL Server connection", cancellationToken, _options.Timeout);
 
         var serverName = connection.DataSource;
         var databaseName = connection.Database;

@@ -105,7 +105,7 @@ internal sealed class GrpcReadinessSignal : IIgnitionSignal, IDisposable
                     _logger.LogError(message);
                     throw new InvalidOperationException(message);
                 }
-            }, "gRPC health check", cancellationToken);
+            }, "gRPC health check", cancellationToken, _options.Timeout);
 
             _logger.LogInformation("gRPC readiness check completed successfully");
         }

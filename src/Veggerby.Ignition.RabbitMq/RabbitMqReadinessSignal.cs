@@ -119,7 +119,7 @@ internal sealed class RabbitMqReadinessSignal : IIgnitionSignal
                 var conn = await connectionFactory.CreateConnectionAsync(ct).ConfigureAwait(false);
                 _logger.LogDebug("RabbitMQ connection established");
                 return conn;
-            }, "RabbitMQ connection", cancellationToken);
+            }, "RabbitMQ connection", cancellationToken, _options.Timeout);
 
             channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
             _logger.LogDebug("RabbitMQ channel created");

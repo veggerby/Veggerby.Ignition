@@ -121,6 +121,7 @@ public async Task FailFast_Sequential_StopsOnFirstFailure()
 * No blocking waits (`Task.Result` / `.Wait()`)—use async throughout.
 * Cancellation tokens should not allocate unbounded registrations; only register when necessary (e.g., in test helper signals) and avoid repeated registrations per await where possible.
 * **Always include `nameof` parameter** in all `Argument*Exception.ThrowIf*()` calls (e.g., `ArgumentNullException.ThrowIfNull(param, nameof(param))`, `ArgumentException.ThrowIfNullOrWhiteSpace(str, nameof(str))`) for improved exception diagnostics and easier error triaging.
+* **Use `RetryPolicy` for transient failures**: Instead of implementing custom retry loops, use the core `RetryPolicy` class (`src/Veggerby.Ignition/Resilience/RetryPolicy.cs`) which provides exponential backoff, global timeout support, cancellation handling, and optional retry predicates. Particularly important for integration packages implementing connection/readiness logic that needs retry resilience.
 
 ## Documentation Expectations
 

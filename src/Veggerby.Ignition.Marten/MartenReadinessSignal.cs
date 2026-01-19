@@ -82,7 +82,7 @@ internal sealed class MartenReadinessSignal : IIgnitionSignal
                     await session.QueryAsync<int>("SELECT 1", token: ct).ConfigureAwait(false);
                     
                     _logger.LogDebug("Marten document store connection verified");
-                }, "Marten connection", cancellationToken);
+                }, "Marten connection", cancellationToken, _options.Timeout);
             }
 
             _logger.LogInformation("Marten document store readiness check completed successfully");
