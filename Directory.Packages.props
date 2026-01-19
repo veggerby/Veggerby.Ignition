@@ -68,6 +68,10 @@
     <PackageVersion Include="Testcontainers" Version="4.4.0" />
     <PackageVersion Include="Testcontainers.Redis" Version="4.4.0" />
 
+    <!-- Search Providers -->
+    <PackageVersion Include="Elastic.Clients.Elasticsearch" Version="8.17.1" />
+    <PackageVersion Include="Testcontainers.Elasticsearch" Version="4.4.0" />
+
     <!-- Cloud Storage Providers -->
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.23.0" />
     <PackageVersion Include="Azure.Storage.Queues" Version="12.21.0" />
