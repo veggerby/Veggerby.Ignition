@@ -48,6 +48,7 @@ jobs:
 
       - uses: dorny/paths-filter@v3
         id: filter
+        if: github.event_name == 'pull_request'
         with:
           filters: |
             core:
@@ -111,27 +112,43 @@ jobs:
              [[ "${{ contains(github.event.pull_request.labels.*.name, 'run-integration-tests') }}" == "true" ]] || \
              [[ "${{ steps.filter.outputs.core }}" == "true" ]]; then
             echo "run-all=true" >> $GITHUB_OUTPUT
+            # For run-all scenarios, set all packages to true
+            echo "aws=true" >> $GITHUB_OUTPUT
+            echo "azure=true" >> $GITHUB_OUTPUT
+            echo "grpc=true" >> $GITHUB_OUTPUT
+            echo "http=true" >> $GITHUB_OUTPUT
+            echo "kafka=true" >> $GITHUB_OUTPUT
+            echo "marten=true" >> $GITHUB_OUTPUT
+            echo "masstransit=true" >> $GITHUB_OUTPUT
+            echo "memcached=true" >> $GITHUB_OUTPUT
+            echo "mongodb=true" >> $GITHUB_OUTPUT
+            echo "orleans=true" >> $GITHUB_OUTPUT
+            echo "postgres=true" >> $GITHUB_OUTPUT
+            echo "rabbitmq=true" >> $GITHUB_OUTPUT
+            echo "redis=true" >> $GITHUB_OUTPUT
+            echo "sqlserver=true" >> $GITHUB_OUTPUT
+            echo "metrics-otel=true" >> $GITHUB_OUTPUT
+            echo "metrics-prom=true" >> $GITHUB_OUTPUT
           else
             echo "run-all=false" >> $GITHUB_OUTPUT
+            # Set individual package flags based on file changes
+            echo "aws=${{ steps.filter.outputs.aws }}" >> $GITHUB_OUTPUT
+            echo "azure=${{ steps.filter.outputs.azure }}" >> $GITHUB_OUTPUT
+            echo "grpc=${{ steps.filter.outputs.grpc }}" >> $GITHUB_OUTPUT
+            echo "http=${{ steps.filter.outputs.http }}" >> $GITHUB_OUTPUT
+            echo "kafka=${{ steps.filter.outputs.kafka }}" >> $GITHUB_OUTPUT
+            echo "marten=${{ steps.filter.outputs.marten }}" >> $GITHUB_OUTPUT
+            echo "masstransit=${{ steps.filter.outputs.masstransit }}" >> $GITHUB_OUTPUT
+            echo "memcached=${{ steps.filter.outputs.memcached }}" >> $GITHUB_OUTPUT
+            echo "mongodb=${{ steps.filter.outputs.mongodb }}" >> $GITHUB_OUTPUT
+            echo "orleans=${{ steps.filter.outputs.orleans }}" >> $GITHUB_OUTPUT
+            echo "postgres=${{ steps.filter.outputs.postgres }}" >> $GITHUB_OUTPUT
+            echo "rabbitmq=${{ steps.filter.outputs.rabbitmq }}" >> $GITHUB_OUTPUT
+            echo "redis=${{ steps.filter.outputs.redis }}" >> $GITHUB_OUTPUT
+            echo "sqlserver=${{ steps.filter.outputs.sqlserver }}" >> $GITHUB_OUTPUT
+            echo "metrics-otel=${{ steps.filter.outputs.metrics-otel }}" >> $GITHUB_OUTPUT
+            echo "metrics-prom=${{ steps.filter.outputs.metrics-prom }}" >> $GITHUB_OUTPUT
           fi
-          
-          # Set individual package flags (run if run-all OR package changed)
-          echo "aws=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.aws == 'true' }}" >> $GITHUB_OUTPUT
-          echo "azure=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.azure == 'true' }}" >> $GITHUB_OUTPUT
-          echo "grpc=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.grpc == 'true' }}" >> $GITHUB_OUTPUT
-          echo "http=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.http == 'true' }}" >> $GITHUB_OUTPUT
-          echo "kafka=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.kafka == 'true' }}" >> $GITHUB_OUTPUT
-          echo "marten=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.marten == 'true' }}" >> $GITHUB_OUTPUT
-          echo "masstransit=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.masstransit == 'true' }}" >> $GITHUB_OUTPUT
-          echo "memcached=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.memcached == 'true' }}" >> $GITHUB_OUTPUT
-          echo "mongodb=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.mongodb == 'true' }}" >> $GITHUB_OUTPUT
-          echo "orleans=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.orleans == 'true' }}" >> $GITHUB_OUTPUT
-          echo "postgres=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.postgres == 'true' }}" >> $GITHUB_OUTPUT
-          echo "rabbitmq=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.rabbitmq == 'true' }}" >> $GITHUB_OUTPUT
-          echo "redis=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.redis == 'true' }}" >> $GITHUB_OUTPUT
-          echo "sqlserver=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.sqlserver == 'true' }}" >> $GITHUB_OUTPUT
-          echo "metrics-otel=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.metrics-otel == 'true' }}" >> $GITHUB_OUTPUT
-          echo "metrics-prom=${{ steps.filter.outputs.run-all == 'true' || steps.filter.outputs.metrics-prom == 'true' }}" >> $GITHUB_OUTPUT
 
   # Build once, run tests as matrix
   build:
@@ -233,14 +250,64 @@ jobs:
     needs: [detect-changes, integration-tests]
     if: always()
     steps:
+      - name: Generate test summary
+        run: |
+          echo "## Integration Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Determine run mode
+          if [[ "${{ needs.detect-changes.outputs.run-all }}" == "true" ]]; then
+            echo "**Mode:** Full suite (all packages)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Mode:** Selective (changed packages only)" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Create status table
+          echo "| Package | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          
+          # Helper function to get emoji
+          get_status() {
+            if [[ "$1" == "true" ]]; then
+              echo "✅ Tested"
+            else
+              echo "⏭️ Skipped"
+            fi
+          }
+          
+          echo "| AWS | $(get_status "${{ needs.detect-changes.outputs.aws }}") |" >> $GITHUB_STEP_SUMMARY
+          echo "| Azure | $(get_status "${{ needs.detect-changes.outputs.azure }}") |" >> $GITHUB_STEP_SUMMARY
+          echo "| gRPC | $(get_status "${{ needs.detect-changes.outputs.grpc }}") |" >> $GITHUB_STEP_SUMMARY
+          echo "| HTTP | $(get_status "${{ needs.detect-changes.outputs.http }}") |" >> $GITHUB_STEP_SUMMARY
+          echo "| Kafka | $(get_status "${{ needs.detect-changes.outputs.kafka }}") |" >> $GITHUB_STEP_SUMMARY
+          echo "| Marten | $(get_status "${{ needs.detect-changes.outputs.marten }}") |" >> $GITHUB_STEP_SUMMARY
+          echo "| MassTransit | $(get_status "${{ needs.detect-changes.outputs.masstransit }}") |" >> $GITHUB_STEP_SUMMARY
+          echo "| Memcached | $(get_status "${{ needs.detect-changes.outputs.memcached }}") |" >> $GITHUB_STEP_SUMMARY
+          echo "| MongoDB | $(get_status "${{ needs.detect-changes.outputs.mongodb }}") |" >> $GITHUB_STEP_SUMMARY
+          echo "| Orleans | $(get_status "${{ needs.detect-changes.outputs.orleans }}") |" >> $GITHUB_STEP_SUMMARY
+          echo "| PostgreSQL | $(get_status "${{ needs.detect-changes.outputs.postgres }}") |" >> $GITHUB_STEP_SUMMARY
+          echo "| RabbitMQ | $(get_status "${{ needs.detect-changes.outputs.rabbitmq }}") |" >> $GITHUB_STEP_SUMMARY
+          echo "| Redis | $(get_status "${{ needs.detect-changes.outputs.redis }}") |" >> $GITHUB_STEP_SUMMARY
+          echo "| SQL Server | $(get_status "${{ needs.detect-changes.outputs.sqlserver }}") |" >> $GITHUB_STEP_SUMMARY
+          echo "| Metrics (OTEL) | $(get_status "${{ needs.detect-changes.outputs.metrics-otel }}") |" >> $GITHUB_STEP_SUMMARY
+          echo "| Metrics (Prom) | $(get_status "${{ needs.detect-changes.outputs.metrics-prom }}") |" >> $GITHUB_STEP_SUMMARY
+
       - name: Check test results
         run: |
           if [[ "${{ needs.integration-tests.result }}" == "failure" ]]; then
-            echo "❌ Integration tests failed"
+            echo "## ❌ Integration Tests Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "One or more integration test packages failed. Review the logs above for details." >> $GITHUB_STEP_SUMMARY
             exit 1
           elif [[ "${{ needs.integration-tests.result }}" == "cancelled" ]]; then
-            echo "⚠️ Integration tests were cancelled"
+            echo "## ⚠️ Integration Tests Cancelled" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The integration test run was cancelled before completion." >> $GITHUB_STEP_SUMMARY
             exit 1
           else
-            echo "✅ Integration tests passed or were skipped appropriately"
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## ✅ All Integration Tests Passed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All required integration tests completed successfully!" >> $GITHUB_STEP_SUMMARY
           fi
