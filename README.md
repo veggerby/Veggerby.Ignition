@@ -125,6 +125,7 @@ Extend Ignition with ready-made signals for popular infrastructure:
 | [Veggerby.Ignition.Postgres](src/Veggerby.Ignition.Postgres) | PostgreSQL database | ✅ |
 | [Veggerby.Ignition.SqlServer](src/Veggerby.Ignition.SqlServer) | SQL Server database | ✅ |
 | [Veggerby.Ignition.MongoDb](src/Veggerby.Ignition.MongoDb) | MongoDB document store | ✅ |
+| [Veggerby.Ignition.Elasticsearch](src/Veggerby.Ignition.Elasticsearch) | Elasticsearch search cluster | ✅ |
 | [Veggerby.Ignition.Http](src/Veggerby.Ignition.Http) | HTTP endpoint health checks | ✅ |
 | [Veggerby.Ignition.Grpc](src/Veggerby.Ignition.Grpc) | gRPC service health protocol | ✅ |
 | [Veggerby.Ignition.Azure](src/Veggerby.Ignition.Azure) | Azure Storage (Blob, Queue, Table) | ✅ |
@@ -423,6 +424,14 @@ await app.Services.GetRequiredService<IIgnitionCoordinator>().WaitAllAsync();
   - Activity tracing and structured logging
   - ```dotnet add package Veggerby.Ignition.MongoDb```
 
+- **[Veggerby.Ignition.Elasticsearch](src/Veggerby.Ignition.Elasticsearch/README.md)** - Elasticsearch search cluster readiness
+  - Multiple verification strategies (ClusterHealth, IndexExists, TemplateValidation, QueryTest)
+  - Cluster health status verification (green/yellow/red)
+  - Index existence and template validation
+  - Test query execution for end-to-end verification
+  - Activity tracing and structured logging
+  - ```dotnet add package Veggerby.Ignition.Elasticsearch```
+
 **Example:** Verify database readiness before startup:
 
 ```csharp
@@ -449,6 +458,15 @@ builder.Services.AddMongoDbReadiness(
     {
         options.DatabaseName = "mydb";
         options.VerifyCollection = "users";
+    });
+
+// Elasticsearch
+builder.Services.AddElasticsearchReadiness(
+    "http://localhost:9200",
+    options =>
+    {
+        options.VerificationStrategy = ElasticsearchVerificationStrategy.IndexExists;
+        options.VerifyIndices.Add("logs-2024");
     });
 
 var app = builder.Build();

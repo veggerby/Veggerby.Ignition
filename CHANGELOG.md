@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+- **Elasticsearch Integration Package (`Veggerby.Ignition.Elasticsearch`)**: Enterprise search and observability platform readiness verification
+  - Supports multiple verification strategies: `ClusterHealth` (cluster status check), `IndexExists` (index existence), `TemplateValidation` (index template verification), `QueryTest` (end-to-end query execution)
+  - Cluster health verification reports green/yellow/red status with node and shard metrics
+  - Configurable retry policies with exponential backoff (default: 3 retries, 200ms initial delay)
+  - Factory pattern support for Testcontainers and staged execution scenarios
+  - Extension methods: `AddElasticsearchReadiness(uri)`, `AddElasticsearchReadiness(settings)`, `AddElasticsearchReadiness(settingsFactory)`
+  - 7 unit tests and 10 integration tests with Testcontainers.Elasticsearch
+  - Comprehensive README with examples for all verification strategies and ELK stack scenarios
+  - Dependencies: Elastic.Clients.Elasticsearch 8.17.1 (official .NET client)
 - **Core: Timeout Enforcement in `RetryPolicy`**: Centralized timeout support prevents infinite hangs across all integration packages
   - Added optional `timeout` parameter to both `RetryPolicy.ExecuteAsync()` overloads
   - Timeout applies to entire retry operation (all attempts + delays), not individual attempts
