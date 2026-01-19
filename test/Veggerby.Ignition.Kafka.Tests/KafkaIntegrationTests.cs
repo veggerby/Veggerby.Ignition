@@ -48,7 +48,6 @@ public class KafkaIntegrationTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
-    [Trait("SkipInCI", "true")]
     public async Task ClusterMetadata_Succeeds()
     {
         // arrange
@@ -66,7 +65,6 @@ public class KafkaIntegrationTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
-    [Trait("SkipInCI", "true")]
     public async Task TopicMetadata_WithExistingTopic_Succeeds()
     {
         // arrange
@@ -102,7 +100,6 @@ public class KafkaIntegrationTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
-    [Trait("SkipInCI", "true")]
     public async Task TopicMetadata_WithMissingTopic_FailOnTrue_Throws()
     {
         // arrange
@@ -122,7 +119,6 @@ public class KafkaIntegrationTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
-    [Trait("SkipInCI", "true")]
     public async Task TopicMetadata_WithMissingTopic_FailOnFalse_Succeeds()
     {
         // arrange
@@ -142,7 +138,6 @@ public class KafkaIntegrationTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
-    [Trait("SkipInCI", "true")]
     public async Task ProducerTest_Succeeds()
     {
         // arrange
@@ -160,7 +155,6 @@ public class KafkaIntegrationTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
-    [Trait("SkipInCI", "true")]
     public async Task ConsumerGroupCheck_WithNoGroups_LogsWarning()
     {
         // arrange
@@ -179,7 +173,6 @@ public class KafkaIntegrationTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
-    [Trait("SkipInCI", "true")]
     public async Task ConsumerGroupCheck_WithoutGroupSpecified_Throws()
     {
         // arrange
@@ -197,7 +190,6 @@ public class KafkaIntegrationTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
-    [Trait("SkipInCI", "true")]
     public async Task RepeatedWaitAsync_ReturnsCachedResult()
     {
         // arrange
@@ -219,7 +211,6 @@ public class KafkaIntegrationTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
-    [Trait("SkipInCI", "true")]
     public async Task TopicMetadata_NoTopicsSpecified_FallsBackToClusterMetadata()
     {
         // arrange
@@ -237,7 +228,6 @@ public class KafkaIntegrationTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
-    [Trait("SkipInCI", "true")]
     public async Task MultipleTopics_AllExist_Succeeds()
     {
         // arrange
