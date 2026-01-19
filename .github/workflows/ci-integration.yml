@@ -124,12 +124,13 @@ jobs:
           # Run all tests if: manual trigger, push to main, label present, or core package changed
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
              [[ "${{ github.event_name }}" == "push" ]] || \
-             [[ "${{ contains(github.event.pull_request.labels.*.name, 'run-integration-tests') }}" == "true" ]] || \
+             [[ "${{ contains(github.event.pull_request.labels.*.name, 'run-full-integration-tests') }}" == "true" ]] || \
              [[ "${{ steps.filter.outputs.core }}" == "true" ]]; then
             echo "run-all=true" >> $GITHUB_OUTPUT
             echo "changed-filters=all" >> $GITHUB_OUTPUT
             # Use all packages
             echo "packages-to-test=${{ needs.discover-packages.outputs.packages }}" >> $GITHUB_OUTPUT
+            echo "✅ Running full integration test suite"
           else
             echo "run-all=false" >> $GITHUB_OUTPUT
             # Get list of changed filters (excluding 'core')
@@ -156,6 +157,7 @@ jobs:
               ')
               echo "packages-to-test=$FILTERED" >> $GITHUB_OUTPUT
               echo "Filtered packages: $FILTERED"
+              echo "⚡ Running selective tests (fast feedback)"
             fi
           fi
 
@@ -279,4 +281,35 @@ jobs:
             echo "## ✅ All Integration Tests Passed" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "All required integration tests completed successfully!" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Required check for merge: ensures full suite was run
+  full-suite-required:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, integration-tests]
+    if: always() && github.event_name == 'pull_request'
+    steps:
+      - name: Verify full suite ran
+        run: |
+          RUN_ALL="${{ needs.detect-changes.outputs.run-all }}"
+          
+          if [[ "$RUN_ALL" == "true" ]]; then
+            echo "✅ Full integration test suite was executed"
+            echo "All ${{ needs.discover-packages.outputs.package-count }} integration packages were tested."
+            
+            # Check if tests passed
+            if [[ "${{ needs.integration-tests.result }}" != "success" ]]; then
+              echo "❌ Full suite ran but tests failed"
+              exit 1
+            fi
+          else
+            echo "❌ Full integration test suite is required before merge"
+            echo ""
+            echo "To run the full suite, either:"
+            echo "  1. Add the 'run-full-integration-tests' label to this PR"
+            echo "  2. Manually dispatch the workflow from the Actions tab"
+            echo ""
+            echo "Partial/selective testing is allowed during development,"
+            echo "but all integration tests must pass before merging to main."
+            exit 1
           fi
