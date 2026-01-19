@@ -87,7 +87,7 @@ internal sealed class AzureTableReadinessSignal : IIgnitionSignal
             await retryPolicy.ExecuteAsync(async ct =>
             {
                 await _tableServiceClient.GetPropertiesAsync(ct).ConfigureAwait(false);
-            }, "Azure Table Storage connection", cancellationToken);
+            }, "Azure Table Storage connection", cancellationToken, _options.Timeout);
 
             if (_options.VerifyTableExists && !string.IsNullOrWhiteSpace(_options.TableName))
             {

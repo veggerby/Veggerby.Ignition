@@ -120,7 +120,7 @@ internal sealed class HttpReadinessSignal : IIgnitionSignal
 
                     _logger.LogDebug("Custom response validation succeeded");
                 }
-            }, "HTTP request", cancellationToken);
+            }, "HTTP request", cancellationToken, _options.Timeout);
 
             _logger.LogInformation("HTTP readiness check completed successfully");
         }

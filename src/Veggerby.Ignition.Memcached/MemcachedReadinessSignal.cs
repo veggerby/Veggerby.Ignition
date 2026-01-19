@@ -88,7 +88,7 @@ internal sealed class MemcachedReadinessSignal : IIgnitionSignal
                 {
                     await ExecuteTestKeyRoundTripAsync(ct);
                 }
-            }, "Memcached connection", cancellationToken);
+            }, "Memcached connection", cancellationToken, _options.Timeout);
 
             _logger.LogInformation("Memcached readiness check completed successfully");
         }

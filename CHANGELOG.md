@@ -8,13 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+- **Core: Timeout Enforcement in `RetryPolicy`**: Centralized timeout support prevents infinite hangs across all integration packages
+  - Added optional `timeout` parameter to both `RetryPolicy.ExecuteAsync()` overloads
+  - Timeout applies to entire retry operation (all attempts + delays), not individual attempts
+  - Throws `TimeoutException` when timeout is exceeded, with proper logging
+  - Replaces duplicated timeout logic previously required in each integration package signal
+  - Benefits all integration packages: Kafka, Redis, Postgres, MongoDb, RabbitMq, SqlServer, Orleans, Memcached, etc.
 - **Kafka Integration Package (`Veggerby.Ignition.Kafka`)**: Enterprise event streaming platform readiness verification
   - Supports multiple verification strategies: `ClusterMetadata` (fast broker connectivity), `TopicMetadata` (topic existence), `ProducerTest` (end-to-end message delivery), `ConsumerGroupCheck` (consumer group registration)
-  - Configurable retry policies with exponential backoff (default: 3 retries, 200ms initial delay)
+  - Configurable retry policies with exponential backoff (default: 10 retries, 500ms initial delay)
   - Optional Schema Registry verification for Confluent Platform deployments
   - Factory pattern support for Testcontainers and staged execution scenarios
   - Extension methods: `AddKafkaReadiness(bootstrapServers)`, `AddKafkaReadiness(producerConfig)`, `AddKafkaReadiness(bootstrapServersFactory)`
-  - 26 unit tests and 10 integration tests with Testcontainers.Kafka
+  - 26 unit tests and 10 integration tests with Testcontainers.Kafka (excluded from CI via `SkipInCI` trait)
   - Comprehensive README with examples for all verification strategies
   - Dependencies: Confluent.Kafka 2.8.0 (official .NET client)
 - **Official Metrics Packages (Prometheus & OpenTelemetry)**: Production-ready metrics integration packages

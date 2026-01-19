@@ -89,7 +89,7 @@ internal sealed class OrleansReadinessSignal : IIgnitionSignal
                 }
                 
                 _logger.LogDebug("Orleans cluster has {ActiveSilos} active silo(s)", hosts.Count);
-            }, "Orleans cluster connection", cancellationToken);
+            }, "Orleans cluster connection", cancellationToken, _options.Timeout);
 
             _logger.LogInformation("Orleans readiness check completed successfully");
         }

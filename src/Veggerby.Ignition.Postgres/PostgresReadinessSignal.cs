@@ -154,7 +154,7 @@ internal sealed class PostgresReadinessSignal : IIgnitionSignal
                 var conn = await dataSource.OpenConnectionAsync(ct).ConfigureAwait(false);
                 _logger.LogDebug("PostgreSQL connection established");
                 return conn;
-            }, "PostgreSQL connection", cancellationToken);
+            }, "PostgreSQL connection", cancellationToken, _options.Timeout);
 
             if (!string.IsNullOrWhiteSpace(_options.ValidationQuery))
             {

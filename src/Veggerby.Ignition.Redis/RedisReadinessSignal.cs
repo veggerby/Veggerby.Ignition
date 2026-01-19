@@ -121,7 +121,8 @@ internal sealed class RedisReadinessSignal : IIgnitionSignal
                 }
             },
             "Redis readiness check",
-            cancellationToken);
+            cancellationToken,
+            _options.Timeout);
 
         _logger.LogInformation("Redis readiness check completed successfully");
     }

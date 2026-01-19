@@ -113,7 +113,7 @@ internal sealed class MongoDbReadinessSignal : IIgnitionSignal
                 var command = new BsonDocument("ping", 1);
                 await database.RunCommandAsync<BsonDocument>(command, cancellationToken: ct).ConfigureAwait(false);
                 _logger.LogDebug("MongoDB cluster ping successful");
-            }, "MongoDB connection", cancellationToken);
+            }, "MongoDB connection", cancellationToken, _options.Timeout);
 
             // Verify collection if specified
             if (!string.IsNullOrWhiteSpace(_options.DatabaseName) && !string.IsNullOrWhiteSpace(_options.VerifyCollection))

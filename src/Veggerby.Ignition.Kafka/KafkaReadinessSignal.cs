@@ -97,22 +97,15 @@ internal sealed class KafkaReadinessSignal : IIgnitionSignal
             producerConfig.BootstrapServers,
             _options.VerificationStrategy);
 
-        try
-        {
-            var retryPolicy = new RetryPolicy(_options.MaxRetries, _options.RetryDelay, _logger);
+        var retryPolicy = new RetryPolicy(_options.MaxRetries, _options.RetryDelay, _logger);
 
-            await retryPolicy.ExecuteAsync(async ct =>
-            {
-                await PerformVerificationAsync(producerConfig, ct);
-            }, "Kafka verification", cancellationToken);
+        await retryPolicy.ExecuteAsync(
+            async ct => await PerformVerificationAsync(producerConfig, ct),
+            "Kafka verification",
+            cancellationToken,
+            _options.Timeout);
 
-            _logger.LogInformation("Kafka readiness check completed successfully");
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _logger.LogError(ex, "Kafka readiness check failed");
-            throw;
-        }
+        _logger.LogInformation("Kafka readiness check completed successfully");
     }
 
     private async Task PerformVerificationAsync(ProducerConfig producerConfig, CancellationToken cancellationToken)
