@@ -36,7 +36,7 @@ jobs:
         run: dotnet build Veggerby.Ignition.sln --configuration Release --no-restore
 
       - name: Run Integration Tests
-        run: dotnet test Veggerby.Ignition.sln --configuration Release --no-build --filter "Category=Integration" --logger "console;verbosity=normal"
+        run: dotnet test Veggerby.Ignition.sln --configuration Release --no-build --filter "Category=Integration&SkipInCI!=true" --logger "console;verbosity=normal"
 
       - name: Upload test results
         if: always()

@@ -34,16 +34,16 @@ public sealed class KafkaReadinessOptions
 
     /// <summary>
     /// Maximum number of retry attempts for transient connection failures.
-    /// Default is 3 attempts.
+    /// Default is 10 attempts to accommodate Kafka broker startup time.
     /// </summary>
-    public int MaxRetries { get; set; } = 3;
+    public int MaxRetries { get; set; } = 10;
 
     /// <summary>
     /// Initial delay between retry attempts.
     /// Subsequent delays use exponential backoff (doubled each retry).
-    /// Default is 200 milliseconds.
+    /// Default is 500 milliseconds.
     /// </summary>
-    public TimeSpan RetryDelay { get; set; } = TimeSpan.FromMilliseconds(200);
+    public TimeSpan RetryDelay { get; set; } = TimeSpan.FromMilliseconds(500);
 
     /// <summary>
     /// Verification strategy to use for readiness checks.

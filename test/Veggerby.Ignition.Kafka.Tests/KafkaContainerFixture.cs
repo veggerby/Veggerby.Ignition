@@ -21,7 +21,7 @@ public class KafkaContainerFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         _kafkaContainer = new KafkaBuilder()
-            .WithImage("confluentinc/cp-kafka:8.0.0")
+            .WithImage("confluentinc/confluent-local:7.7.1")
             .WithWaitStrategy(Wait.ForUnixContainer())
             .Build();
 

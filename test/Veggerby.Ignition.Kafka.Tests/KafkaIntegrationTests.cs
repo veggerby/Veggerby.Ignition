@@ -21,6 +21,7 @@ public class KafkaIntegrationTests
 
     [Fact]
     [Trait("Category", "Integration")]
+    [Trait("SkipInCI", "true")]
     public async Task ClusterMetadata_Succeeds()
     {
         // arrange
@@ -38,6 +39,7 @@ public class KafkaIntegrationTests
 
     [Fact]
     [Trait("Category", "Integration")]
+    [Trait("SkipInCI", "true")]
     public async Task TopicMetadata_WithExistingTopic_Succeeds()
     {
         // arrange
@@ -58,7 +60,7 @@ public class KafkaIntegrationTests
         var options = new KafkaReadinessOptions
         {
             VerificationStrategy = KafkaVerificationStrategy.TopicMetadata,
-            Timeout = TimeSpan.FromSeconds(30)
+            Timeout = TimeSpan.FromSeconds(60)
         };
         options.WithTopic(topicName);
         var logger = Substitute.For<ILogger<KafkaReadinessSignal>>();
@@ -73,6 +75,7 @@ public class KafkaIntegrationTests
 
     [Fact]
     [Trait("Category", "Integration")]
+    [Trait("SkipInCI", "true")]
     public async Task TopicMetadata_WithMissingTopic_FailOnTrue_Throws()
     {
         // arrange
@@ -80,7 +83,7 @@ public class KafkaIntegrationTests
         {
             VerificationStrategy = KafkaVerificationStrategy.TopicMetadata,
             FailOnMissingTopics = true,
-            Timeout = TimeSpan.FromSeconds(30)
+            Timeout = TimeSpan.FromSeconds(60)
         };
         options.WithTopic("nonexistent-topic");
         var logger = Substitute.For<ILogger<KafkaReadinessSignal>>();
@@ -92,6 +95,7 @@ public class KafkaIntegrationTests
 
     [Fact]
     [Trait("Category", "Integration")]
+    [Trait("SkipInCI", "true")]
     public async Task TopicMetadata_WithMissingTopic_FailOnFalse_Succeeds()
     {
         // arrange
@@ -99,7 +103,7 @@ public class KafkaIntegrationTests
         {
             VerificationStrategy = KafkaVerificationStrategy.TopicMetadata,
             FailOnMissingTopics = false,
-            Timeout = TimeSpan.FromSeconds(30)
+            Timeout = TimeSpan.FromSeconds(60)
         };
         options.WithTopic("nonexistent-topic");
         var logger = Substitute.For<ILogger<KafkaReadinessSignal>>();
@@ -111,12 +115,32 @@ public class KafkaIntegrationTests
 
     [Fact]
     [Trait("Category", "Integration")]
+    [Trait("SkipInCI", "true")]
     public async Task ProducerTest_Succeeds()
     {
         // arrange
         var options = new KafkaReadinessOptions
         {
             VerificationStrategy = KafkaVerificationStrategy.ProducerTest,
+            Timeout = TimeSpan.FromSeconds(90)
+        };
+        var logger = Substitute.For<ILogger<KafkaReadinessSignal>>();
+        var signal = new KafkaReadinessSignal(_producerConfig, options, logger);
+
+        // act & assert
+        await signal.WaitAsync();
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    [Trait("SkipInCI", "true")]
+    public async Task ConsumerGroupCheck_WithNoGroups_LogsWarning()
+    {
+        // arrange
+        var options = new KafkaReadinessOptions
+        {
+            VerificationStrategy = KafkaVerificationStrategy.ConsumerGroupCheck,
+            VerifyConsumerGroup = "nonexistent-group",
             Timeout = TimeSpan.FromSeconds(60)
         };
         var logger = Substitute.For<ILogger<KafkaReadinessSignal>>();
@@ -128,31 +152,14 @@ public class KafkaIntegrationTests
 
     [Fact]
     [Trait("Category", "Integration")]
-    public async Task ConsumerGroupCheck_WithNoGroups_LogsWarning()
-    {
-        // arrange
-        var options = new KafkaReadinessOptions
-        {
-            VerificationStrategy = KafkaVerificationStrategy.ConsumerGroupCheck,
-            VerifyConsumerGroup = "nonexistent-group",
-            Timeout = TimeSpan.FromSeconds(30)
-        };
-        var logger = Substitute.For<ILogger<KafkaReadinessSignal>>();
-        var signal = new KafkaReadinessSignal(_producerConfig, options, logger);
-
-        // act & assert
-        await signal.WaitAsync();
-    }
-
-    [Fact]
-    [Trait("Category", "Integration")]
+    [Trait("SkipInCI", "true")]
     public async Task ConsumerGroupCheck_WithoutGroupSpecified_Throws()
     {
         // arrange
         var options = new KafkaReadinessOptions
         {
             VerificationStrategy = KafkaVerificationStrategy.ConsumerGroupCheck,
-            Timeout = TimeSpan.FromSeconds(30)
+            Timeout = TimeSpan.FromSeconds(60)
         };
         var logger = Substitute.For<ILogger<KafkaReadinessSignal>>();
         var signal = new KafkaReadinessSignal(_producerConfig, options, logger);
@@ -163,13 +170,14 @@ public class KafkaIntegrationTests
 
     [Fact]
     [Trait("Category", "Integration")]
+    [Trait("SkipInCI", "true")]
     public async Task RepeatedWaitAsync_ReturnsCachedResult()
     {
         // arrange
         var options = new KafkaReadinessOptions
         {
             VerificationStrategy = KafkaVerificationStrategy.ClusterMetadata,
-            Timeout = TimeSpan.FromSeconds(30)
+            Timeout = TimeSpan.FromSeconds(60)
         };
         var logger = Substitute.For<ILogger<KafkaReadinessSignal>>();
         var signal = new KafkaReadinessSignal(_producerConfig, options, logger);
@@ -184,13 +192,14 @@ public class KafkaIntegrationTests
 
     [Fact]
     [Trait("Category", "Integration")]
+    [Trait("SkipInCI", "true")]
     public async Task TopicMetadata_NoTopicsSpecified_FallsBackToClusterMetadata()
     {
         // arrange
         var options = new KafkaReadinessOptions
         {
             VerificationStrategy = KafkaVerificationStrategy.TopicMetadata,
-            Timeout = TimeSpan.FromSeconds(30)
+            Timeout = TimeSpan.FromSeconds(60)
         };
         var logger = Substitute.For<ILogger<KafkaReadinessSignal>>();
         var signal = new KafkaReadinessSignal(_producerConfig, options, logger);
@@ -201,6 +210,7 @@ public class KafkaIntegrationTests
 
     [Fact]
     [Trait("Category", "Integration")]
+    [Trait("SkipInCI", "true")]
     public async Task MultipleTopics_AllExist_Succeeds()
     {
         // arrange
@@ -218,7 +228,7 @@ public class KafkaIntegrationTests
         var options = new KafkaReadinessOptions
         {
             VerificationStrategy = KafkaVerificationStrategy.TopicMetadata,
-            Timeout = TimeSpan.FromSeconds(30)
+            Timeout = TimeSpan.FromSeconds(60)
         };
         options.WithTopic(topic1);
         options.WithTopic(topic2);

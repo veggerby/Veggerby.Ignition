@@ -151,7 +151,8 @@ internal sealed class KafkaReadinessSignal : IIgnitionSignal
 
         using var adminClient = new AdminClientBuilder(producerConfig).Build();
 
-        var metadata = adminClient.GetMetadata(TimeSpan.FromSeconds(10));
+        var metadataTimeout = _options.Timeout ?? TimeSpan.FromSeconds(15);
+        var metadata = adminClient.GetMetadata(metadataTimeout);
 
         if (metadata.Brokers == null || metadata.Brokers.Count == 0)
         {
@@ -177,7 +178,8 @@ internal sealed class KafkaReadinessSignal : IIgnitionSignal
 
         using var adminClient = new AdminClientBuilder(producerConfig).Build();
 
-        var metadata = adminClient.GetMetadata(TimeSpan.FromSeconds(10));
+        var metadataTimeout = _options.Timeout ?? TimeSpan.FromSeconds(15);
+        var metadata = adminClient.GetMetadata(metadataTimeout);
 
         foreach (var topicName in _options.VerifyTopics)
         {
@@ -273,7 +275,8 @@ internal sealed class KafkaReadinessSignal : IIgnitionSignal
 
         using var adminClient = new AdminClientBuilder(producerConfig).Build();
 
-        var groups = adminClient.ListGroups(TimeSpan.FromSeconds(10));
+        var metadataTimeout = _options.Timeout ?? TimeSpan.FromSeconds(15);
+        var groups = adminClient.ListGroups(metadataTimeout);
 
         var group = groups.FirstOrDefault(g => g.Group == _options.VerifyConsumerGroup);
 
