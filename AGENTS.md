@@ -281,6 +281,7 @@ public class RedisIntegrationTests : IAsyncLifetime
 - Test idempotency (multiple coordinator waits return cached results)
 - Preserve existing test coverage when refactoring
 - **Integration tests**: Use Testcontainers for real infrastructure; avoid mocking external services when testing integration packages
+- **Integration package workflow**: The CI integration test workflow (`.github/workflows/ci-integration.yml`) automatically discovers all integration packages from the `src/` directory - no manual updates needed when adding/removing packages
 
 ## Code Style Guidelines
 

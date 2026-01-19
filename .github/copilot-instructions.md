@@ -86,6 +86,7 @@ Docs: Inline XML documentation; root `README.md` (usage, semantics). Add or upda
 * For new options or policies, add focused tests including edge cases (zero signals, single failing signal, mixed statuses, cancellation tokens).
 * Avoid flakiness: prefer deterministic delays (small `Task.Delay`) under generous global timeouts or use manual `TaskCompletionSource` signaling.
 * When measuring concurrency effects, assert qualitative properties (e.g., limited start count) rather than brittle exact timing.
+* **Integration package workflow**: The CI integration test workflow (`.github/workflows/ci-integration.yml`) automatically discovers all integration packages from the `src/` directory - no manual updates needed when adding/removing packages.
 
 ### Example Test Pattern
 ```csharp
