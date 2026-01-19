@@ -318,6 +318,13 @@ public class RedisIntegrationTests : IAsyncLifetime
 **Language Guidelines:**
 
 - Expression-bodied members allowed for simple, immutable factory helpers
+- **Use `RetryPolicy` for robust retry logic**: When implementing signal readiness checks or integration package connection logic that requires retries, use the built-in `RetryPolicy` class instead of custom retry loops
+  - Provides exponential backoff with configurable initial delay
+  - Supports global timeout for entire retry operation (including all attempts and delays)
+  - Handles cancellation token propagation correctly
+  - Offers optional `shouldRetry` predicate for conditional retry logic
+  - Available for both `Task` and `Task<T>` operations
+  - Example: `await new RetryPolicy(maxRetries: 5, TimeSpan.FromMilliseconds(200)).ExecuteAsync(async ct => { /* operation */ }, "operation-name", cancellationToken, timeout: TimeSpan.FromSeconds(10));`
 - Avoid LINQ in hot coordinator paths; prefer explicit loops for performance
 - No blocking waits (`.Result`, `.Wait()`) — async/await throughout
 - Use `Stopwatch` for timing, never `DateTime.Now` for elapsed measurement
