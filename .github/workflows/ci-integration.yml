@@ -177,15 +177,6 @@ jobs:
       - name: Build
         run: dotnet build Veggerby.Ignition.sln --configuration Release --no-restore
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-output
-          path: |
-            src/**/bin/Release/**
-            test/**/bin/Release/**
-          retention-days: 1
-
   # Run integration tests for each package
   integration-tests:
     runs-on: ubuntu-latest
@@ -206,11 +197,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-output
 
       - name: Restore dependencies
         run: dotnet restore test/${{ matrix.package.project }}/${{ matrix.package.project }}.csproj
