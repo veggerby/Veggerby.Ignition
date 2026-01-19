@@ -151,7 +151,7 @@ internal sealed class KafkaReadinessSignal : IIgnitionSignal
         }
     }
 
-    private async Task VerifyClusterMetadataAsync(ProducerConfig producerConfig, CancellationToken cancellationToken)
+    private Task VerifyClusterMetadataAsync(ProducerConfig producerConfig, CancellationToken cancellationToken)
     {
         _logger.LogDebug("Verifying cluster metadata");
 
@@ -169,6 +169,8 @@ internal sealed class KafkaReadinessSignal : IIgnitionSignal
             "Cluster metadata retrieved successfully: {BrokerCount} brokers, {TopicCount} topics",
             metadata.Brokers.Count,
             metadata.Topics?.Count ?? 0);
+
+        return Task.CompletedTask;
     }
 
     private async Task VerifyTopicMetadataAsync(ProducerConfig producerConfig, CancellationToken cancellationToken)
@@ -269,7 +271,7 @@ internal sealed class KafkaReadinessSignal : IIgnitionSignal
         }
     }
 
-    private async Task VerifyConsumerGroupAsync(ProducerConfig producerConfig, CancellationToken cancellationToken)
+    private Task VerifyConsumerGroupAsync(ProducerConfig producerConfig, CancellationToken cancellationToken)
     {
         _logger.LogDebug("Verifying consumer group '{GroupId}'", _options.VerifyConsumerGroup);
 
@@ -292,6 +294,8 @@ internal sealed class KafkaReadinessSignal : IIgnitionSignal
                 _options.VerifyConsumerGroup,
                 group.ProtocolType);
         }
+
+        return Task.CompletedTask;
     }
 
     private async Task VerifySchemaRegistryAsync(CancellationToken cancellationToken)

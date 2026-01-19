@@ -20,7 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
   - Optional Schema Registry verification for Confluent Platform deployments
   - Factory pattern support for Testcontainers and staged execution scenarios
   - Extension methods: `AddKafkaReadiness(bootstrapServers)`, `AddKafkaReadiness(producerConfig)`, `AddKafkaReadiness(bootstrapServersFactory)`
-  - 26 unit tests and 10 integration tests with Testcontainers.Kafka (excluded from CI via `SkipInCI` trait)
+  - 26 unit tests and 10 integration tests with Testcontainers.Kafka
   - Comprehensive README with examples for all verification strategies
   - Dependencies: Confluent.Kafka 2.8.0 (official .NET client)
 - **Official Metrics Packages (Prometheus & OpenTelemetry)**: Production-ready metrics integration packages

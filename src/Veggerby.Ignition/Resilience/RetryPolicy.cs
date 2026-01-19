@@ -113,10 +113,10 @@ public sealed class RetryPolicy
                 }
             }
         }
-        catch (OperationCanceledException) when (timeout.HasValue && timeoutCts?.Token.IsCancellationRequested == true)
+        catch (OperationCanceledException) when (timeoutCts?.Token.IsCancellationRequested == true)
         {
-            _logger?.LogError("{OperationName} timed out after {Timeout}", operationName, timeout.Value);
-            throw new TimeoutException($"{operationName} timed out after {timeout.Value}");
+            _logger?.LogError("{OperationName} timed out after {Timeout}", operationName, timeout!.Value);
+            throw new TimeoutException($"{operationName} timed out after {timeout!.Value}");
         }
     }
 
@@ -220,10 +220,10 @@ public sealed class RetryPolicy
                 }
             }
         }
-        catch (OperationCanceledException) when (timeout.HasValue && timeoutCts?.Token.IsCancellationRequested == true)
+        catch (OperationCanceledException) when (timeoutCts?.Token.IsCancellationRequested == true)
         {
-            _logger?.LogError("{OperationName} timed out after {Timeout}", operationName, timeout.Value);
-            throw new TimeoutException($"{operationName} timed out after {timeout.Value}");
+            _logger?.LogError("{OperationName} timed out after {Timeout}", operationName, timeout!.Value);
+            throw new TimeoutException($"{operationName} timed out after {timeout!.Value}");
         }
     }
 
@@ -310,10 +310,10 @@ public sealed class RetryPolicy
                 }
             }
         }
-        catch (OperationCanceledException) when (timeout.HasValue && timeoutCts?.Token.IsCancellationRequested == true)
+        catch (OperationCanceledException) when (timeoutCts?.Token.IsCancellationRequested == true)
         {
-            _logger?.LogError("{OperationName} timed out after {Timeout}", operationName, timeout.Value);
-            throw new TimeoutException($"{operationName} timed out after {timeout.Value}");
+            _logger?.LogError("{OperationName} timed out after {Timeout}", operationName, timeout!.Value);
+            throw new TimeoutException($"{operationName} timed out after {timeout!.Value}");
         }
     }
 }

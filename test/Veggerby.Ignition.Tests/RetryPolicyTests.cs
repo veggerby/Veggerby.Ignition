@@ -342,7 +342,7 @@ public class RetryPolicyTests
         var policy = new RetryPolicy(maxRetries: 5, TimeSpan.FromMilliseconds(100));
 
         // act & assert
-        var ex = await Assert.ThrowsAsync<TimeoutException>(async () =>
+        await Assert.ThrowsAsync<TimeoutException>(async () =>
         {
             await policy.ExecuteAsync(
                 async ct =>
@@ -514,7 +514,7 @@ public class RetryPolicyTests
         var policy = new RetryPolicy(maxRetries: 5, TimeSpan.FromMilliseconds(10));
 
         // act & assert
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
             await policy.ExecuteAsync(
                 async ct =>
@@ -538,7 +538,7 @@ public class RetryPolicyTests
         var policy = new RetryPolicy(maxRetries: 5, TimeSpan.FromMilliseconds(10));
 
         // act & assert
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
             await policy.ExecuteAsync(
                 async ct =>
@@ -595,7 +595,7 @@ public class RetryPolicyTests
         var policy = new RetryPolicy(maxRetries: 5, TimeSpan.FromMilliseconds(100));
 
         // act & assert
-        var ex = await Assert.ThrowsAsync<TimeoutException>(async () =>
+        await Assert.ThrowsAsync<TimeoutException>(async () =>
         {
             await policy.ExecuteAsync(
                 async ct =>
@@ -617,7 +617,7 @@ public class RetryPolicyTests
         // arrange
         var callCount = 0;
         var policy = new RetryPolicy(maxRetries: 3);
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         cts.Cancel();
 
         // act & assert
@@ -643,10 +643,10 @@ public class RetryPolicyTests
         // arrange
         var callCount = 0;
         var policy = new RetryPolicy(maxRetries: 5, TimeSpan.FromMilliseconds(50));
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
 
         // act & assert
-        var ex = await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
         {
             await policy.ExecuteAsync(
                 async ct =>
@@ -665,7 +665,6 @@ public class RetryPolicyTests
 
         // Should stop after cancellation during delay
         callCount.Should().BeLessThanOrEqualTo(2);
-        ex.Should().NotBeNull();
     }
 
     [Fact]
@@ -674,7 +673,7 @@ public class RetryPolicyTests
         // arrange
         var callCount = 0;
         var policy = new RetryPolicy(maxRetries: 3);
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         cts.Cancel();
 
         // act & assert
@@ -705,7 +704,7 @@ public class RetryPolicyTests
         var policy = new RetryPolicy(maxRetries: 1, TimeSpan.FromMilliseconds(10));
 
         // act & assert
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
             await policy.ExecuteAsync(
                 async ct =>
