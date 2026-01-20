@@ -20,88 +20,103 @@ env:
   # TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
 
 jobs:
-  # Detect which integration test projects need to run based on changed files
-  detect-changes:
+  # Discover all integration packages and generate dynamic configuration
+  discover-packages:
     runs-on: ubuntu-latest
     outputs:
-      run-all: ${{ steps.detect.outputs.run-all }}
-      aws: ${{ steps.detect.outputs.aws }}
-      azure: ${{ steps.detect.outputs.azure }}
-      grpc: ${{ steps.detect.outputs.grpc }}
-      http: ${{ steps.detect.outputs.http }}
-      kafka: ${{ steps.detect.outputs.kafka }}
-      marten: ${{ steps.detect.outputs.marten }}
-      masstransit: ${{ steps.detect.outputs.masstransit }}
-      memcached: ${{ steps.detect.outputs.memcached }}
-      mongodb: ${{ steps.detect.outputs.mongodb }}
-      orleans: ${{ steps.detect.outputs.orleans }}
-      postgres: ${{ steps.detect.outputs.postgres }}
-      rabbitmq: ${{ steps.detect.outputs.rabbitmq }}
-      redis: ${{ steps.detect.outputs.redis }}
-      sqlserver: ${{ steps.detect.outputs.sqlserver }}
-      metrics-otel: ${{ steps.detect.outputs.metrics-otel }}
-      metrics-prom: ${{ steps.detect.outputs.metrics-prom }}
+      packages: ${{ steps.discover.outputs.packages }}
+      package-count: ${{ steps.discover.outputs.package-count }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Discover integration packages
+        id: discover
+        run: |
+          echo "Discovering integration packages..."
+          
+          # Find all integration packages (exclude core and metrics)
+          PACKAGES=$(find src -maxdepth 1 -type d -name 'Veggerby.Ignition.*' ! -name 'Veggerby.Ignition.Metrics.*' -exec basename {} \; | sed 's/Veggerby.Ignition.//g' | sort)
+          
+          # Build JSON array for matrix
+          JSON_ARRAY="["
+          FIRST=true
+          for pkg in $PACKAGES; do
+            if [ "$FIRST" = true ]; then
+              FIRST=false
+            else
+              JSON_ARRAY="$JSON_ARRAY,"
+            fi
+            # Convert to lowercase for filter names
+            FILTER_NAME=$(echo "$pkg" | tr '[:upper:]' '[:lower:]')
+            JSON_ARRAY="$JSON_ARRAY{\"name\":\"$pkg\",\"filter\":\"$FILTER_NAME\",\"project\":\"Veggerby.Ignition.$pkg.Tests\"}"
+          done
+          JSON_ARRAY="$JSON_ARRAY]"
+          
+          echo "packages=$JSON_ARRAY" >> $GITHUB_OUTPUT
+          echo "package-count=$(echo $PACKAGES | wc -w)" >> $GITHUB_OUTPUT
+          
+          echo "✅ Discovered $(echo $PACKAGES | wc -w) integration packages"
+          echo "Packages: $PACKAGES"
+
+      - name: Generate paths-filter configuration
+        id: generate-filters
+        run: |
+          echo "Generating dynamic paths-filter configuration..."
+          
+          # Create filter config file
+          cat > /tmp/filters.yml << 'EOF'
+          core:
+            - 'src/Veggerby.Ignition/**'
+            - 'test/Veggerby.Ignition.Tests/**'
+          EOF
+          
+          # Add each integration package
+          PACKAGES=$(find src -maxdepth 1 -type d -name 'Veggerby.Ignition.*' ! -name 'Veggerby.Ignition.Metrics.*' -exec basename {} \; | sed 's/Veggerby.Ignition.//g' | sort)
+          for pkg in $PACKAGES; do
+            FILTER_NAME=$(echo "$pkg" | tr '[:upper:]' '[:lower:]')
+            cat >> /tmp/filters.yml << EOF
+          ${FILTER_NAME}:
+            - 'src/Veggerby.Ignition.${pkg}/**'
+            - 'test/Veggerby.Ignition.${pkg}.Tests/**'
+          EOF
+          done
+          
+          echo "Filter configuration generated:"
+          cat /tmp/filters.yml
+
+      - name: Upload filter configuration
+        uses: actions/upload-artifact@v4
+        with:
+          name: filter-config
+          path: /tmp/filters.yml
+          retention-days: 1
+
+  # Detect which integration test projects need to run based on changed files
+  detect-changes:
+    needs: discover-packages
+    runs-on: ubuntu-latest
+    outputs:
+      run-all: ${{ steps.detect.outputs.run-all }}
+      changed-filters: ${{ steps.detect.outputs.changed-filters }}
+      packages-to-test: ${{ steps.detect.outputs.packages-to-test }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download filter configuration
+        uses: actions/download-artifact@v4
+        with:
+          name: filter-config
+          path: /tmp
+
       - uses: dorny/paths-filter@v3
         id: filter
         if: github.event_name == 'pull_request'
         with:
-          filters: |
-            core:
-              - 'src/Veggerby.Ignition/**'
-              - 'test/Veggerby.Ignition.Tests/**'
-            aws:
-              - 'src/Veggerby.Ignition.Aws/**'
-              - 'test/Veggerby.Ignition.Aws.Tests/**'
-            azure:
-              - 'src/Veggerby.Ignition.Azure/**'
-              - 'test/Veggerby.Ignition.Azure.Tests/**'
-            grpc:
-              - 'src/Veggerby.Ignition.Grpc/**'
-              - 'test/Veggerby.Ignition.Grpc.Tests/**'
-            http:
-              - 'src/Veggerby.Ignition.Http/**'
-              - 'test/Veggerby.Ignition.Http.Tests/**'
-            kafka:
-              - 'src/Veggerby.Ignition.Kafka/**'
-              - 'test/Veggerby.Ignition.Kafka.Tests/**'
-            marten:
-              - 'src/Veggerby.Ignition.Marten/**'
-              - 'test/Veggerby.Ignition.Marten.Tests/**'
-            masstransit:
-              - 'src/Veggerby.Ignition.MassTransit/**'
-              - 'test/Veggerby.Ignition.MassTransit.Tests/**'
-            memcached:
-              - 'src/Veggerby.Ignition.Memcached/**'
-              - 'test/Veggerby.Ignition.Memcached.Tests/**'
-            mongodb:
-              - 'src/Veggerby.Ignition.MongoDb/**'
-              - 'test/Veggerby.Ignition.MongoDb.Tests/**'
-            orleans:
-              - 'src/Veggerby.Ignition.Orleans/**'
-              - 'test/Veggerby.Ignition.Orleans.Tests/**'
-            postgres:
-              - 'src/Veggerby.Ignition.Postgres/**'
-              - 'test/Veggerby.Ignition.Postgres.Tests/**'
-            rabbitmq:
-              - 'src/Veggerby.Ignition.RabbitMq/**'
-              - 'test/Veggerby.Ignition.RabbitMq.Tests/**'
-            redis:
-              - 'src/Veggerby.Ignition.Redis/**'
-              - 'test/Veggerby.Ignition.Redis.Tests/**'
-            sqlserver:
-              - 'src/Veggerby.Ignition.SqlServer/**'
-              - 'test/Veggerby.Ignition.SqlServer.Tests/**'
-            metrics-otel:
-              - 'src/Veggerby.Ignition.Metrics.OpenTelemetry/**'
-              - 'test/Veggerby.Ignition.Metrics.OpenTelemetry.Tests/**'
-            metrics-prom:
-              - 'src/Veggerby.Ignition.Metrics.Prometheus/**'
-              - 'test/Veggerby.Ignition.Metrics.Prometheus.Tests/**'
+          filters: /tmp/filters.yml
 
       - name: Determine test scope
         id: detect
@@ -109,51 +124,47 @@ jobs:
           # Run all tests if: manual trigger, push to main, label present, or core package changed
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
              [[ "${{ github.event_name }}" == "push" ]] || \
-             [[ "${{ contains(github.event.pull_request.labels.*.name, 'run-integration-tests') }}" == "true" ]] || \
+             [[ "${{ contains(github.event.pull_request.labels.*.name, 'run-full-integration-tests') }}" == "true" ]] || \
              [[ "${{ steps.filter.outputs.core }}" == "true" ]]; then
             echo "run-all=true" >> $GITHUB_OUTPUT
-            # For run-all scenarios, set all packages to true
-            echo "aws=true" >> $GITHUB_OUTPUT
-            echo "azure=true" >> $GITHUB_OUTPUT
-            echo "grpc=true" >> $GITHUB_OUTPUT
-            echo "http=true" >> $GITHUB_OUTPUT
-            echo "kafka=true" >> $GITHUB_OUTPUT
-            echo "marten=true" >> $GITHUB_OUTPUT
-            echo "masstransit=true" >> $GITHUB_OUTPUT
-            echo "memcached=true" >> $GITHUB_OUTPUT
-            echo "mongodb=true" >> $GITHUB_OUTPUT
-            echo "orleans=true" >> $GITHUB_OUTPUT
-            echo "postgres=true" >> $GITHUB_OUTPUT
-            echo "rabbitmq=true" >> $GITHUB_OUTPUT
-            echo "redis=true" >> $GITHUB_OUTPUT
-            echo "sqlserver=true" >> $GITHUB_OUTPUT
-            echo "metrics-otel=true" >> $GITHUB_OUTPUT
-            echo "metrics-prom=true" >> $GITHUB_OUTPUT
+            echo "changed-filters=all" >> $GITHUB_OUTPUT
+            # Use all packages
+            echo "packages-to-test=${{ needs.discover-packages.outputs.packages }}" >> $GITHUB_OUTPUT
+            echo "✅ Running full integration test suite"
           else
             echo "run-all=false" >> $GITHUB_OUTPUT
-            # Set individual package flags based on file changes
-            echo "aws=${{ steps.filter.outputs.aws }}" >> $GITHUB_OUTPUT
-            echo "azure=${{ steps.filter.outputs.azure }}" >> $GITHUB_OUTPUT
-            echo "grpc=${{ steps.filter.outputs.grpc }}" >> $GITHUB_OUTPUT
-            echo "http=${{ steps.filter.outputs.http }}" >> $GITHUB_OUTPUT
-            echo "kafka=${{ steps.filter.outputs.kafka }}" >> $GITHUB_OUTPUT
-            echo "marten=${{ steps.filter.outputs.marten }}" >> $GITHUB_OUTPUT
-            echo "masstransit=${{ steps.filter.outputs.masstransit }}" >> $GITHUB_OUTPUT
-            echo "memcached=${{ steps.filter.outputs.memcached }}" >> $GITHUB_OUTPUT
-            echo "mongodb=${{ steps.filter.outputs.mongodb }}" >> $GITHUB_OUTPUT
-            echo "orleans=${{ steps.filter.outputs.orleans }}" >> $GITHUB_OUTPUT
-            echo "postgres=${{ steps.filter.outputs.postgres }}" >> $GITHUB_OUTPUT
-            echo "rabbitmq=${{ steps.filter.outputs.rabbitmq }}" >> $GITHUB_OUTPUT
-            echo "redis=${{ steps.filter.outputs.redis }}" >> $GITHUB_OUTPUT
-            echo "sqlserver=${{ steps.filter.outputs.sqlserver }}" >> $GITHUB_OUTPUT
-            echo "metrics-otel=${{ steps.filter.outputs.metrics-otel }}" >> $GITHUB_OUTPUT
-            echo "metrics-prom=${{ steps.filter.outputs.metrics-prom }}" >> $GITHUB_OUTPUT
+            # Get list of changed filters (excluding 'core')
+            CHANGED=$(cat << 'EOF' | jq -r 'to_entries | map(select(.value == "true" and .key != "core")) | map(.key) | join(",")'
+          ${{ toJSON(steps.filter.outputs) }}
+          EOF
+          )
+            echo "changed-filters=$CHANGED" >> $GITHUB_OUTPUT
+            echo "Changed packages: $CHANGED"
+            
+            # Filter packages to only those that changed
+            ALL_PACKAGES='${{ needs.discover-packages.outputs.packages }}'
+            if [[ -z "$CHANGED" ]]; then
+              # No changes, empty array
+              echo "packages-to-test=[]" >> $GITHUB_OUTPUT
+            else
+              # Filter to only changed packages
+              FILTERED=$(echo "$ALL_PACKAGES" | jq -c --arg changed "$CHANGED" '
+                map(select(
+                  . as $pkg |
+                  ($changed | split(",")) as $filters |
+                  $filters | map(. == $pkg.filter) | any
+                ))
+              ')
+              echo "packages-to-test=$FILTERED" >> $GITHUB_OUTPUT
+              echo "Filtered packages: $FILTERED"
+              echo "⚡ Running selective tests (fast feedback)"
+            fi
           fi
 
   # Build once, run tests as matrix
   build:
     runs-on: ubuntu-latest
-    needs: detect-changes
+    needs: [discover-packages, detect-changes]
     steps:
       - uses: actions/checkout@v4
 
@@ -168,74 +179,44 @@ jobs:
       - name: Build
         run: dotnet build Veggerby.Ignition.sln --configuration Release --no-restore
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-output
-          path: |
-            src/**/bin/Release/**
-            test/**/bin/Release/**
-          retention-days: 1
-
   # Run integration tests for each package
   integration-tests:
     runs-on: ubuntu-latest
-    needs: [detect-changes, build]
+    needs: [discover-packages, detect-changes, build]
+    if: needs.detect-changes.outputs.packages-to-test != '[]'
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        package:
-          - { name: 'Aws', project: 'Veggerby.Ignition.Aws.Tests', enabled: '${{ needs.detect-changes.outputs.aws }}' }
-          - { name: 'Azure', project: 'Veggerby.Ignition.Azure.Tests', enabled: '${{ needs.detect-changes.outputs.azure }}' }
-          - { name: 'Grpc', project: 'Veggerby.Ignition.Grpc.Tests', enabled: '${{ needs.detect-changes.outputs.grpc }}' }
-          - { name: 'Http', project: 'Veggerby.Ignition.Http.Tests', enabled: '${{ needs.detect-changes.outputs.http }}' }
-          - { name: 'Kafka', project: 'Veggerby.Ignition.Kafka.Tests', enabled: '${{ needs.detect-changes.outputs.kafka }}' }
-          - { name: 'Marten', project: 'Veggerby.Ignition.Marten.Tests', enabled: '${{ needs.detect-changes.outputs.marten }}' }
-          - { name: 'MassTransit', project: 'Veggerby.Ignition.MassTransit.Tests', enabled: '${{ needs.detect-changes.outputs.masstransit }}' }
-          - { name: 'Memcached', project: 'Veggerby.Ignition.Memcached.Tests', enabled: '${{ needs.detect-changes.outputs.memcached }}' }
-          - { name: 'MongoDb', project: 'Veggerby.Ignition.MongoDb.Tests', enabled: '${{ needs.detect-changes.outputs.mongodb }}' }
-          - { name: 'Orleans', project: 'Veggerby.Ignition.Orleans.Tests', enabled: '${{ needs.detect-changes.outputs.orleans }}' }
-          - { name: 'Postgres', project: 'Veggerby.Ignition.Postgres.Tests', enabled: '${{ needs.detect-changes.outputs.postgres }}' }
-          - { name: 'RabbitMq', project: 'Veggerby.Ignition.RabbitMq.Tests', enabled: '${{ needs.detect-changes.outputs.rabbitmq }}' }
-          - { name: 'Redis', project: 'Veggerby.Ignition.Redis.Tests', enabled: '${{ needs.detect-changes.outputs.redis }}' }
-          - { name: 'SqlServer', project: 'Veggerby.Ignition.SqlServer.Tests', enabled: '${{ needs.detect-changes.outputs.sqlserver }}' }
-          - { name: 'Metrics.OpenTelemetry', project: 'Veggerby.Ignition.Metrics.OpenTelemetry.Tests', enabled: '${{ needs.detect-changes.outputs.metrics-otel }}' }
-          - { name: 'Metrics.Prometheus', project: 'Veggerby.Ignition.Metrics.Prometheus.Tests', enabled: '${{ needs.detect-changes.outputs.metrics-prom }}' }
+        package: ${{ fromJSON(needs.detect-changes.outputs.packages-to-test) }}
 
     name: Test ${{ matrix.package.name }}
     
     steps:
-      - name: Skip if not needed
-        if: matrix.package.enabled != 'true'
-        run: echo "Skipping ${{ matrix.package.name }} - no changes detected"
-
       - uses: actions/checkout@v4
-        if: matrix.package.enabled == 'true'
 
       - name: Setup .NET
-        if: matrix.package.enabled == 'true'
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
 
-      - name: Download build artifacts
-        if: matrix.package.enabled == 'true'
-        uses: actions/download-artifact@v4
-        with:
-          name: build-output
+      - name: Restore dependencies
+        run: dotnet restore test/${{ matrix.package.project }}/${{ matrix.package.project }}.csproj
+
+      - name: Build ${{ matrix.package.name }} test project
+        run: dotnet build test/${{ matrix.package.project }}/${{ matrix.package.project }}.csproj --configuration Release --no-restore
 
       - name: Run ${{ matrix.package.name }} Integration Tests
-        if: matrix.package.enabled == 'true'
         run: |
           dotnet test test/${{ matrix.package.project }}/${{ matrix.package.project }}.csproj \
             --configuration Release \
             --no-build \
             --filter "Category=Integration&SkipInCI!=true" \
-            --logger "console;verbosity=normal"
+            --logger "console;verbosity=normal" \
+            --logger "trx;LogFileName=test-results.trx"
 
       - name: Upload test results for ${{ matrix.package.name }}
-        if: always() && matrix.package.enabled == 'true'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: integration-test-results-${{ matrix.package.name }}
@@ -247,7 +228,7 @@ jobs:
   # Summary job that's required for branch protection
   integration-summary:
     runs-on: ubuntu-latest
-    needs: [detect-changes, integration-tests]
+    needs: [discover-packages, detect-changes, integration-tests]
     if: always()
     steps:
       - name: Generate test summary
@@ -256,10 +237,17 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           # Determine run mode
-          if [[ "${{ needs.detect-changes.outputs.run-all }}" == "true" ]]; then
-            echo "**Mode:** Full suite (all packages)" >> $GITHUB_STEP_SUMMARY
+          RUN_ALL="${{ needs.detect-changes.outputs.run-all }}"
+          CHANGED="${{ needs.detect-changes.outputs.changed-filters }}"
+          
+          if [[ "$RUN_ALL" == "true" ]]; then
+            echo "**Mode:** Full suite (all ${{ needs.discover-packages.outputs.package-count }} packages)" >> $GITHUB_STEP_SUMMARY
           else
-            echo "**Mode:** Selective (changed packages only)" >> $GITHUB_STEP_SUMMARY
+            CHANGED_COUNT=$(echo "$CHANGED" | tr ',' '\n' | grep -v '^$' | wc -l)
+            echo "**Mode:** Selective ($CHANGED_COUNT changed package(s))" >> $GITHUB_STEP_SUMMARY
+            if [[ -n "$CHANGED" && "$CHANGED" != "all" ]]; then
+              echo "**Changed:** $CHANGED" >> $GITHUB_STEP_SUMMARY
+            fi
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
           
@@ -267,31 +255,15 @@ jobs:
           echo "| Package | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
           
-          # Helper function to get emoji
-          get_status() {
-            if [[ "$1" == "true" ]]; then
-              echo "✅ Tested"
+          # Parse package matrix and show status
+          PACKAGES='${{ needs.discover-packages.outputs.packages }}'
+          echo "$PACKAGES" | jq -r '.[] | "\(.name) \(.filter)"' | while read NAME FILTER; do
+            if [[ "$RUN_ALL" == "true" ]] || [[ "$CHANGED" == "all" ]] || [[ ",$CHANGED," == *",$FILTER,"* ]]; then
+              echo "| $NAME | ✅ Tested |" >> $GITHUB_STEP_SUMMARY
             else
-              echo "⏭️ Skipped"
+              echo "| $NAME | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
             fi
-          }
-          
-          echo "| AWS | $(get_status "${{ needs.detect-changes.outputs.aws }}") |" >> $GITHUB_STEP_SUMMARY
-          echo "| Azure | $(get_status "${{ needs.detect-changes.outputs.azure }}") |" >> $GITHUB_STEP_SUMMARY
-          echo "| gRPC | $(get_status "${{ needs.detect-changes.outputs.grpc }}") |" >> $GITHUB_STEP_SUMMARY
-          echo "| HTTP | $(get_status "${{ needs.detect-changes.outputs.http }}") |" >> $GITHUB_STEP_SUMMARY
-          echo "| Kafka | $(get_status "${{ needs.detect-changes.outputs.kafka }}") |" >> $GITHUB_STEP_SUMMARY
-          echo "| Marten | $(get_status "${{ needs.detect-changes.outputs.marten }}") |" >> $GITHUB_STEP_SUMMARY
-          echo "| MassTransit | $(get_status "${{ needs.detect-changes.outputs.masstransit }}") |" >> $GITHUB_STEP_SUMMARY
-          echo "| Memcached | $(get_status "${{ needs.detect-changes.outputs.memcached }}") |" >> $GITHUB_STEP_SUMMARY
-          echo "| MongoDB | $(get_status "${{ needs.detect-changes.outputs.mongodb }}") |" >> $GITHUB_STEP_SUMMARY
-          echo "| Orleans | $(get_status "${{ needs.detect-changes.outputs.orleans }}") |" >> $GITHUB_STEP_SUMMARY
-          echo "| PostgreSQL | $(get_status "${{ needs.detect-changes.outputs.postgres }}") |" >> $GITHUB_STEP_SUMMARY
-          echo "| RabbitMQ | $(get_status "${{ needs.detect-changes.outputs.rabbitmq }}") |" >> $GITHUB_STEP_SUMMARY
-          echo "| Redis | $(get_status "${{ needs.detect-changes.outputs.redis }}") |" >> $GITHUB_STEP_SUMMARY
-          echo "| SQL Server | $(get_status "${{ needs.detect-changes.outputs.sqlserver }}") |" >> $GITHUB_STEP_SUMMARY
-          echo "| Metrics (OTEL) | $(get_status "${{ needs.detect-changes.outputs.metrics-otel }}") |" >> $GITHUB_STEP_SUMMARY
-          echo "| Metrics (Prom) | $(get_status "${{ needs.detect-changes.outputs.metrics-prom }}") |" >> $GITHUB_STEP_SUMMARY
+          done
 
       - name: Check test results
         run: |
@@ -310,4 +282,21 @@ jobs:
             echo "## ✅ All Integration Tests Passed" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "All required integration tests completed successfully!" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Required check for merge: ensures full suite was run
+  full-suite-required:
+    runs-on: ubuntu-latest
+    needs: [discover-packages, detect-changes, integration-tests]
+    if: always() && github.event_name == 'pull_request' && needs.detect-changes.outputs.run-all == 'true'
+    steps:
+      - name: Verify full suite passed
+        run: |
+          echo "✅ Full integration test suite was executed"
+          echo "All ${{ needs.discover-packages.outputs.package-count }} integration packages were tested."
+          
+          # Check if tests passed
+          if [[ "${{ needs.integration-tests.result }}" != "success" ]]; then
+            echo "❌ Full suite ran but tests failed"
+            exit 1
           fi
