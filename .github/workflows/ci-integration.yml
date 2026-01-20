@@ -64,8 +64,10 @@ jobs:
         run: |
           echo "Generating dynamic paths-filter configuration..."
           
-          # Create filter config file
+          # Create filter config file with src filter
           cat > /tmp/filters.yml << 'EOF'
+          src:
+            - 'src/**'
           core:
             - 'src/Veggerby.Ignition/**'
             - 'test/Veggerby.Ignition.Tests/**'
@@ -116,10 +118,7 @@ jobs:
         id: filter
         if: github.event_name == 'pull_request'
         with:
-          filters: |
-            src:
-              - 'src/**'
-            ${{ readFile('/tmp/filters.yml') }}
+          filters: /tmp/filters.yml
 
       - name: Determine test scope
         id: detect
