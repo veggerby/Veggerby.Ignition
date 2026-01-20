@@ -310,15 +310,21 @@ jobs:
   full-suite-required:
     runs-on: ubuntu-latest
     needs: [discover-packages, detect-changes, integration-tests]
-    if: always() && github.event_name == 'pull_request' && needs.detect-changes.outputs.run-all == 'true'
+    if: always() && github.event_name == 'pull_request'
     steps:
       - name: Verify full suite passed
         run: |
-          echo "✅ Full integration test suite was executed"
-          echo "All ${{ needs.discover-packages.outputs.package-count }} integration packages were tested."
+          RESULT="${{ needs.integration-tests.result }}"
           
-          # Check if tests passed
-          if [[ "${{ needs.integration-tests.result }}" != "success" ]]; then
-            echo "❌ Full suite ran but tests failed"
+          if [[ "$RESULT" == "success" ]]; then
+            echo "✅ Full integration test suite executed successfully"
+            echo "All ${{ needs.discover-packages.outputs.package-count }} integration packages were tested and passed."
+          elif [[ "$RESULT" == "skipped" ]]; then
+            echo "❌ Full suite required but tests were skipped"
+            echo "This indicates a workflow configuration error - full suite was required but no tests ran."
+            exit 1
+          else
+            echo "❌ Full suite executed but tests failed"
+            echo "Status: $RESULT"
             exit 1
           fi
