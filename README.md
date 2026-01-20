@@ -124,6 +124,7 @@ Extend Ignition with ready-made signals for popular infrastructure:
 | [Veggerby.Ignition.Redis](src/Veggerby.Ignition.Redis) | Redis cache connectivity | ✅ |
 | [Veggerby.Ignition.Postgres](src/Veggerby.Ignition.Postgres) | PostgreSQL database | ✅ |
 | [Veggerby.Ignition.MySql](src/Veggerby.Ignition.MySql) | MySQL database | ✅ |
+| [Veggerby.Ignition.MariaDb](src/Veggerby.Ignition.MariaDb) | MariaDB database | ✅ |
 | [Veggerby.Ignition.SqlServer](src/Veggerby.Ignition.SqlServer) | SQL Server database | ✅ |
 | [Veggerby.Ignition.MongoDb](src/Veggerby.Ignition.MongoDb) | MongoDB document store | ✅ |
 | [Veggerby.Ignition.Elasticsearch](src/Veggerby.Ignition.Elasticsearch) | Elasticsearch search cluster | ✅ |
@@ -419,6 +420,14 @@ await app.Services.GetRequiredService<IIgnitionCoordinator>().WaitAllAsync();
   - Custom query execution with row count validation
   - Activity tracing and structured logging
   - ```dotnet add package Veggerby.Ignition.MySql```
+
+- **[Veggerby.Ignition.MariaDb](src/Veggerby.Ignition.MariaDb/README.md)** - MariaDB connection and schema readiness
+  - Multiple verification strategies (Ping, SimpleQuery, TableExists, ConnectionPool)
+  - Table existence validation with optional failure mode
+  - Custom query execution with row count validation
+  - Retry with exponential backoff for transient failures
+  - Activity tracing and structured logging
+  - ```dotnet add package Veggerby.Ignition.MariaDb```
 
 - **[Veggerby.Ignition.Marten](src/Veggerby.Ignition.Marten/README.md)** - Marten document store readiness
   - Document store connectivity verification

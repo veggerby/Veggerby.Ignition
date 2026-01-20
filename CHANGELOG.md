@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+- **MariaDB Integration Package (`Veggerby.Ignition.MariaDb`)**: MariaDB/MySQL-compatible database readiness verification
+  - Supports multiple verification strategies: `Ping` (MySQL ping command), `SimpleQuery` (SELECT 1), `TableExists` (table existence validation), `ConnectionPool` (connection pool readiness)
+  - Table existence validation with configurable failure mode (`FailOnMissingTables`)
+  - Custom query execution with optional minimum row count validation
+  - Configurable retry policies with exponential backoff (default: 8 retries, 500ms initial delay)
+  - Factory pattern support for Testcontainers and staged execution scenarios
+  - Extension methods: `AddMariaDbReadiness(connectionString)`, `AddMariaDbReadiness(connectionStringFactory)`, `AddMariaDbReadiness(connectionFactory)`
+  - 21 unit tests and 12 integration tests with Testcontainers.MariaDb
+  - Comprehensive README with examples for all verification strategies
+  - Dependencies: MySqlConnector 2.4.0 (high-performance MySQL/MariaDB client)
+  - Wire-compatible with both MariaDB 10.x+ and MySQL 5.7+/8.0+
 - **Elasticsearch Integration Package (`Veggerby.Ignition.Elasticsearch`)**: Enterprise search and observability platform readiness verification
   - Supports multiple verification strategies: `ClusterHealth` (cluster status check), `IndexExists` (index existence), `TemplateValidation` (index template verification), `QueryTest` (end-to-end query execution)
   - Cluster health verification reports green/yellow/red status with node and shard metrics
