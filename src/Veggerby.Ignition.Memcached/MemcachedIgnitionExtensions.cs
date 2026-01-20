@@ -6,9 +6,7 @@ using Enyim.Caching.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-#pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.Memcached;
-#pragma warning restore IDE0130 // Namespace does not match folder structure
 
 /// <summary>
 /// Extension methods for registering Memcached readiness signals with dependency injection.
@@ -105,11 +103,14 @@ public static class MemcachedIgnitionExtensions
             }).ToList().ForEach(server => opts.AddServer(server.Host, server.Port));
         });
 
-        services.AddSingleton<IIgnitionSignal>(sp =>
+        services.AddSingleton<IIgnitionSignalFactory>(sp =>
         {
             var client = sp.GetRequiredService<IMemcachedClient>();
             var logger = sp.GetRequiredService<ILogger<MemcachedReadinessSignal>>();
-            return new MemcachedReadinessSignal(client, options, logger);
+            var signal = new MemcachedReadinessSignal(client, options, logger);
+
+            // Simple wrapper factory
+            return new SimpleMemcachedSignalFactory(signal);
         });
 
         return services;
@@ -180,11 +181,14 @@ public static class MemcachedIgnitionExtensions
             return services;
         }
 
-        services.AddSingleton<IIgnitionSignal>(sp =>
+        services.AddSingleton<IIgnitionSignalFactory>(sp =>
         {
             var client = sp.GetRequiredService<IMemcachedClient>();
             var logger = sp.GetRequiredService<ILogger<MemcachedReadinessSignal>>();
-            return new MemcachedReadinessSignal(client, options, logger);
+            var signal = new MemcachedReadinessSignal(client, options, logger);
+
+            // Simple wrapper factory
+            return new SimpleMemcachedSignalFactory(signal);
         });
 
         return services;
