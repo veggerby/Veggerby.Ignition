@@ -123,6 +123,7 @@ Extend Ignition with ready-made signals for popular infrastructure:
 | [Veggerby.Ignition.RabbitMq](src/Veggerby.Ignition.RabbitMq) | RabbitMQ broker readiness | ✅ |
 | [Veggerby.Ignition.Redis](src/Veggerby.Ignition.Redis) | Redis cache connectivity | ✅ |
 | [Veggerby.Ignition.Postgres](src/Veggerby.Ignition.Postgres) | PostgreSQL database | ✅ |
+| [Veggerby.Ignition.MySql](src/Veggerby.Ignition.MySql) | MySQL database | ✅ |
 | [Veggerby.Ignition.SqlServer](src/Veggerby.Ignition.SqlServer) | SQL Server database | ✅ |
 | [Veggerby.Ignition.MongoDb](src/Veggerby.Ignition.MongoDb) | MongoDB document store | ✅ |
 | [Veggerby.Ignition.Elasticsearch](src/Veggerby.Ignition.Elasticsearch) | Elasticsearch search cluster | ✅ |
@@ -412,6 +413,13 @@ await app.Services.GetRequiredService<IIgnitionCoordinator>().WaitAllAsync();
   - Activity tracing and structured logging
   - ```dotnet add package Veggerby.Ignition.Postgres```
 
+- **[Veggerby.Ignition.MySql](src/Veggerby.Ignition.MySql/README.md)** - MySQL connection and schema readiness
+  - Multiple verification strategies (Ping, SimpleQuery, TableExists, ConnectionPool)
+  - Table existence validation
+  - Custom query execution with row count validation
+  - Activity tracing and structured logging
+  - ```dotnet add package Veggerby.Ignition.MySql```
+
 - **[Veggerby.Ignition.Marten](src/Veggerby.Ignition.Marten/README.md)** - Marten document store readiness
   - Document store connectivity verification
   - Integrates with existing `IDocumentStore`
@@ -446,6 +454,15 @@ builder.Services.AddSqlServerReadiness(
 builder.Services.AddPostgresReadiness(
     "Host=localhost;Database=mydb;Username=user;Password=pass",
     options => options.ValidationQuery = "SELECT 1");
+
+// MySQL
+builder.Services.AddMySqlReadiness(
+    "Server=localhost;Database=mydb;User=user;Password=pass",
+    options =>
+    {
+        options.VerificationStrategy = MySqlVerificationStrategy.TableExists;
+        options.VerifyTables.Add("users");
+    });
 
 // Marten (requires Marten to be configured first)
 builder.Services.AddMarten(opts => opts.Connection(connectionString));

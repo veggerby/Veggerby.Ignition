@@ -47,10 +47,12 @@
     <!-- Database Providers -->
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.0.2" />
     <PackageVersion Include="Npgsql" Version="9.0.3" />
+    <PackageVersion Include="MySqlConnector" Version="2.4.0" />
     <PackageVersion Include="Marten" Version="8.1.0" />
     <PackageVersion Include="MongoDB.Driver" Version="3.2.1" />
     <PackageVersion Include="Testcontainers.MsSql" Version="4.4.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.4.0" />
+    <PackageVersion Include="Testcontainers.MySql" Version="4.4.0" />
     <PackageVersion Include="Testcontainers.MongoDb" Version="4.4.0" />
 
     <!-- HTTP & External Services -->

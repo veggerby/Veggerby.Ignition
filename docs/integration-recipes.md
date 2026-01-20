@@ -574,6 +574,99 @@ builder.Services.AddIgnitionGraph((graphBuilder, sp) =>
 
 ---
 
+## Integration Package Recipes
+
+### MySQL Database Readiness
+
+**Package**: `Veggerby.Ignition.MySql`
+
+#### Basic Connection Verification
+
+```csharp
+using Veggerby.Ignition.MySql;
+
+builder.Services.AddIgnition();
+
+// Simple ping verification
+builder.Services.AddMySqlReadiness(
+    "Server=localhost;Database=myapp;User=root;Password=secret",
+    options =>
+    {
+        options.VerificationStrategy = MySqlVerificationStrategy.Ping;
+        options.Timeout = TimeSpan.FromSeconds(30);
+    });
+```
+
+#### Table Existence Validation
+
+```csharp
+// Verify critical tables exist before startup
+builder.Services.AddMySqlReadiness(
+    "Server=localhost;Database=myapp;User=root;Password=secret",
+    options =>
+    {
+        options.VerificationStrategy = MySqlVerificationStrategy.TableExists;
+        options.VerifyTables.Add("users");
+        options.VerifyTables.Add("orders");
+        options.VerifyTables.Add("products");
+        options.FailOnMissingTables = true;
+        options.Timeout = TimeSpan.FromSeconds(30);
+    });
+```
+
+#### Custom Query Validation
+
+```csharp
+// Verify data availability with custom query
+builder.Services.AddMySqlReadiness(
+    "Server=localhost;Database=myapp;User=root;Password=secret",
+    options =>
+    {
+        options.TestQuery = "SELECT COUNT(*) FROM system_status WHERE ready = 1";
+        options.ExpectedMinimumRows = 1;
+        options.Timeout = TimeSpan.FromSeconds(30);
+    });
+```
+
+#### Staged Execution with Testcontainers
+
+```csharp
+// Stage 0: Start MySQL container
+var infrastructure = new InfrastructureManager();
+builder.Services.AddSingleton(infrastructure);
+builder.Services.AddIgnitionFromTaskWithStage(
+    "mysql-container",
+    async ct => await infrastructure.StartMySqlAsync(),
+    stage: 0);
+
+// Stage 1: Verify MySQL readiness
+builder.Services.AddMySqlReadiness(
+    sp => sp.GetRequiredService<InfrastructureManager>().MySqlConnectionString,
+    options =>
+    {
+        options.Stage = 1;
+        options.VerificationStrategy = MySqlVerificationStrategy.TableExists;
+        options.VerifyTables.Add("migrations");
+        options.Timeout = TimeSpan.FromSeconds(30);
+    });
+```
+
+#### With Retry Configuration
+
+```csharp
+builder.Services.AddMySqlReadiness(
+    "Server=localhost;Database=myapp;User=root;Password=secret",
+    options =>
+    {
+        options.VerificationStrategy = MySqlVerificationStrategy.SimpleQuery;
+        options.MaxRetries = 10;
+        options.RetryDelay = TimeSpan.FromMilliseconds(500);
+        options.Timeout = TimeSpan.FromSeconds(60);
+    });
+```
+
+---
+
 ## Production Checklist
 
 ### Web API
