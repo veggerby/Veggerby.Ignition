@@ -1,7 +1,8 @@
+using System;
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MySqlConnector;
-using System;
 
 #pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.MariaDb;
@@ -151,64 +152,6 @@ public static class MariaDbIgnitionExtensions
         {
             services.AddSingleton<IIgnitionSignalFactory>(innerFactory);
         }
-
-        return services;
-    }
-
-    /// <summary>
-    /// Registers a MariaDB readiness signal using a connection factory.
-    /// </summary>
-    /// <param name="services">Target DI service collection.</param>
-    /// <param name="connectionFactory">Factory function that creates MariaDB/MySQL connections.</param>
-    /// <param name="configure">Optional configuration delegate for readiness options.</param>
-    /// <returns>The same <see cref="IServiceCollection"/> instance for fluent chaining.</returns>
-    /// <remarks>
-    /// <para>
-    /// This overload enables advanced scenarios where connection creation needs custom logic
-    /// or when integrating with existing connection pooling infrastructure.
-    /// </para>
-    /// <para>
-    /// For staged execution, set <c>options.Stage</c> in the configuration delegate, but note
-    /// that this overload requires the connection factory to be available at registration time
-    /// and cannot properly support staged factory-based scenarios. Use the connection string
-    /// factory overload instead for staged execution.
-    /// </para>
-    /// </remarks>
-    /// <example>
-    /// <code>
-    /// // Using custom connection factory
-    /// services.AddMariaDbReadiness(
-    ///     () => new MySqlConnection("Server=localhost;Database=mydb;User=root;Password=pass"),
-    ///     options =>
-    ///     {
-    ///         options.VerificationStrategy = MariaDbVerificationStrategy.ConnectionPool;
-    ///         options.Timeout = TimeSpan.FromSeconds(10);
-    ///     });
-    /// </code>
-    /// </example>
-    public static IServiceCollection AddMariaDbReadiness(
-        this IServiceCollection services,
-        Func<MySqlConnection> connectionFactory,
-        Action<MariaDbReadinessOptions>? configure = null)
-    {
-        ArgumentNullException.ThrowIfNull(connectionFactory, nameof(connectionFactory));
-
-        var options = new MariaDbReadinessOptions();
-        configure?.Invoke(options);
-
-        // If Stage is specified, this method cannot be used (need connection string factory for proper DI)
-        if (options.Stage.HasValue)
-        {
-            throw new InvalidOperationException(
-                "Staged execution with AddMariaDbReadiness(Func<MySqlConnection>) requires a connection string factory. " +
-                "Use the overload that accepts Func<IServiceProvider, string> connectionStringFactory parameter.");
-        }
-
-        services.AddSingleton<IIgnitionSignal>(sp =>
-        {
-            var logger = sp.GetRequiredService<ILogger<MariaDbReadinessSignal>>();
-            return new MariaDbReadinessSignal(connectionFactory, options, logger);
-        });
 
         return services;
     }
