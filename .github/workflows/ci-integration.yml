@@ -123,12 +123,15 @@ jobs:
         run: |
           # Run all tests if: manual trigger, push to main, label present, or core package changed
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
-             [[ "${{ github.event_name }}" == "push" ]] || \
-             [[ "${{ contains(github.event.pull_request.labels.*.name, 'run-full-integration-tests') }}" == "true" ]] || \
-             [[ "${{ steps.filter.outputs.core }}" == "true" ]]; then
+             [[ "${{ github.event_name }}" == "push" ]]; then
             echo "run-all=true" >> $GITHUB_OUTPUT
             echo "changed-filters=all" >> $GITHUB_OUTPUT
-            # Use all packages
+            echo "packages-to-test=${{ needs.discover-packages.outputs.packages }}" >> $GITHUB_OUTPUT
+            echo "✅ Running full integration test suite"
+          elif [[ "${{ contains(github.event.pull_request.labels.*.name, 'run-full-integration-tests') }}" == "true" ]] || \
+               [[ "${{ steps.filter.outputs.core }}" == "true" ]]; then
+            echo "run-all=true" >> $GITHUB_OUTPUT
+            echo "changed-filters=all" >> $GITHUB_OUTPUT
             echo "packages-to-test=${{ needs.discover-packages.outputs.packages }}" >> $GITHUB_OUTPUT
             echo "✅ Running full integration test suite"
           else
@@ -239,8 +242,16 @@ jobs:
           # Determine run mode
           RUN_ALL="${{ needs.detect-changes.outputs.run-all }}"
           CHANGED="${{ needs.detect-changes.outputs.changed-filters }}"
+          TEST_RESULT="${{ needs.integration-tests.result }}"
+          EVENT_NAME="${{ github.event_name }}"
           
-          if [[ "$RUN_ALL" == "true" ]]; then
+          if [[ "$TEST_RESULT" == "skipped" ]]; then
+            echo "**Mode:** No tests required" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "No integration test packages needed to run for these changes." >> $GITHUB_STEP_SUMMARY
+          elif [[ "$EVENT_NAME" == "push" ]]; then
+            echo "**Mode:** Main branch validation (all ${{ needs.discover-packages.outputs.package-count }} packages)" >> $GITHUB_STEP_SUMMARY
+          elif [[ "$RUN_ALL" == "true" ]]; then
             echo "**Mode:** Full suite (all ${{ needs.discover-packages.outputs.package-count }} packages)" >> $GITHUB_STEP_SUMMARY
           else
             CHANGED_COUNT=$(echo "$CHANGED" | tr ',' '\n' | grep -v '^$' | wc -l)
@@ -249,34 +260,45 @@ jobs:
               echo "**Changed:** $CHANGED" >> $GITHUB_STEP_SUMMARY
             fi
           fi
-          echo "" >> $GITHUB_STEP_SUMMARY
           
-          # Create status table
-          echo "| Package | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
-          
-          # Parse package matrix and show status
-          PACKAGES='${{ needs.discover-packages.outputs.packages }}'
-          echo "$PACKAGES" | jq -r '.[] | "\(.name) \(.filter)"' | while read NAME FILTER; do
-            if [[ "$RUN_ALL" == "true" ]] || [[ "$CHANGED" == "all" ]] || [[ ",$CHANGED," == *",$FILTER,"* ]]; then
-              echo "| $NAME | ✅ Tested |" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "| $NAME | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
-            fi
-          done
+          # Only show package table if tests ran
+          if [[ "$TEST_RESULT" != "skipped" ]]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Create status table
+            echo "| Package | Status |" >> $GITHUB_STEP_SUMMARY
+            echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+            
+            # Parse package matrix and show status
+            PACKAGES='${{ needs.discover-packages.outputs.packages }}'
+            echo "$PACKAGES" | jq -r '.[] | "\(.name) \(.filter)"' | while read NAME FILTER; do
+              if [[ "$RUN_ALL" == "true" ]] || [[ "$CHANGED" == "all" ]] || [[ ",$CHANGED," == *",$FILTER,"* ]]; then
+                echo "| $NAME | ✅ Tested |" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "| $NAME | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
+          fi
 
       - name: Check test results
         run: |
-          if [[ "${{ needs.integration-tests.result }}" == "failure" ]]; then
+          RESULT="${{ needs.integration-tests.result }}"
+          
+          if [[ "$RESULT" == "failure" ]]; then
             echo "## ❌ Integration Tests Failed" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "One or more integration test packages failed. Review the logs above for details." >> $GITHUB_STEP_SUMMARY
             exit 1
-          elif [[ "${{ needs.integration-tests.result }}" == "cancelled" ]]; then
+          elif [[ "$RESULT" == "cancelled" ]]; then
             echo "## ⚠️ Integration Tests Cancelled" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "The integration test run was cancelled before completion." >> $GITHUB_STEP_SUMMARY
             exit 1
+          elif [[ "$RESULT" == "skipped" ]]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## ℹ️ No Integration Tests Required" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "No integration test packages needed to run for these changes." >> $GITHUB_STEP_SUMMARY
           else
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "## ✅ All Integration Tests Passed" >> $GITHUB_STEP_SUMMARY
