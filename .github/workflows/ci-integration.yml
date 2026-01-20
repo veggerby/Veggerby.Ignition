@@ -17,7 +17,6 @@ on:
 env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
   DOTNET_NOLOGO: true
-  # TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
 
 jobs:
   # Discover all integration packages and generate dynamic configuration
@@ -120,19 +119,21 @@ jobs:
 
       - name: Determine test scope
         id: detect
+        env:
+          ALL_PACKAGES: ${{ needs.discover-packages.outputs.packages }}
         run: |
           # Run all tests if: manual trigger, push to main, label present, or core package changed
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
              [[ "${{ github.event_name }}" == "push" ]]; then
             echo "run-all=true" >> $GITHUB_OUTPUT
             echo "changed-filters=all" >> $GITHUB_OUTPUT
-            echo "packages-to-test=${{ needs.discover-packages.outputs.packages }}" >> $GITHUB_OUTPUT
+            echo "packages-to-test=$ALL_PACKAGES" >> $GITHUB_OUTPUT
             echo "✅ Running full integration test suite"
           elif [[ "${{ contains(github.event.pull_request.labels.*.name, 'run-full-integration-tests') }}" == "true" ]] || \
                [[ "${{ steps.filter.outputs.core }}" == "true" ]]; then
             echo "run-all=true" >> $GITHUB_OUTPUT
             echo "changed-filters=all" >> $GITHUB_OUTPUT
-            echo "packages-to-test=${{ needs.discover-packages.outputs.packages }}" >> $GITHUB_OUTPUT
+            echo "packages-to-test=$ALL_PACKAGES" >> $GITHUB_OUTPUT
             echo "✅ Running full integration test suite"
           else
             echo "run-all=false" >> $GITHUB_OUTPUT
@@ -145,7 +146,6 @@ jobs:
             echo "Changed packages: $CHANGED"
             
             # Filter packages to only those that changed
-            ALL_PACKAGES='${{ needs.discover-packages.outputs.packages }}'
             if [[ -z "$CHANGED" ]]; then
               # No changes, empty array
               echo "packages-to-test=[]" >> $GITHUB_OUTPUT
