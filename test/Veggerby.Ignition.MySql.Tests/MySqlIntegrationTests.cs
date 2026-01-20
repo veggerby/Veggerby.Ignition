@@ -1,4 +1,3 @@
-using DotNet.Testcontainers.Builders;
 using Microsoft.Extensions.Logging;
 using MySqlConnector;
 using Testcontainers.MySql;
