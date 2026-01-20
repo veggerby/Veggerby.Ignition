@@ -667,6 +667,97 @@ builder.Services.AddMySqlReadiness(
 
 ---
 
+### MariaDB Database Readiness
+
+**Package**: `Veggerby.Ignition.MariaDb`
+
+#### Basic Connection Verification
+
+```csharp
+using Veggerby.Ignition.MariaDb;
+
+builder.Services.AddIgnition();
+
+// Simple ping verification
+builder.Services.AddMariaDbReadiness(
+    "Server=localhost;Database=myapp;User=root;Password=secret",
+    options =>
+    {
+        options.VerificationStrategy = MariaDbVerificationStrategy.Ping;
+        options.Timeout = TimeSpan.FromSeconds(30);
+    });
+```
+
+#### Table Existence Validation
+
+```csharp
+// Verify critical tables exist before startup
+builder.Services.AddMariaDbReadiness(
+    "Server=localhost;Database=myapp;User=root;Password=secret",
+    options =>
+    {
+        options.VerificationStrategy = MariaDbVerificationStrategy.TableExists;
+        options.VerifyTables.Add("users");
+        options.VerifyTables.Add("orders");
+        options.VerifyTables.Add("products");
+        options.FailOnMissingTables = true;
+        options.Timeout = TimeSpan.FromSeconds(30);
+    });
+```
+
+#### Custom Query Validation
+
+```csharp
+// Verify data availability with custom query
+builder.Services.AddMariaDbReadiness(
+    "Server=localhost;Database=myapp;User=root;Password=secret",
+    options =>
+    {
+        options.TestQuery = "SELECT COUNT(*) FROM system_status WHERE ready = 1";
+        options.ExpectedMinimumRows = 1;
+        options.Timeout = TimeSpan.FromSeconds(30);
+    });
+```
+
+#### Staged Execution with Testcontainers
+
+```csharp
+// Stage 0: Start MariaDB container
+var infrastructure = new InfrastructureManager();
+builder.Services.AddSingleton(infrastructure);
+builder.Services.AddIgnitionFromTaskWithStage(
+    "mariadb-container",
+    async ct => await infrastructure.StartMariaDbAsync(),
+    stage: 0);
+
+// Stage 1: Verify MariaDB readiness
+builder.Services.AddMariaDbReadiness(
+    sp => sp.GetRequiredService<InfrastructureManager>().MariaDbConnectionString,
+    options =>
+    {
+        options.Stage = 1;
+        options.VerificationStrategy = MariaDbVerificationStrategy.TableExists;
+        options.VerifyTables.Add("migrations");
+        options.Timeout = TimeSpan.FromSeconds(30);
+    });
+```
+
+#### With Retry Configuration
+
+```csharp
+builder.Services.AddMariaDbReadiness(
+    "Server=localhost;Database=myapp;User=root;Password=secret",
+    options =>
+    {
+        options.VerificationStrategy = MariaDbVerificationStrategy.SimpleQuery;
+        options.MaxRetries = 12; // More retries for cloud environments
+        options.RetryDelay = TimeSpan.FromMilliseconds(500); // Exponential backoff
+        options.Timeout = TimeSpan.FromSeconds(60);
+    });
+```
+
+---
+
 ## Production Checklist
 
 ### Web API
