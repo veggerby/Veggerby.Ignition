@@ -212,7 +212,8 @@ jobs:
             --configuration Release \
             --no-build \
             --filter "Category=Integration&SkipInCI!=true" \
-            --logger "console;verbosity=normal"
+            --logger "console;verbosity=normal" \
+            --logger "trx;LogFileName=test-results.trx"
 
       - name: Upload test results for ${{ matrix.package.name }}
         if: always()
