@@ -100,6 +100,7 @@ jobs:
       run-all: ${{ steps.detect.outputs.run-all }}
       changed-filters: ${{ steps.detect.outputs.changed-filters }}
       packages-to-test: ${{ steps.detect.outputs.packages-to-test }}
+      has-src-changes: ${{ steps.detect.outputs.has-src-changes }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -115,13 +116,27 @@ jobs:
         id: filter
         if: github.event_name == 'pull_request'
         with:
-          filters: /tmp/filters.yml
+          filters: |
+            src:
+              - 'src/**'
+            ${{ readFile('/tmp/filters.yml') }}
 
       - name: Determine test scope
         id: detect
         env:
           ALL_PACKAGES: ${{ needs.discover-packages.outputs.packages }}
         run: |
+          # Check if there are any src changes (for PR merge requirement)
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            if [[ "${{ steps.filter.outputs.src }}" == "true" ]]; then
+              echo "has-src-changes=true" >> $GITHUB_OUTPUT
+            else
+              echo "has-src-changes=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "has-src-changes=true" >> $GITHUB_OUTPUT
+          fi
+          
           # Run all tests if: manual trigger, push to main, label present, or core package changed
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
              [[ "${{ github.event_name }}" == "push" ]]; then
@@ -138,7 +153,7 @@ jobs:
           else
             echo "run-all=false" >> $GITHUB_OUTPUT
             # Get list of changed filters (excluding 'core')
-            CHANGED=$(cat << 'EOF' | jq -r 'to_entries | map(select(.value == "true" and .key != "core")) | map(.key) | join(",")'
+            CHANGED=$(cat << 'EOF' | jq -r 'to_entries | map(select(.value == "true" and .key != "core" and .key != "src")) | map(.key) | join(",")'
           ${{ toJSON(steps.filter.outputs) }}
           EOF
           )
@@ -306,15 +321,22 @@ jobs:
             echo "All required integration tests completed successfully!" >> $GITHUB_STEP_SUMMARY
           fi
 
-  # Required check for merge: ensures full suite was run
+  # Required check for merge: ensures full suite was run when src changes
   full-suite-required:
     runs-on: ubuntu-latest
     needs: [discover-packages, detect-changes, integration-tests]
     if: always() && github.event_name == 'pull_request'
     steps:
-      - name: Verify full suite passed
+      - name: Verify full suite passed or not needed
         run: |
+          HAS_SRC_CHANGES="${{ needs.detect-changes.outputs.has-src-changes }}"
           RESULT="${{ needs.integration-tests.result }}"
+          
+          if [[ "$HAS_SRC_CHANGES" == "false" ]]; then
+            echo "✅ No source code changes - integration tests not required"
+            echo "This PR only contains documentation, configuration, or other non-source changes."
+            exit 0
+          fi
           
           if [[ "$RESULT" == "success" ]]; then
             echo "✅ Full integration test suite executed successfully"
