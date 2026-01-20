@@ -1,9 +1,9 @@
 # Veggerby.Ignition
 
-![Build](https://img.shields.io/github/actions/workflow/status/veggerby/Veggerby.Ignition/ci-release.yml?label=build&style=flat-square)
-![Coverage](https://img.shields.io/codecov/c/github/veggerby/Veggerby.Ignition?style=flat-square)
-![NuGet](https://img.shields.io/nuget/v/Veggerby.Ignition?label=nuget&style=flat-square)
-![License](https://img.shields.io/github/license/veggerby/Veggerby.Ignition?style=flat-square)
+[![Build](https://img.shields.io/github/actions/workflow/status/veggerby/Veggerby.Ignition/ci-release.yml?label=build&style=flat-square)](https://github.com/veggerby/Veggerby.Ignition/actions/workflows/ci-release.yml)
+[![Coverage](https://codecov.io/gh/veggerby/Veggerby.Ignition/branch/main/graph/badge.svg)](https://codecov.io/gh/veggerby/Veggerby.Ignition)
+[![NuGet](https://img.shields.io/nuget/v/Veggerby.Ignition?label=nuget&style=flat-square)](https://www.nuget.org/packages/Veggerby.Ignition/)
+[![License](https://img.shields.io/github/license/veggerby/Veggerby.Ignition?style=flat-square)](./LICENSE)
 
 **Coordinate startup readiness for .NET applications with confidence.**
 
