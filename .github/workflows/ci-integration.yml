@@ -326,8 +326,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: [discover-packages, detect-changes, integration-tests]
     if: always() && github.event_name == 'pull_request'
+    outputs:
+      check-passed: ${{ steps.verify.outputs.passed }}
     steps:
       - name: Verify full suite passed or not needed
+        id: verify
         run: |
           HAS_SRC_CHANGES="${{ needs.detect-changes.outputs.has-src-changes }}"
           RUN_ALL="${{ needs.detect-changes.outputs.run-all }}"
@@ -340,12 +343,13 @@ jobs:
           if [[ "$HAS_SRC_CHANGES" == "false" ]]; then
             echo "✅ No source code changes - integration tests not required"
             echo "This PR only contains documentation, configuration, or other non-source changes."
+            echo "passed=true" >> $GITHUB_OUTPUT
             exit 0
           fi
           
           # Source changes detected - full suite is required
           if [[ "$RUN_ALL" != "true" ]]; then
-            echo "❌ Full integration test suite required but only selective tests ran"
+            echo "⚠️ Full integration test suite required but only selective tests ran"
             echo ""
             echo "This PR contains source code changes and requires the full integration test suite."
             echo ""
@@ -355,18 +359,26 @@ jobs:
             echo "Only selective tests ran for changed packages: ${{ needs.detect-changes.outputs.changed-filters }}"
             echo ""
             echo "The label triggers all ${{ needs.discover-packages.outputs.package-count }} integration packages to be tested."
-            exit 1
+            echo "passed=false" >> $GITHUB_OUTPUT
+            exit 0
           fi
           
           if [[ "$RESULT" == "success" ]]; then
             echo "✅ Full integration test suite executed successfully"
             echo "All ${{ needs.discover-packages.outputs.package-count }} integration packages were tested and passed."
+            echo "passed=true" >> $GITHUB_OUTPUT
           elif [[ "$RESULT" == "skipped" ]]; then
-            echo "❌ Full suite required but tests were skipped"
+            echo "⚠️ Full suite required but tests were skipped"
             echo "This indicates a workflow configuration error - full suite was required but no tests ran."
-            exit 1
+            echo "passed=false" >> $GITHUB_OUTPUT
           else
             echo "❌ Full suite executed but tests failed"
             echo "Status: $RESULT"
-            exit 1
+            echo "passed=false" >> $GITHUB_OUTPUT
           fi
+
+      - name: Block merge if check did not pass
+        if: steps.verify.outputs.passed == 'false'
+        run: |
+          echo "::error::Full integration test suite is required before this PR can be merged."
+          exit 1
