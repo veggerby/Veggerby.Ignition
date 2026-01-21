@@ -136,7 +136,7 @@ jobs:
             echo "has-src-changes=true" >> $GITHUB_OUTPUT
           fi
           
-          # Run all tests if: manual trigger, push to main, label present, non-draft PR, or core package changed
+          # Run all tests if: manual trigger, push to main, label present, or core package changed
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
              [[ "${{ github.event_name }}" == "push" ]]; then
             echo "run-all=true" >> $GITHUB_OUTPUT
@@ -144,7 +144,6 @@ jobs:
             echo "packages-to-test=$ALL_PACKAGES" >> $GITHUB_OUTPUT
             echo "✅ Running full integration test suite"
           elif [[ "${{ contains(github.event.pull_request.labels.*.name, 'run-full-integration-tests') }}" == "true" ]] || \
-               [[ "${{ github.event.pull_request.draft }}" == "false" ]] || \
                [[ "${{ steps.filter.outputs.core }}" == "true" ]]; then
             echo "run-all=true" >> $GITHUB_OUTPUT
             echo "changed-filters=all" >> $GITHUB_OUTPUT
@@ -175,7 +174,7 @@ jobs:
               ')
               echo "packages-to-test=$FILTERED" >> $GITHUB_OUTPUT
               echo "Filtered packages: $FILTERED"
-              echo "⚡ Running selective tests (fast feedback for draft PR)"
+              echo "⚡ Running selective tests (fast feedback)"
             fi
           fi
 
@@ -345,13 +344,12 @@ jobs:
             echo ""
             echo "This PR contains source code changes and requires the full integration test suite."
             echo ""
-            echo "To trigger the full suite, either:"
-            echo "  1. Mark the PR as ready for review (remove draft status), OR"
-            echo "  2. Add the 'run-full-integration-tests' label to this PR"
+            echo "To trigger the full suite and enable merge:"
+            echo "  Add the 'run-full-integration-tests' label to this PR"
             echo ""
             echo "Only selective tests ran for changed packages: ${{ needs.detect-changes.outputs.changed-filters }}"
             echo ""
-            echo "Draft PRs only run selective tests for fast feedback during development."
+            echo "The label triggers all ${{ needs.discover-packages.outputs.package-count }} integration packages to be tested."
             exit 1
           fi
           
