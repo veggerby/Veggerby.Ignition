@@ -78,18 +78,21 @@ public class PulsarIntegrationTests : IAsyncLifetime
     public async Task TopicMetadata_WithNonExistentTopic_FailsWhenFailOnMissingTopicsIsTrue()
     {
         // arrange
+        var adminUrl = $"http://{_pulsarContainer!.Hostname}:{_pulsarContainer.GetMappedPublicPort(8080)}";
+
         var options = new PulsarReadinessOptions
         {
             VerificationStrategy = PulsarVerificationStrategy.TopicMetadata,
             Timeout = TimeSpan.FromSeconds(30),
-            FailOnMissingTopics = true
+            FailOnMissingTopics = true,
+            AdminServiceUrl = adminUrl
         };
         options.WithTopic($"persistent://public/default/non-existent-topic-{Guid.NewGuid():N}");
         var logger = Substitute.For<ILogger<PulsarReadinessSignal>>();
         var signal = new PulsarReadinessSignal(_serviceUrl!, options, logger);
 
         // act & assert
-        await Assert.ThrowsAsync<InvalidOperationException>(async () => await signal.WaitAsync());
+        await Assert.ThrowsAsync<OperationCanceledException>(async () => await signal.WaitAsync());
     }
 
     [Fact]

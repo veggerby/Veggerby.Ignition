@@ -23,6 +23,7 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
 {
     private readonly string? _serviceUrl;
     private readonly Func<string>? _serviceUrlFactory;
+    private readonly PulsarClient? _pulsarClient;
     private readonly PulsarReadinessOptions _options;
     private readonly ILogger<PulsarReadinessSignal> _logger;
     private readonly object _sync = new object();
@@ -60,6 +61,26 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
     {
         _serviceUrl = null;
         _serviceUrlFactory = serviceUrlFactory ?? throw new ArgumentNullException(nameof(serviceUrlFactory));
+        _pulsarClient = null;
+        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PulsarReadinessSignal"/> class
+    /// using a dependency-injected Pulsar client.
+    /// </summary>
+    /// <param name="pulsarClient">Pre-configured Pulsar client instance.</param>
+    /// <param name="options">Configuration options for readiness verification.</param>
+    /// <param name="logger">Logger for diagnostic output.</param>
+    public PulsarReadinessSignal(
+        PulsarClient pulsarClient,
+        PulsarReadinessOptions options,
+        ILogger<PulsarReadinessSignal> logger)
+    {
+        _serviceUrl = null;
+        _serviceUrlFactory = null;
+        _pulsarClient = pulsarClient ?? throw new ArgumentNullException(nameof(pulsarClient));
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -178,7 +199,7 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
     {
         _logger.LogDebug("Verifying cluster health");
 
-        var client = await new PulsarClientBuilder()
+        var client = _pulsarClient ?? await new PulsarClientBuilder()
             .ServiceUrl(serviceUrl)
             .BuildAsync();
 
@@ -197,7 +218,11 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
         }
         finally
         {
-            await client.CloseAsync();
+            // Only close the client if we created it
+            if (_pulsarClient == null)
+            {
+                await client.CloseAsync();
+            }
         }
     }
 
@@ -212,7 +237,95 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
 
         _logger.LogDebug("Verifying {Count} topics", _options.VerifyTopics.Count);
 
-        var client = await new PulsarClientBuilder()
+        // Try to use Admin API if available, otherwise fall back to consumer-based verification
+        if (!string.IsNullOrWhiteSpace(_options.AdminServiceUrl))
+        {
+            await VerifyTopicsViaAdminApiAsync(_options.AdminServiceUrl, cancellationToken);
+        }
+        else if (_serviceUrl != null && TryInferAdminUrl(_serviceUrl, out var inferredAdminUrl))
+        {
+            await VerifyTopicsViaAdminApiAsync(inferredAdminUrl!, cancellationToken);
+        }
+        else
+        {
+            _logger.LogDebug("Admin API not available, using consumer-based topic verification");
+            await VerifyTopicsViaConsumerAsync(serviceUrl, cancellationToken);
+        }
+    }
+
+    private async Task VerifyTopicsViaAdminApiAsync(string adminUrl, CancellationToken cancellationToken)
+    {
+        using var httpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(5)
+        };
+
+        foreach (var topicName in _options.VerifyTopics)
+        {
+            try
+            {
+                var normalizedTopic = NormalizeTopic(topicName);
+
+                // Extract tenant, namespace, and topic from the normalized name
+                // Format: persistent://tenant/namespace/topic
+                var parts = normalizedTopic.Split(new[] { "://", "/" }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 4)
+                {
+                    throw new InvalidOperationException($"Invalid topic format: {normalizedTopic}");
+                }
+
+                var tenant = parts[1];
+                var ns = parts[2];
+                var topic = parts[3];
+
+                // Use Admin API to get topic metadata
+                var metadataUrl = $"{adminUrl.TrimEnd('/')}/admin/v2/persistent/{tenant}/{ns}/{topic}";
+                var response = await httpClient.GetAsync(metadataUrl, cancellationToken);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var message = $"Topic '{topicName}' does not exist or is not accessible";
+
+                    if (_options.FailOnMissingTopics)
+                    {
+                        _logger.LogError(message);
+                        // Throw OperationCanceledException to prevent retries in RetryPolicy
+                        throw new OperationCanceledException(message);
+                    }
+
+                    _logger.LogWarning("{Message} (continuing due to FailOnMissingTopics=false)", message);
+                }
+                else
+                {
+                    _logger.LogDebug("Topic '{TopicName}' verified successfully", topicName);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (InvalidOperationException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                var message = $"Topic '{topicName}' verification failed: {ex.Message}";
+
+                if (_options.FailOnMissingTopics)
+                {
+                    _logger.LogError(ex, message);
+                    throw new InvalidOperationException(message, ex);
+                }
+
+                _logger.LogWarning("{Message} (continuing due to FailOnMissingTopics=false)", message);
+            }
+        }
+    }
+
+    private async Task VerifyTopicsViaConsumerAsync(string serviceUrl, CancellationToken cancellationToken)
+    {
+        var client = _pulsarClient ?? await new PulsarClientBuilder()
             .ServiceUrl(serviceUrl)
             .BuildAsync();
 
@@ -223,10 +336,10 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
                 try
                 {
                     var normalizedTopic = NormalizeTopic(topicName);
-
-                    // Create a consumer to verify topic exists
                     var subscriptionName = $"ignition-verify-{Guid.NewGuid():N}";
 
+                    // Attempt to create a consumer - this will succeed even if topic doesn't exist
+                    // (Pulsar auto-creates topics by default)
                     var consumer = await client.NewConsumer()
                         .Topic(normalizedTopic)
                         .SubscriptionName(subscriptionName)
@@ -253,7 +366,11 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
         }
         finally
         {
-            await client.CloseAsync();
+            // Only close the client if we created it
+            if (_pulsarClient == null)
+            {
+                await client.CloseAsync();
+            }
         }
     }
 
@@ -265,7 +382,7 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
             ? NormalizeTopic(_options.VerifyTopics[0])
             : $"persistent://public/default/__ignition_test_{Guid.NewGuid():N}";
 
-        var client = await new PulsarClientBuilder()
+        var client = _pulsarClient ?? await new PulsarClientBuilder()
             .ServiceUrl(serviceUrl)
             .BuildAsync();
 
@@ -293,7 +410,11 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
         }
         finally
         {
-            await client.CloseAsync();
+            // Only close the client if we created it
+            if (_pulsarClient == null)
+            {
+                await client.CloseAsync();
+            }
         }
     }
 
@@ -305,7 +426,7 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
 
         var normalizedTopic = NormalizeTopic(_options.SubscriptionTopic!);
 
-        var client = await new PulsarClientBuilder()
+        var client = _pulsarClient ?? await new PulsarClientBuilder()
             .ServiceUrl(serviceUrl)
             .BuildAsync();
 
@@ -336,7 +457,11 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
         }
         finally
         {
-            await client.CloseAsync();
+            // Only close the client if we created it
+            if (_pulsarClient == null)
+            {
+                await client.CloseAsync();
+            }
         }
     }
 
@@ -385,5 +510,28 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
 
         // Otherwise, prepend the default persistent namespace
         return $"persistent://public/default/{topicName}";
+    }
+
+    private static bool TryInferAdminUrl(string serviceUrl, out string? adminUrl)
+    {
+        // Convert pulsar://host:6650 to http://host:8080
+        if (serviceUrl.StartsWith("pulsar://", StringComparison.OrdinalIgnoreCase))
+        {
+            var hostPort = serviceUrl.Substring("pulsar://".Length);
+            var host = hostPort.Split(':')[0];
+            adminUrl = $"http://{host}:8080";
+            return true;
+        }
+
+        if (serviceUrl.StartsWith("pulsar+ssl://", StringComparison.OrdinalIgnoreCase))
+        {
+            var hostPort = serviceUrl.Substring("pulsar+ssl://".Length);
+            var host = hostPort.Split(':')[0];
+            adminUrl = $"https://{host}:8443";
+            return true;
+        }
+
+        adminUrl = null;
+        return false;
     }
 }
