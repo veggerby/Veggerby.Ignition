@@ -1,5 +1,6 @@
 using DotNet.Testcontainers.Builders;
 
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 using Testcontainers.Pulsar;
@@ -22,8 +23,8 @@ public class PulsarIntegrationTests : IAsyncLifetime
 
         await _pulsarContainer.StartAsync();
 
-        // Get the service URL
-        _serviceUrl = _pulsarContainer.GetPulsarBrokerUrl();
+        // Get the service URL - use the broker URL
+        _serviceUrl = $"pulsar://{_pulsarContainer.Hostname}:{_pulsarContainer.GetMappedPublicPort(6650)}";
 
         // Give Pulsar additional time to fully initialize
         await Task.Delay(TimeSpan.FromSeconds(5));
@@ -137,7 +138,7 @@ public class PulsarIntegrationTests : IAsyncLifetime
     public async Task AdminApiCheck_Succeeds()
     {
         // arrange
-        var adminUrl = _pulsarContainer!.GetWebServiceUrl();
+        var adminUrl = $"http://{_pulsarContainer!.Hostname}:{_pulsarContainer.GetMappedPublicPort(8080)}";
 
         var options = new PulsarReadinessOptions
         {
@@ -157,7 +158,7 @@ public class PulsarIntegrationTests : IAsyncLifetime
     public async Task Factory_CreateSignal_Succeeds()
     {
         // arrange
-        var services = new Microsoft.Extensions.DependencyInjection.ServiceCollection();
+        var services = new ServiceCollection();
         services.AddLogging();
 
         var options = new PulsarReadinessOptions
