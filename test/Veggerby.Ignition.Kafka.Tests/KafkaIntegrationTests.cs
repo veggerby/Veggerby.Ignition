@@ -36,6 +36,10 @@ public class KafkaIntegrationTests : IAsyncLifetime
             SocketTimeoutMs = 10000,
             RequestTimeoutMs = 5000
         };
+
+        // Give Kafka additional time to fully initialize after container startup
+        // The container wait strategy only ensures the container is running, not that Kafka is ready
+        await Task.Delay(TimeSpan.FromSeconds(3));
     }
 
     public async Task DisposeAsync()

@@ -119,7 +119,8 @@ public class MemcachedReadinessSignalTests
 
         // act & assert
         await Assert.ThrowsAsync<InvalidOperationException>(async () => await signal.WaitAsync());
-        client.Received(1).Stats();
+        // With default MaxRetries=3, Stats() is called 3 times (initial + 2 retries)
+        client.Received(3).Stats();
     }
 
     [Fact]
