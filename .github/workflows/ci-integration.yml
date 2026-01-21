@@ -68,6 +68,7 @@ jobs:
           cat > /tmp/filters.yml << 'EOF'
           src:
             - 'src/**'
+            - 'test/**'
           core:
             - 'src/Veggerby.Ignition/**'
             - 'test/Veggerby.Ignition.Tests/**'
@@ -331,6 +332,10 @@ jobs:
           HAS_SRC_CHANGES="${{ needs.detect-changes.outputs.has-src-changes }}"
           RUN_ALL="${{ needs.detect-changes.outputs.run-all }}"
           RESULT="${{ needs.integration-tests.result }}"
+          
+          echo "Debug: HAS_SRC_CHANGES=$HAS_SRC_CHANGES"
+          echo "Debug: RUN_ALL=$RUN_ALL"
+          echo "Debug: RESULT=$RESULT"
           
           if [[ "$HAS_SRC_CHANGES" == "false" ]]; then
             echo "✅ No source code changes - integration tests not required"
