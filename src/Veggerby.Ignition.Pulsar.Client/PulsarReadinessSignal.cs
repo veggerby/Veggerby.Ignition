@@ -191,7 +191,7 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
                 .Topic(testTopic)
                 .CreateAsync();
 
-            await producer.CloseAsync();
+            await producer.DisposeAsync();
 
             _logger.LogDebug("Cluster health verified successfully");
         }
@@ -230,10 +230,10 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
                     var consumer = await client.NewConsumer()
                         .Topic(normalizedTopic)
                         .SubscriptionName(subscriptionName)
-                        .SubscriptionType(SubType.Exclusive)
+                        .SubscriptionType(SubscriptionType.Exclusive)
                         .SubscribeAsync();
 
-                    await consumer.CloseAsync();
+                    await consumer.DisposeAsync();
 
                     _logger.LogDebug("Topic '{TopicName}' verified successfully", topicName);
                 }
@@ -288,7 +288,7 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
             }
             finally
             {
-                await producer.CloseAsync();
+                await producer.DisposeAsync();
             }
         }
         finally
@@ -317,10 +317,10 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
                 var consumer = await client.NewConsumer()
                     .Topic(normalizedTopic)
                     .SubscriptionName(_options.VerifySubscription!)
-                    .SubscriptionType(SubType.Shared)
+                    .SubscriptionType(SubscriptionType.Shared)
                     .SubscribeAsync();
 
-                await consumer.CloseAsync();
+                await consumer.DisposeAsync();
 
                 _logger.LogDebug(
                     "Subscription '{Subscription}' verified on topic '{Topic}'",
@@ -370,7 +370,7 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
         }
         catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new TimeoutException($"Admin API verification timed out: {_options.AdminServiceUrl}", ex);
+            throw new System.TimeoutException($"Admin API verification timed out: {_options.AdminServiceUrl}", ex);
         }
     }
 
