@@ -106,7 +106,7 @@ public class IgnitionCoordinatorTests
     public async Task PerSignalTimeout_TimesOutWhileOthersSucceed()
     {
         // arrange
-        var timedOut = new FakeSignal("t-out", async ct => await Task.Delay(60, ct), timeout: TimeSpan.FromMilliseconds(50));
+        var timedOut = new FakeSignal("t-out", async ct => await Task.Delay(200, ct), timeout: TimeSpan.FromMilliseconds(50));
         var fast = new FakeSignal("fast", _ => Task.CompletedTask);
         var coord = CreateCoordinator(new[] { timedOut, fast }, o =>
         {
