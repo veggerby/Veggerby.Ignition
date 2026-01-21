@@ -120,7 +120,7 @@ try
             logger.LogInformation("{Icon} {SignalName}: {Status} ({Duration}ms)",
                 icon, signal.Name, signal.Status, signal.Duration.TotalMilliseconds);
 
-            if (signal.Exception != null)
+            if (signal.Exception is not null)
             {
                 logger.LogWarning("  Error: {Error}", signal.Exception.Message);
             }

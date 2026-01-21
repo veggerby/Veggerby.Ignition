@@ -189,7 +189,7 @@ internal sealed class MariaDbReadinessSignal : IIgnitionSignal
         using var command = new MySqlCommand("SELECT 1", connection);
         var result = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
 
-        if (result == null || Convert.ToInt32(result) != 1)
+        if (result is null || Convert.ToInt32(result) != 1)
         {
             throw new InvalidOperationException("Simple query did not return expected result");
         }

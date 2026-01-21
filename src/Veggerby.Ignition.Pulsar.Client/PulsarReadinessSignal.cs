@@ -219,7 +219,7 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
         finally
         {
             // Only close the client if we created it
-            if (_pulsarClient == null)
+            if (_pulsarClient is null)
             {
                 await client.CloseAsync();
             }
@@ -242,7 +242,7 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
         {
             await VerifyTopicsViaAdminApiAsync(_options.AdminServiceUrl, cancellationToken);
         }
-        else if (_serviceUrl != null && TryInferAdminUrl(_serviceUrl, out var inferredAdminUrl))
+        else if (_serviceUrl is not null && TryInferAdminUrl(_serviceUrl, out var inferredAdminUrl))
         {
             await VerifyTopicsViaAdminApiAsync(inferredAdminUrl!, cancellationToken);
         }
@@ -367,7 +367,7 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
         finally
         {
             // Only close the client if we created it
-            if (_pulsarClient == null)
+            if (_pulsarClient is null)
             {
                 await client.CloseAsync();
             }
@@ -411,7 +411,7 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
         finally
         {
             // Only close the client if we created it
-            if (_pulsarClient == null)
+            if (_pulsarClient is null)
             {
                 await client.CloseAsync();
             }
@@ -458,7 +458,7 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
         finally
         {
             // Only close the client if we created it
-            if (_pulsarClient == null)
+            if (_pulsarClient is null)
             {
                 await client.CloseAsync();
             }

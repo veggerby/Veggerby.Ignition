@@ -216,7 +216,7 @@ public class Program
 
             Console.Write($"   {icon} {signalResult.Name}: {signalResult.Status}");
 
-            if (signalResult.Exception != null)
+            if (signalResult.Exception is not null)
             {
                 Console.Write($" - {signalResult.Exception.Message}");
             }

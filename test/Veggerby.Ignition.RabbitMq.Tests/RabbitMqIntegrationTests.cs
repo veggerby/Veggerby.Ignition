@@ -27,7 +27,7 @@ public class RabbitMqIntegrationTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        if (_rabbitMqContainer != null)
+        if (_rabbitMqContainer is not null)
         {
             await _rabbitMqContainer.DisposeAsync();
         }

@@ -24,7 +24,7 @@ public class MySqlIntegrationTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        if (_mySqlContainer != null)
+        if (_mySqlContainer is not null)
         {
             await _mySqlContainer.DisposeAsync();
         }

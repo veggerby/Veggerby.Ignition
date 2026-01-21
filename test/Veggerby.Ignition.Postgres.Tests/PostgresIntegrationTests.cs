@@ -31,12 +31,12 @@ public class PostgresIntegrationTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        if (_dataSource != null)
+        if (_dataSource is not null)
         {
             await _dataSource.DisposeAsync();
         }
         
-        if (_postgresContainer != null)
+        if (_postgresContainer is not null)
         {
             await _postgresContainer.DisposeAsync();
         }

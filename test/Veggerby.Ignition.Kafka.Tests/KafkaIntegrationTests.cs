@@ -44,7 +44,7 @@ public class KafkaIntegrationTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        if (_kafkaContainer != null)
+        if (_kafkaContainer is not null)
         {
             await _kafkaContainer.DisposeAsync();
         }

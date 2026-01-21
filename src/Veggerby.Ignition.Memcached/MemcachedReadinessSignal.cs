@@ -104,7 +104,7 @@ internal sealed class MemcachedReadinessSignal : IIgnitionSignal
         _logger.LogDebug("Executing Memcached stats command");
 
         var stats = _memcachedClient.Stats();
-        if (stats == null)
+        if (stats is null)
         {
             throw new InvalidOperationException("Failed to retrieve Memcached stats");
         }
@@ -131,7 +131,7 @@ internal sealed class MemcachedReadinessSignal : IIgnitionSignal
 
             // Get and verify
             var getValue = await _memcachedClient.GetAsync<string>(testKey);
-            if (getValue.Value == null || getValue.Value != testValue)
+            if (getValue.Value is null || getValue.Value != testValue)
             {
                 throw new InvalidOperationException("Test key value mismatch in Memcached");
             }

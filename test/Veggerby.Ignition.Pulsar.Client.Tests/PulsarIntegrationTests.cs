@@ -32,7 +32,7 @@ public class PulsarIntegrationTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        if (_pulsarContainer != null)
+        if (_pulsarContainer is not null)
         {
             await _pulsarContainer.DisposeAsync();
         }

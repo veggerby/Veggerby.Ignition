@@ -172,7 +172,7 @@ internal sealed class PostgresReadinessSignal : IIgnitionSignal
         finally
         {
             // Dispose data source if we own it (created from connection string)
-            if (_ownsDataSource && _dataSource != null)
+            if (_ownsDataSource && _dataSource is not null)
             {
                 await _dataSource.DisposeAsync().ConfigureAwait(false);
             }

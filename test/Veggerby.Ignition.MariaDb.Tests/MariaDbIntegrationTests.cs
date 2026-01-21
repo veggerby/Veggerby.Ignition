@@ -26,7 +26,7 @@ public class MariaDbIntegrationTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        if (_mariaDbContainer != null)
+        if (_mariaDbContainer is not null)
         {
             await _mariaDbContainer.DisposeAsync();
         }

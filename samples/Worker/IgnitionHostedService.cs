@@ -52,7 +52,7 @@ public sealed class IgnitionHostedService : IHostedService
                         signalResult.Status,
                         signalResult.Duration.TotalMilliseconds);
 
-                    if (signalResult.Exception != null)
+                    if (signalResult.Exception is not null)
                     {
                         _logger.LogWarning("    Error: {Error}", signalResult.Exception.Message);
                     }

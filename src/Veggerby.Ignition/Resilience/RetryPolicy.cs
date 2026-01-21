@@ -61,7 +61,7 @@ public sealed class RetryPolicy
             : null;
 
         // Combine the timeout with the incoming cancellation token
-        using var linkedCts = timeoutCts != null
+        using var linkedCts = timeoutCts is not null
             ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token)
             : null;
 
@@ -153,7 +153,7 @@ public sealed class RetryPolicy
             : null;
 
         // Combine the timeout with the incoming cancellation token
-        using var linkedCts = timeoutCts != null
+        using var linkedCts = timeoutCts is not null
             ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token)
             : null;
 
@@ -258,7 +258,7 @@ public sealed class RetryPolicy
             : null;
 
         // Combine the timeout with the incoming cancellation token
-        using var linkedCts = timeoutCts != null
+        using var linkedCts = timeoutCts is not null
             ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token)
             : null;
 

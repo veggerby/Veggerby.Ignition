@@ -89,31 +89,31 @@ public class InfrastructureManager
     {
         var tasks = new List<Task>();
 
-        if (_postgres != null)
+        if (_postgres is not null)
         {
             Console.WriteLine("  🐘 Stopping PostgreSQL...");
             tasks.Add(_postgres.DisposeAsync().AsTask());
         }
 
-        if (_redis != null)
+        if (_redis is not null)
         {
             Console.WriteLine("  🔴 Stopping Redis...");
             tasks.Add(_redis.DisposeAsync().AsTask());
         }
 
-        if (_rabbitMq != null)
+        if (_rabbitMq is not null)
         {
             Console.WriteLine("  🐰 Stopping RabbitMQ...");
             tasks.Add(_rabbitMq.DisposeAsync().AsTask());
         }
 
-        if (_mongoDb != null)
+        if (_mongoDb is not null)
         {
             Console.WriteLine("  🍃 Stopping MongoDB...");
             tasks.Add(_mongoDb.DisposeAsync().AsTask());
         }
 
-        if (_sqlServer != null)
+        if (_sqlServer is not null)
         {
             Console.WriteLine("  🗄️  Stopping SQL Server...");
             tasks.Add(_sqlServer.DisposeAsync().AsTask());

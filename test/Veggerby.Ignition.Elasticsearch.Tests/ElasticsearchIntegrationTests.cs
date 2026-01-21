@@ -29,7 +29,7 @@ public class ElasticsearchIntegrationTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        if (_elasticsearchContainer != null)
+        if (_elasticsearchContainer is not null)
         {
             await _elasticsearchContainer.DisposeAsync();
         }

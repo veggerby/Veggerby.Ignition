@@ -200,7 +200,7 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
         _logger.LogDebug("Verifying cluster health");
 
         IPulsarClient client;
-        if (_pulsarClient != null)
+        if (_pulsarClient is not null)
         {
             client = _pulsarClient;
         }
@@ -225,7 +225,7 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
         finally
         {
             // Only dispose the client if we created it
-            if (_pulsarClient == null)
+            if (_pulsarClient is null)
             {
                 await client.DisposeAsync();
             }
@@ -248,7 +248,7 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
         {
             await VerifyTopicsViaAdminApiAsync(_options.AdminServiceUrl, cancellationToken);
         }
-        else if (_serviceUrl != null && TryInferAdminUrl(_serviceUrl, out var inferredAdminUrl))
+        else if (_serviceUrl is not null && TryInferAdminUrl(_serviceUrl, out var inferredAdminUrl))
         {
             await VerifyTopicsViaAdminApiAsync(inferredAdminUrl!, cancellationToken);
         }
@@ -332,7 +332,7 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
     private async Task VerifyTopicsViaConsumerAsync(string serviceUrl, CancellationToken cancellationToken)
     {
         IPulsarClient client;
-        if (_pulsarClient != null)
+        if (_pulsarClient is not null)
         {
             client = _pulsarClient;
         }
@@ -379,7 +379,7 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
         finally
         {
             // Only dispose the client if we created it
-            if (_pulsarClient == null)
+            if (_pulsarClient is null)
             {
                 await client.DisposeAsync();
             }
@@ -395,7 +395,7 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
             : $"persistent://public/default/__ignition_test_{Guid.NewGuid():N}";
 
         IPulsarClient client;
-        if (_pulsarClient != null)
+        if (_pulsarClient is not null)
         {
             client = _pulsarClient;
         }
@@ -423,7 +423,7 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
         finally
         {
             // Only dispose the client if we created it
-            if (_pulsarClient == null)
+            if (_pulsarClient is null)
             {
                 await client.DisposeAsync();
             }
@@ -439,7 +439,7 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
         var normalizedTopic = NormalizeTopic(_options.SubscriptionTopic!);
 
         IPulsarClient client;
-        if (_pulsarClient != null)
+        if (_pulsarClient is not null)
         {
             client = _pulsarClient;
         }
@@ -476,7 +476,7 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
         finally
         {
             // Only dispose the client if we created it
-            if (_pulsarClient == null)
+            if (_pulsarClient is null)
             {
                 await client.DisposeAsync();
             }

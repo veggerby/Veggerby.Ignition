@@ -27,7 +27,7 @@ public class MemcachedIntegrationTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        if (_memcachedContainer != null)
+        if (_memcachedContainer is not null)
         {
             await _memcachedContainer.DisposeAsync();
         }

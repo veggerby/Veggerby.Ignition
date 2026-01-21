@@ -391,7 +391,7 @@ public static class IgnitionTimelineExtensions
         var timedOutStr = timeline.TimedOut ? "YES" : "NO";
         sb.AppendLine($" Timed Out:             {timedOutStr}");
 
-        if (timeline.ExecutionMode != null)
+        if (timeline.ExecutionMode is not null)
         {
             sb.AppendLine($" Execution Mode:        {timeline.ExecutionMode}");
         }
@@ -477,7 +477,7 @@ public static class IgnitionTimelineExtensions
         sb.AppendLine(" SUMMARY");
         sb.AppendLine("────────────────────────────────────────────────────────────────────────────────");
 
-        if (timeline.Summary != null)
+        if (timeline.Summary is not null)
         {
             var s = timeline.Summary;
             sb.AppendLine($"   Total Signals:       {s.TotalSignals,5}");
@@ -505,14 +505,14 @@ public static class IgnitionTimelineExtensions
 
             sb.AppendLine($"   Max Concurrency:     {s.MaxConcurrency,5}");
 
-            if (s.SlowestSignal != null)
+            if (s.SlowestSignal is not null)
             {
                 var slowestName = TruncateSignalName(s.SlowestSignal, 20);
                 var slowestMs = $"{s.SlowestDurationMs:F0}ms";
                 sb.AppendLine($"   Slowest:             {slowestName} ({slowestMs})");
             }
 
-            if (s.FastestSignal != null)
+            if (s.FastestSignal is not null)
             {
                 var fastestName = TruncateSignalName(s.FastestSignal, 20);
                 var fastestMs = $"{s.FastestDurationMs:F0}ms";

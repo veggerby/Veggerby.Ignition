@@ -26,7 +26,7 @@ public class SqlServerIntegrationTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        if (_sqlServerContainer != null)
+        if (_sqlServerContainer is not null)
         {
             await _sqlServerContainer.DisposeAsync();
         }

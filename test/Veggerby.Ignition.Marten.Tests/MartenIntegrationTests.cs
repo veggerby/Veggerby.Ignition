@@ -27,7 +27,7 @@ public class MartenIntegrationTests : IAsyncLifetime
     {
         _documentStore?.Dispose();
         
-        if (_postgresContainer != null)
+        if (_postgresContainer is not null)
         {
             await _postgresContainer.DisposeAsync();
         }
