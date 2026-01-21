@@ -378,6 +378,17 @@ Extend Ignition with ready-made signals for popular infrastructure components:
   - Works with existing `IBus` instance
   - ```dotnet add package Veggerby.Ignition.MassTransit```
 
+- **[Veggerby.Ignition.Pulsar.DotPulsar](src/Veggerby.Ignition.Pulsar.DotPulsar/README.md)** - Apache Pulsar (official DotPulsar client)
+  - Cluster connectivity and broker health verification
+  - Topic metadata and subscription validation
+  - Producer test messaging and Admin API health checks
+  - ```dotnet add package Veggerby.Ignition.Pulsar.DotPulsar```
+
+- **[Veggerby.Ignition.Pulsar.Client](src/Veggerby.Ignition.Pulsar.Client/README.md)** - Apache Pulsar (Pulsar.Client library)
+  - Identical functionality to DotPulsar package
+  - Choose based on existing Pulsar client preference
+  - ```dotnet add package Veggerby.Ignition.Pulsar.Client```
+
 **Example:** Verify RabbitMQ and MassTransit readiness:
 
 ```csharp

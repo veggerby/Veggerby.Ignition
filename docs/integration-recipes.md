@@ -785,6 +785,210 @@ builder.Services.AddMariaDbReadiness(
 
 ---
 
+## Apache Pulsar Integration (DotPulsar & Pulsar.Client)
+
+### Overview
+
+Two Apache Pulsar integration packages are available:
+
+- **`Veggerby.Ignition.Pulsar.DotPulsar`** - Uses the official Apache DotPulsar client
+- **`Veggerby.Ignition.Pulsar.Client`** - Uses the Pulsar.Client library
+
+Both packages provide identical verification strategies and configuration options. Choose based on your existing Pulsar client preference or organizational standards.
+
+### Installation
+
+```bash
+# Option 1: DotPulsar (official Apache client)
+dotnet add package Veggerby.Ignition.Pulsar.DotPulsar
+
+# Option 2: Pulsar.Client
+dotnet add package Veggerby.Ignition.Pulsar.Client
+```
+
+### Verification Strategies
+
+| Strategy | Description | Configuration Required |
+|----------|-------------|------------------------|
+| `ClusterHealth` | Validates broker connectivity (default) | None |
+| `TopicMetadata` | Verifies specified topics exist | `VerifyTopics` |
+| `ProducerTest` | Produces test message to verify producer connectivity | `VerifyTopics` (at least one) |
+| `SubscriptionCheck` | Verifies subscription exists for a topic | `VerifySubscription`, `SubscriptionTopic` |
+| `AdminApiCheck` | Validates broker health via Admin API | `AdminServiceUrl` |
+
+### Basic Cluster Connectivity
+
+```csharp
+using Veggerby.Ignition.Pulsar.DotPulsar; // or Veggerby.Ignition.Pulsar.Client
+
+// Simple connection verification
+builder.Services.AddPulsarReadiness("pulsar://localhost:6650");
+```
+
+### Topic Verification
+
+```csharp
+// Verify topics exist (strict mode)
+builder.Services.AddPulsarReadiness(
+    "pulsar://localhost:6650",
+    options =>
+    {
+        options.VerificationStrategy = PulsarVerificationStrategy.TopicMetadata;
+        options.WithTopic("persistent://public/default/orders");
+        options.WithTopic("persistent://public/default/payments");
+        options.WithTopic("persistent://public/default/inventory");
+        options.FailOnMissingTopics = true; // Fail if any topic is missing
+        options.Timeout = TimeSpan.FromSeconds(30);
+    });
+```
+
+### Producer Test
+
+```csharp
+// Test message production (end-to-end verification)
+builder.Services.AddPulsarReadiness(
+    "pulsar://localhost:6650",
+    options =>
+    {
+        options.VerificationStrategy = PulsarVerificationStrategy.ProducerTest;
+        options.WithTopic("persistent://public/default/test-topic");
+        options.Timeout = TimeSpan.FromSeconds(30);
+    });
+```
+
+### Subscription Verification
+
+```csharp
+// Verify consumer subscription exists
+builder.Services.AddPulsarReadiness(
+    "pulsar://localhost:6650",
+    options =>
+    {
+        options.VerificationStrategy = PulsarVerificationStrategy.SubscriptionCheck;
+        options.SubscriptionTopic = "persistent://public/default/orders";
+        options.VerifySubscription = "order-processor-subscription";
+        options.Timeout = TimeSpan.FromSeconds(30);
+    });
+```
+
+### Admin API Health Check
+
+```csharp
+// Check broker health via Admin API
+builder.Services.AddPulsarReadiness(
+    "pulsar://localhost:6650",
+    options =>
+    {
+        options.VerificationStrategy = PulsarVerificationStrategy.AdminApiCheck;
+        options.AdminServiceUrl = "http://localhost:8080";
+        options.Timeout = TimeSpan.FromSeconds(30);
+    });
+```
+
+### Staged Execution with Testcontainers
+
+```csharp
+// Stage 0: Start Pulsar container
+var infrastructure = new InfrastructureManager();
+builder.Services.AddSingleton(infrastructure);
+builder.Services.AddIgnitionFromTaskWithStage(
+    "pulsar-container",
+    async ct => await infrastructure.StartPulsarAsync(),
+    stage: 0);
+
+// Stage 3: Verify Pulsar readiness
+builder.Services.AddPulsarReadiness(
+    sp => sp.GetRequiredService<InfrastructureManager>().PulsarServiceUrl,
+    options =>
+    {
+        options.Stage = 3;
+        options.VerificationStrategy = PulsarVerificationStrategy.TopicMetadata;
+        options.WithTopic("persistent://public/default/orders");
+        options.WithTopic("persistent://public/default/events");
+        options.Timeout = TimeSpan.FromSeconds(30);
+    });
+```
+
+### With Retry Configuration
+
+```csharp
+builder.Services.AddPulsarReadiness(
+    "pulsar://localhost:6650",
+    options =>
+    {
+        options.VerificationStrategy = PulsarVerificationStrategy.ClusterHealth;
+        options.MaxRetries = 5;
+        options.RetryDelay = TimeSpan.FromMilliseconds(200);
+        options.Timeout = TimeSpan.FromSeconds(30);
+    });
+```
+
+### Multi-Topic Verification with Tolerance
+
+```csharp
+// Verify topics but don't fail if some are missing
+builder.Services.AddPulsarReadiness(
+    "pulsar://localhost:6650",
+    options =>
+    {
+        options.VerificationStrategy = PulsarVerificationStrategy.TopicMetadata;
+        options.WithTopic("persistent://public/default/orders");
+        options.WithTopic("persistent://public/default/inventory");
+        options.WithTopic("persistent://public/default/shipping");
+        options.FailOnMissingTopics = false; // Log warnings instead of failing
+        options.Timeout = TimeSpan.FromSeconds(30);
+    });
+```
+
+### Production Readiness Pattern
+
+```csharp
+// Combine multiple verification strategies
+builder.Services.AddPulsarReadiness(
+    sp => sp.GetRequiredService<IConfiguration>()["Pulsar:ServiceUrl"] 
+        ?? "pulsar://localhost:6650",
+    options =>
+    {
+        options.VerificationStrategy = PulsarVerificationStrategy.ProducerTest;
+        options.WithTopic("persistent://public/default/health-check");
+        options.MaxRetries = 8;
+        options.RetryDelay = TimeSpan.FromMilliseconds(500);
+        options.Timeout = TimeSpan.FromSeconds(30);
+        options.Stage = 3; // After infrastructure setup
+    });
+```
+
+### Topic Name Format
+
+Pulsar topics use a hierarchical naming structure:
+
+```
+{persistent|non-persistent}://{tenant}/{namespace}/{topic}
+```
+
+Simple topic names are automatically normalized to the default namespace:
+
+```csharp
+options.WithTopic("orders");
+// Becomes: persistent://public/default/orders
+
+options.WithTopic("persistent://my-tenant/my-namespace/my-topic");
+// Used as-is (fully qualified)
+```
+
+### DotPulsar vs Pulsar.Client
+
+Both packages provide identical configuration and functionality. Choose based on:
+
+| Factor | DotPulsar | Pulsar.Client |
+|--------|-----------|---------------|
+| **Official Support** | Apache Foundation official client | Community-maintained |
+| **Package Size** | ~500KB | Larger footprint |
+| **API Style** | Modern async/await patterns | Traditional .NET style |
+| **Recommendation** | ✅ Preferred for new projects | Use if already in your stack |
+
+---
+
 ## See Also
 
 - **[Getting Started Guide](getting-started.md)** - Basic concepts and first signal

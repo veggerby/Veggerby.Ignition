@@ -249,7 +249,7 @@ public class Program
 
                 Console.WriteLine($"   {status} {signalResult.Name}: {signalResult.Status} ({signalResult.Duration.TotalMilliseconds:F0}ms)");
 
-                if (signalResult.Exception != null)
+                if (signalResult.Exception is not null)
                 {
                     Console.WriteLine($"      Error: {signalResult.Exception.Message}");
                 }

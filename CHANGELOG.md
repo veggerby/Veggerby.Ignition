@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+- **Apache Pulsar Integration Packages**: Two new packages for Apache Pulsar readiness verification
+  - `Veggerby.Ignition.Pulsar.DotPulsar`: Uses official Apache DotPulsar client
+  - `Veggerby.Ignition.Pulsar.Client`: Uses Pulsar.Client library
+  - Provides 5 verification strategies: ClusterHealth, TopicMetadata, ProducerTest, SubscriptionCheck, AdminApiCheck
+  - Supports topic name normalization, staged execution, retry policies, and Activity tracing
+  - Includes comprehensive integration tests with Testcontainers
+  - Both packages provide identical functionality - choose based on client preference
 - **MariaDB Integration Package (`Veggerby.Ignition.MariaDb`)**: MariaDB/MySQL-compatible database readiness verification
   - Supports multiple verification strategies: `Ping` (MySQL ping command), `SimpleQuery` (SELECT 1), `TableExists` (table existence validation), `ConnectionPool` (connection pool readiness)
   - Table existence validation with configurable failure mode (`FailOnMissingTables`)

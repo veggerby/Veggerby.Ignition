@@ -160,7 +160,7 @@ internal sealed class KafkaReadinessSignal : IIgnitionSignal
         var metadataTimeout = _options.Timeout ?? TimeSpan.FromSeconds(15);
         var metadata = adminClient.GetMetadata(metadataTimeout);
 
-        if (metadata.Brokers == null || metadata.Brokers.Count == 0)
+        if (metadata.Brokers is null || metadata.Brokers.Count == 0)
         {
             throw new InvalidOperationException("No brokers found in cluster metadata");
         }
@@ -193,7 +193,7 @@ internal sealed class KafkaReadinessSignal : IIgnitionSignal
         {
             var topicMetadata = metadata.Topics?.FirstOrDefault(t => t.Topic == topicName);
 
-            if (topicMetadata == null)
+            if (topicMetadata is null)
             {
                 var message = $"Topic '{topicName}' not found in cluster";
 
@@ -282,7 +282,7 @@ internal sealed class KafkaReadinessSignal : IIgnitionSignal
 
         var group = groups.FirstOrDefault(g => g.Group == _options.VerifyConsumerGroup);
 
-        if (group == null)
+        if (group is null)
         {
             var message = $"Consumer group '{_options.VerifyConsumerGroup}' not found";
             _logger.LogWarning(message);

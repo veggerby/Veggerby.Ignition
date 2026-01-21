@@ -25,7 +25,7 @@ public class MongoDbIntegrationTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        if (_mongoDbContainer != null)
+        if (_mongoDbContainer is not null)
         {
             await _mongoDbContainer.DisposeAsync();
         }

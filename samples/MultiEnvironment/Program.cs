@@ -208,7 +208,7 @@ public class Program
                 Console.WriteLine($"     Status: {signalResult.Status}");
                 Console.WriteLine($"     Duration: {signalResult.Duration.TotalMilliseconds:F0}ms");
 
-                if (signalResult.Exception != null)
+                if (signalResult.Exception is not null)
                 {
                     Console.WriteLine($"     Error: {signalResult.Exception.Message}");
                 }

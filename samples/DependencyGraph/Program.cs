@@ -306,7 +306,7 @@ public class Program
                 {
                     Console.Write($" - Skipped due to failed dependencies: {string.Join(", ", signalResult.FailedDependencies!)}");
                 }
-                else if (signalResult.Exception != null)
+                else if (signalResult.Exception is not null)
                 {
                     Console.Write($" - {signalResult.Exception.Message}");
                 }

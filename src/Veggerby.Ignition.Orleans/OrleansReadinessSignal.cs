@@ -83,7 +83,7 @@ internal sealed class OrleansReadinessSignal : IIgnitionSignal
                 var managementGrain = _clusterClient.GetGrain<IManagementGrain>(0);
                 var hosts = await managementGrain.GetHosts(onlyActive: true);
                 
-                if (hosts == null || hosts.Count == 0)
+                if (hosts is null || hosts.Count == 0)
                 {
                     throw new InvalidOperationException("No active silos found in Orleans cluster");
                 }

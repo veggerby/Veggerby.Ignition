@@ -68,7 +68,7 @@ public class RedisStarterBundle : IIgnitionBundle
             var healthSig = signals.FirstOrDefault(s => s.Name == "redis:health-check");
             var warmupSig = signals.FirstOrDefault(s => s.Name == "redis:warmup-cache");
 
-            if (connectSig != null && healthSig != null && warmupSig != null)
+            if (connectSig is not null && healthSig is not null && warmupSig is not null)
             {
                 builder.AddSignals(new[] { connectSig, healthSig, warmupSig });
                 builder.DependsOn(healthSig, connectSig);
@@ -124,7 +124,7 @@ public class MessageQueueBundle : IIgnitionBundle
             var connectSig = signals.FirstOrDefault(s => s.Name == $"queue:{_queueName}:connect");
             var subscribeSig = signals.FirstOrDefault(s => s.Name == $"queue:{_queueName}:subscribe");
 
-            if (connectSig != null && subscribeSig != null)
+            if (connectSig is not null && subscribeSig is not null)
             {
                 builder.AddSignals(new[] { connectSig, subscribeSig });
                 builder.DependsOn(subscribeSig, connectSig);
@@ -342,7 +342,7 @@ public class Program
                 {
                     Console.Write($" - Skipped due to: {string.Join(", ", signalResult.FailedDependencies)}");
                 }
-                else if (signalResult.Exception != null)
+                else if (signalResult.Exception is not null)
                 {
                     Console.Write($" - {signalResult.Exception.Message}");
                 }

@@ -29,7 +29,7 @@ public class RedisIntegrationTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        if (_redisContainer != null)
+        if (_redisContainer is not null)
         {
             await _redisContainer.DisposeAsync();
         }

@@ -46,14 +46,14 @@ public class MassTransitIntegrationTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        if (_busControl != null)
+        if (_busControl is not null)
         {
             await _busControl.StopAsync();
         }
         
         _serviceProvider?.Dispose();
         
-        if (_rabbitMqContainer != null)
+        if (_rabbitMqContainer is not null)
         {
             await _rabbitMqContainer.DisposeAsync();
         }
