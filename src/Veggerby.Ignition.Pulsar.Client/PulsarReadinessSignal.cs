@@ -11,6 +11,8 @@ using Microsoft.Extensions.Logging;
 using Pulsar.Client.Api;
 using Pulsar.Client.Common;
 
+using TimeoutException = System.TimeoutException;
+
 #pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.Pulsar.Client;
 #pragma warning restore IDE0130 // Namespace does not match folder structure
@@ -495,7 +497,7 @@ internal sealed class PulsarReadinessSignal : IIgnitionSignal
         }
         catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new System.TimeoutException($"Admin API verification timed out: {_options.AdminServiceUrl}", ex);
+            throw new TimeoutException($"Admin API verification timed out: {_options.AdminServiceUrl}", ex);
         }
     }
 
