@@ -136,7 +136,7 @@ jobs:
             echo "has-src-changes=true" >> $GITHUB_OUTPUT
           fi
           
-          # Run all tests if: manual trigger, push to main, label present, or core package changed
+          # Run all tests if: manual trigger, push to main, label present, non-draft PR, or core package changed
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
              [[ "${{ github.event_name }}" == "push" ]]; then
             echo "run-all=true" >> $GITHUB_OUTPUT
@@ -144,6 +144,7 @@ jobs:
             echo "packages-to-test=$ALL_PACKAGES" >> $GITHUB_OUTPUT
             echo "✅ Running full integration test suite"
           elif [[ "${{ contains(github.event.pull_request.labels.*.name, 'run-full-integration-tests') }}" == "true" ]] || \
+               [[ "${{ github.event.pull_request.draft }}" == "false" ]] || \
                [[ "${{ steps.filter.outputs.core }}" == "true" ]]; then
             echo "run-all=true" >> $GITHUB_OUTPUT
             echo "changed-filters=all" >> $GITHUB_OUTPUT
@@ -174,7 +175,7 @@ jobs:
               ')
               echo "packages-to-test=$FILTERED" >> $GITHUB_OUTPUT
               echo "Filtered packages: $FILTERED"
-              echo "⚡ Running selective tests (fast feedback)"
+              echo "⚡ Running selective tests (fast feedback for draft PR)"
             fi
           fi
 
@@ -329,12 +330,29 @@ jobs:
       - name: Verify full suite passed or not needed
         run: |
           HAS_SRC_CHANGES="${{ needs.detect-changes.outputs.has-src-changes }}"
+          RUN_ALL="${{ needs.detect-changes.outputs.run-all }}"
           RESULT="${{ needs.integration-tests.result }}"
           
           if [[ "$HAS_SRC_CHANGES" == "false" ]]; then
             echo "✅ No source code changes - integration tests not required"
             echo "This PR only contains documentation, configuration, or other non-source changes."
             exit 0
+          fi
+          
+          # Source changes detected - full suite is required
+          if [[ "$RUN_ALL" != "true" ]]; then
+            echo "❌ Full integration test suite required but only selective tests ran"
+            echo ""
+            echo "This PR contains source code changes and requires the full integration test suite."
+            echo ""
+            echo "To trigger the full suite, either:"
+            echo "  1. Mark the PR as ready for review (remove draft status), OR"
+            echo "  2. Add the 'run-full-integration-tests' label to this PR"
+            echo ""
+            echo "Only selective tests ran for changed packages: ${{ needs.detect-changes.outputs.changed-filters }}"
+            echo ""
+            echo "Draft PRs only run selective tests for fast feedback during development."
+            exit 1
           fi
           
           if [[ "$RESULT" == "success" ]]; then
