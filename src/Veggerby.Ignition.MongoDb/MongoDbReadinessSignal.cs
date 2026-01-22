@@ -6,9 +6,7 @@ using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Driver;
 
-#pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.MongoDb;
-#pragma warning restore IDE0130 // Namespace does not match folder structure
 
 /// <summary>
 /// Ignition signal for verifying MongoDB cluster readiness.

@@ -1,8 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
-#pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.MongoDb;
-#pragma warning restore IDE0130 // Namespace does not match folder structure
 
 /// <summary>
 /// Configuration options for MongoDB readiness verification.

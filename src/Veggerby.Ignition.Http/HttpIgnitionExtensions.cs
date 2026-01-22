@@ -3,9 +3,7 @@ using System.Net.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-#pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.Http;
-#pragma warning restore IDE0130 // Namespace does not match folder structure
 
 /// <summary>
 /// Extension methods for registering HTTP readiness signals with dependency injection.

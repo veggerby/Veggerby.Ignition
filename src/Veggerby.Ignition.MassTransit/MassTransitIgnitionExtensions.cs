@@ -2,9 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using global::MassTransit;
 
-#pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.MassTransit;
-#pragma warning restore IDE0130 // Namespace does not match folder structure
 
 /// <summary>
 /// Extension methods for registering MassTransit bus readiness signals with dependency injection.

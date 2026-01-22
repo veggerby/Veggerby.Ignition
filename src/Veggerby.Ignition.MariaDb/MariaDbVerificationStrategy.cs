@@ -1,6 +1,4 @@
-#pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.MariaDb;
-#pragma warning restore IDE0130 // Namespace does not match folder structure
 
 /// <summary>
 /// Specifies the MariaDB database verification strategy.

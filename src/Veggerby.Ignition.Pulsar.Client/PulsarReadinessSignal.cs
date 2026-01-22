@@ -13,9 +13,7 @@ using Pulsar.Client.Common;
 
 using TimeoutException = System.TimeoutException;
 
-#pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.Pulsar.Client;
-#pragma warning restore IDE0130 // Namespace does not match folder structure
 
 /// <summary>
 /// Ignition signal for verifying Apache Pulsar cluster readiness using Pulsar.Client.

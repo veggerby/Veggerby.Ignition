@@ -74,10 +74,10 @@ Format: `Veggerby.Ignition.<Technology>`
 Format: `Veggerby.Ignition.<Technology>`
 
 ```csharp
-#pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.Redis;
-#pragma warning restore IDE0130 // Namespace does not match folder structure
 ```
+
+**Note:** The `#pragma warning disable IDE0130` directive is **NOT** needed for integration packages because the namespace matches the folder structure (`src/Veggerby.Ignition.Redis/` → `namespace Veggerby.Ignition.Redis`). Only use the pragma when the namespace intentionally does not match the folder structure (e.g., core library files in subfolders that use the root `Veggerby.Ignition` namespace).
 
 ### Signal Name
 
@@ -97,9 +97,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-#pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.Redis;
-#pragma warning restore IDE0130 // Namespace does not match folder structure
 
 /// <summary>
 /// Ignition signal for verifying Redis cache readiness.
@@ -239,9 +237,7 @@ public enum RedisVerificationStrategy
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
 
-#pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.Redis;
-#pragma warning restore IDE0130 // Namespace does not match folder structure
 
 /// <summary>
 /// Extension methods for registering Redis ignition signals.

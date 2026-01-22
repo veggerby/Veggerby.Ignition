@@ -5,9 +5,7 @@ using Confluent.Kafka;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-#pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.Kafka;
-#pragma warning restore IDE0130 // Namespace does not match folder structure
 
 /// <summary>
 /// Factory for creating Kafka readiness signals with configurable bootstrap servers.

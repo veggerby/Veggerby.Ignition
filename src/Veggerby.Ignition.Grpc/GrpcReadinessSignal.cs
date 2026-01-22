@@ -7,9 +7,7 @@ using Grpc.Health.V1;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
 
-#pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.Grpc;
-#pragma warning restore IDE0130 // Namespace does not match folder structure
 
 /// <summary>
 /// Ignition signal for verifying gRPC service readiness via health check protocol.
