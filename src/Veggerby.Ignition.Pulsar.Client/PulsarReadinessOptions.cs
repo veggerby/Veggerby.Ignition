@@ -2,9 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 
-#pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.Pulsar.Client;
-#pragma warning restore IDE0130 // Namespace does not match folder structure
 
 /// <summary>
 /// Configuration options for Apache Pulsar readiness verification.

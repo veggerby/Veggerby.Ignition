@@ -7,9 +7,7 @@ using Azure;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
 
-#pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.Azure;
-#pragma warning restore IDE0130 // Namespace does not match folder structure
 
 /// <summary>
 /// Ignition signal for verifying Azure Table Storage readiness.

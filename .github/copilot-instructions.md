@@ -54,6 +54,15 @@ Docs: Inline XML documentation; root `README.md` (usage, semantics). Add or upda
 * Tests segmented with `// arrange`, `// act`, `// assert` comments for readability.
 * When editing a file, ensure full-file compliance (formatting, spacing, brace style) not just changed lines.
 
+## Namespace and Pragma Usage
+
+* **Integration packages (separate projects):** Namespace MUST match folder structure. Do NOT use `#pragma warning disable IDE0130`.
+  * Example: `src/Veggerby.Ignition.Redis/` → `namespace Veggerby.Ignition.Redis;` (NO pragma needed)
+  * This applies to all packages: Redis, Postgres, RabbitMq, Http, Grpc, Azure, Aws, Orleans, etc.
+* **Core library subfolders:** Files in `Core/`, `Extensions/`, `Graph/`, `Resilience/`, `Stages/`, `Policies/` etc. use root namespace `Veggerby.Ignition` and REQUIRE the pragma.
+  * Example: `src/Veggerby.Ignition/Core/IIgnitionSignal.cs` → `namespace Veggerby.Ignition;` with `#pragma warning disable IDE0130` (pragma IS needed)
+* **Rule:** Only use `#pragma warning disable IDE0130` when namespace intentionally does NOT match folder structure. Never use it when namespace matches folder.
+
 ## Formatting Preferences
 * Single blank line between logically distinct sections (between methods, after variable declaration blocks, before returns when it aids readability—not required for trivial returns).
 * Avoid multiple consecutive blank lines.

@@ -3,9 +3,7 @@ using Grpc.Net.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-#pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.Grpc;
-#pragma warning restore IDE0130 // Namespace does not match folder structure
 
 /// <summary>
 /// Factory for creating gRPC readiness signals with configurable service URLs.

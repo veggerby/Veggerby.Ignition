@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-#pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.MySql;
-#pragma warning restore IDE0130 // Namespace does not match folder structure
 
 /// <summary>
 /// Configuration options for MySQL readiness verification.

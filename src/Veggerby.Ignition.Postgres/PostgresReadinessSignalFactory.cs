@@ -3,9 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 
-#pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.Postgres;
-#pragma warning restore IDE0130 // Namespace does not match folder structure
 
 /// <summary>
 /// Factory for creating PostgreSQL readiness signals with configurable connection strings.

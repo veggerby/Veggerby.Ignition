@@ -3,9 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 
-#pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.RabbitMq;
-#pragma warning restore IDE0130 // Namespace does not match folder structure
 
 /// <summary>
 /// Factory for creating RabbitMQ readiness signals with configurable connection strings.

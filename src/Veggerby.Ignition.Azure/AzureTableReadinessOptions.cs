@@ -1,6 +1,4 @@
-#pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Veggerby.Ignition.Azure;
-#pragma warning restore IDE0130 // Namespace does not match folder structure
 
 /// <summary>
 /// Configuration options for Azure Table Storage readiness verification.

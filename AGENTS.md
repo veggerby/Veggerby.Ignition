@@ -291,6 +291,14 @@ public class RedisIntegrationTests : IAsyncLifetime
 - Block namespaces with Allman braces allowed (legacy style in existing code)
 - One type per file, file name matches type name
 
+**Namespace and Pragma Usage:**
+
+- **Integration packages:** Namespace MUST match folder structure. Do NOT use `#pragma warning disable IDE0130`.
+  - Example: `src/Veggerby.Ignition.Redis/` → `namespace Veggerby.Ignition.Redis;` (NO pragma needed)
+- **Core library subfolders:** Files in `Core/`, `Extensions/`, `Graph/`, `Resilience/`, `Stages/`, etc. use root namespace `Veggerby.Ignition` and REQUIRE `#pragma warning disable/restore IDE0130`.
+  - Example: `src/Veggerby.Ignition/Core/IIgnitionSignal.cs` → `namespace Veggerby.Ignition;` (pragma IS needed)
+- **Rule:** Only use `#pragma warning disable IDE0130` when namespace intentionally does NOT match folder structure. Never use it when they match.
+
 **Formatting (Enforced by .editorconfig):**
 
 - **Indentation:** 4 spaces, never tabs
