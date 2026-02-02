@@ -8,6 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+- None.
+
+### Changed
+
+- None.
+
+### Fixed
+
+- None.
+
+## [0.6.0] - 2026-02-02
+
+### Added
+
 - **Apache Pulsar Integration Packages**: Two new packages for Apache Pulsar readiness verification
   - `Veggerby.Ignition.Pulsar.DotPulsar`: Uses official Apache DotPulsar client
   - `Veggerby.Ignition.Pulsar.Client`: Uses Pulsar.Client library
