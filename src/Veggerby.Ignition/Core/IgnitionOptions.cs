@@ -34,6 +34,11 @@ public sealed class IgnitionOptions
         }
     }
 
+    // Cached singleton instances of built-in policies to avoid allocations on each GetEffectivePolicy call.
+    private static readonly IIgnitionPolicy _failFastPolicySingleton = new FailFastPolicy();
+    private static readonly IIgnitionPolicy _bestEffortPolicySingleton = new BestEffortPolicy();
+    private static readonly IIgnitionPolicy _continueOnTimeoutPolicySingleton = new ContinueOnTimeoutPolicy();
+
     private IIgnitionPolicy? _customPolicy;
 
     /// <summary>
@@ -289,13 +294,13 @@ public sealed class IgnitionOptions
             return _customPolicy;
         }
 
-        // Map built-in enum to IIgnitionPolicy implementation
+        // Return cached singleton instances; built-in policies are stateless and allocation-free.
         return Policy switch
         {
-            IgnitionPolicy.FailFast => new FailFastPolicy(),
-            IgnitionPolicy.BestEffort => new BestEffortPolicy(),
-            IgnitionPolicy.ContinueOnTimeout => new ContinueOnTimeoutPolicy(),
-            _ => new BestEffortPolicy()
+            IgnitionPolicy.FailFast => _failFastPolicySingleton,
+            IgnitionPolicy.BestEffort => _bestEffortPolicySingleton,
+            IgnitionPolicy.ContinueOnTimeout => _continueOnTimeoutPolicySingleton,
+            _ => _bestEffortPolicySingleton
         };
     }
 }

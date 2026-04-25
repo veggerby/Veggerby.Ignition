@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 
 using Veggerby.Ignition.Stages;
 
@@ -138,7 +137,15 @@ public sealed record IgnitionResult(
                 return false;
             }
 
-            return Results.All(result => result.HasTimelineData);
+            foreach (var result in Results)
+            {
+                if (!result.HasTimelineData)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 }
