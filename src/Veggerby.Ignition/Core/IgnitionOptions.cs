@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 using Veggerby.Ignition.Metrics;
 using Veggerby.Ignition.Stages;
 
@@ -265,6 +267,45 @@ public sealed class IgnitionOptions
     /// </para>
     /// </remarks>
     public IIgnitionLifecycleHooks? LifecycleHooks { get; set; }
+
+    /// <summary>
+    /// Optional list of signal filters consulted before each signal executes.
+    /// Filters can suppress execution of individual signals based on runtime conditions.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Filters are evaluated in list order. If any filter returns <c>false</c>, the signal is skipped
+    /// (recorded with <see cref="IgnitionSignalStatus.Skipped"/>); remaining filters for that signal are not called.
+    /// </para>
+    /// <para>
+    /// When <c>null</c> or empty, no filtering occurs and all registered signals execute.
+    /// </para>
+    /// <para>
+    /// Common use cases:
+    /// <list type="bullet">
+    ///   <item>Skip signals not applicable to the current environment (e.g., skip Redis check when Redis is disabled via feature flag).</item>
+    ///   <item>Suppress advisory signals during integration tests.</item>
+    ///   <item>Inject pre-execution tracing or metrics.</item>
+    /// </list>
+    /// </para>
+    /// </remarks>
+    public IList<IIgnitionSignalFilter>? Filters { get; set; }
+
+    /// <summary>
+    /// Optional list of pre-flight validators run before any signals execute.
+    /// If any validator returns errors, the coordinator throws <see cref="IgnitionValidationException"/>
+    /// and no signals are executed.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Validators are designed for fast, synchronous pre-flight checks (configuration completeness,
+    /// required registrations, etc.). They run once before ignition starts, not per-signal.
+    /// </para>
+    /// <para>
+    /// When <c>null</c> or empty, no pre-flight validation is performed and execution begins immediately.
+    /// </para>
+    /// </remarks>
+    public IList<IIgnitionValidator>? Validators { get; set; }
 
     /// <summary>
     /// Gets the effective policy to use for ignition execution.

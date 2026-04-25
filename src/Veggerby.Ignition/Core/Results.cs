@@ -46,6 +46,7 @@ public enum IgnitionSignalStatus
 /// <param name="CancelledBySignal">Name of the signal that triggered the cancellation, if applicable (hierarchical cancellation).</param>
 /// <param name="StartedAt">Offset from ignition start when this signal began execution. Used for timeline export.</param>
 /// <param name="CompletedAt">Offset from ignition start when this signal completed. Used for timeline export.</param>
+/// <param name="IsRequired">Whether the signal was marked as required. Advisory (non-required) signals do not block startup on failure.</param>
 public sealed record IgnitionSignalResult(
     string Name,
     IgnitionSignalStatus Status,
@@ -55,7 +56,8 @@ public sealed record IgnitionSignalResult(
     CancellationReason CancellationReason = CancellationReason.None,
     string? CancelledBySignal = null,
     TimeSpan? StartedAt = null,
-    TimeSpan? CompletedAt = null)
+    TimeSpan? CompletedAt = null,
+    bool IsRequired = true)
 {
     /// <summary>
     /// Gets whether this signal was skipped due to failed dependencies.
