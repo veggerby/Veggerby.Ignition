@@ -27,7 +27,7 @@ public sealed class S3ReadinessSignalFactory : IIgnitionSignalFactory
     }
 
     /// <inheritdoc/>
-    public string Name => "s3-readiness";
+    public string Name => _options.Name;
 
     /// <inheritdoc/>
     public TimeSpan? Timeout => _options.Timeout;

@@ -26,16 +26,15 @@ public sealed class DefaultIgnitionTimeoutStrategy : IIgnitionTimeoutStrategy
     /// Returns the signal's configured timeout and the global cancellation setting.
     /// </summary>
     /// <param name="signal">The ignition signal being evaluated.</param>
-    /// <param name="options">The current ignition options providing global configuration context.</param>
+    /// <param name="context">The timeout context providing global configuration and runtime state.</param>
     /// <returns>
     /// A tuple containing the signal's <see cref="IIgnitionSignal.Timeout"/> (or <c>null</c> if not specified)
-    /// and the value of <see cref="IgnitionOptions.CancelIndividualOnTimeout"/>.
+    /// and the value of <see cref="IgnitionTimeoutContext.CancelIndividualOnTimeout"/>.
     /// </returns>
-    public (TimeSpan? signalTimeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionOptions options)
+    public (TimeSpan? signalTimeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionTimeoutContext context)
     {
         ArgumentNullException.ThrowIfNull(signal, nameof(signal));
-        ArgumentNullException.ThrowIfNull(options, nameof(options));
 
-        return (signal.Timeout, options.CancelIndividualOnTimeout);
+        return (signal.Timeout, context.CancelIndividualOnTimeout);
     }
 }

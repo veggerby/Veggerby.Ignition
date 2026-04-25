@@ -42,7 +42,7 @@ internal sealed class HttpReadinessSignal : IIgnitionSignal
     }
 
     /// <inheritdoc/>
-    public string Name => "http-readiness";
+    public string Name => _options.Name;
 
     /// <inheritdoc/>
     public TimeSpan? Timeout => _options.Timeout;
@@ -107,7 +107,8 @@ internal sealed class HttpReadinessSignal : IIgnitionSignal
                     activity?.SetTag("http.custom_validation", "true");
                     _logger.LogDebug("Executing custom response validation");
 
-                    var isValid = await _options.ValidateResponse(response);
+                    var responseBody = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                    var isValid = await _options.ValidateResponse(responseBody);
 
                     if (!isValid)
                     {

@@ -38,7 +38,7 @@ internal sealed class AzureBlobReadinessSignal : IIgnitionSignal
     }
 
     /// <inheritdoc/>
-    public string Name => "azure-blob-readiness";
+    public string Name => _options.Name;
 
     /// <inheritdoc/>
     public TimeSpan? Timeout => _options.Timeout;

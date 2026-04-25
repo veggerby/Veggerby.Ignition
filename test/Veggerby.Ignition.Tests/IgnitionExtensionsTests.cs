@@ -378,7 +378,7 @@ public class IgnitionExtensionsTests
 
     private sealed class TestTimeoutStrategy : IIgnitionTimeoutStrategy
     {
-        public (TimeSpan? signalTimeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionOptions options)
+        public (TimeSpan? signalTimeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionTimeoutContext context)
         {
             return (TimeSpan.FromSeconds(5), false);
         }

@@ -22,7 +22,7 @@ public sealed class OrleansReadinessSignalFactory : IIgnitionSignalFactory
     }
 
     /// <inheritdoc/>
-    public string Name => "orleans-readiness";
+    public string Name => _options.Name;
 
     /// <inheritdoc/>
     public TimeSpan? Timeout => _options.Timeout;

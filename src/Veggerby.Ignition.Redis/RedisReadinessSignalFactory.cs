@@ -27,7 +27,7 @@ public sealed class RedisReadinessSignalFactory : IIgnitionSignalFactory
     }
 
     /// <inheritdoc/>
-    public string Name => "redis-readiness";
+    public string Name => _options.Name;
 
     /// <inheritdoc/>
     public TimeSpan? Timeout => _options.Timeout;

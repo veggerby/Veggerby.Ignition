@@ -25,7 +25,7 @@ public sealed class LenientTimeoutStrategy : IIgnitionTimeoutStrategy
         _defaultTimeout = defaultTimeout;
     }
 
-    public (TimeSpan? signalTimeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionOptions options)
+    public (TimeSpan? signalTimeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionTimeoutContext context)
     {
         // Always give generous timeout, don't cancel immediately
         return (_defaultTimeout, cancelImmediately: false);
@@ -45,7 +45,7 @@ public sealed class StrictTimeoutStrategy : IIgnitionTimeoutStrategy
         _timeout = timeout;
     }
 
-    public (TimeSpan? signalTimeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionOptions options)
+    public (TimeSpan? signalTimeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionTimeoutContext context)
     {
         // Use strict timeout and cancel immediately on timeout
         return (_timeout, cancelImmediately: true);
@@ -67,7 +67,7 @@ public sealed class AdaptiveTimeoutStrategy : IIgnitionTimeoutStrategy
         _slowTimeout = slowTimeout;
     }
 
-    public (TimeSpan? signalTimeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionOptions options)
+    public (TimeSpan? signalTimeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionTimeoutContext context)
     {
         // Check if signal is known to be slow (by naming convention)
         bool isSlowSignal = signal.Name.Contains("slow", StringComparison.OrdinalIgnoreCase)
@@ -88,7 +88,7 @@ public sealed class AdaptiveTimeoutStrategy : IIgnitionTimeoutStrategy
 /// </summary>
 public sealed class CategoryTimeoutStrategy : IIgnitionTimeoutStrategy
 {
-    public (TimeSpan? signalTimeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionOptions options)
+    public (TimeSpan? signalTimeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionTimeoutContext context)
     {
         TimeSpan? timeout = signal.Name switch
         {

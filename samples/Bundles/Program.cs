@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Threading.Tasks;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -24,13 +23,13 @@ public class RedisStarterBundle : IIgnitionBundle
 
     public string Name => "RedisStarter";
 
-    public void ConfigureBundle(IServiceCollection services, Action<IgnitionBundleOptions>? configure = null)
+    public void ConfigureBundle(IIgnitionRegistrar registrar, Action<IgnitionBundleOptions>? configure = null)
     {
         var options = new IgnitionBundleOptions();
         configure?.Invoke(options);
 
         // Register three signals for Redis initialization
-        services.AddIgnitionFromTask(
+        registrar.AddSignal(
             "redis:connect",
             async ct =>
             {
@@ -40,7 +39,7 @@ public class RedisStarterBundle : IIgnitionBundle
             },
             options.DefaultTimeout);
 
-        services.AddIgnitionFromTask(
+        registrar.AddSignal(
             "redis:health-check",
             async ct =>
             {
@@ -50,7 +49,7 @@ public class RedisStarterBundle : IIgnitionBundle
             },
             options.DefaultTimeout);
 
-        services.AddIgnitionFromTask(
+        registrar.AddSignal(
             "redis:warmup-cache",
             async ct =>
             {
@@ -59,22 +58,6 @@ public class RedisStarterBundle : IIgnitionBundle
                 Console.WriteLine("✅ Redis cache warmed successfully");
             },
             options.DefaultTimeout);
-
-        // Configure dependency graph: connect → health → warmup
-        services.AddIgnitionGraph((builder, sp) =>
-        {
-            var signals = sp.GetServices<IIgnitionSignal>().ToList();
-            var connectSig = signals.FirstOrDefault(s => s.Name == "redis:connect");
-            var healthSig = signals.FirstOrDefault(s => s.Name == "redis:health-check");
-            var warmupSig = signals.FirstOrDefault(s => s.Name == "redis:warmup-cache");
-
-            if (connectSig is not null && healthSig is not null && warmupSig is not null)
-            {
-                builder.AddSignals(new[] { connectSig, healthSig, warmupSig });
-                builder.DependsOn(healthSig, connectSig);
-                builder.DependsOn(warmupSig, healthSig);
-            }
-        });
     }
 }
 
@@ -107,7 +90,22 @@ public class MessageQueueBundle : IIgnitionBundle
             },
             options.DefaultTimeout);
 
-        services.AddIgnitionFromTask(
+    public void ConfigureBundle(IIgnitionRegistrar registrar, Action<IgnitionBundleOptions>? configure = null)
+    {
+        var options = new IgnitionBundleOptions();
+        configure?.Invoke(options);
+
+        registrar.AddSignal(
+            $"queue:{_queueName}:connect",
+            async ct =>
+            {
+                Console.WriteLine($"🔌 Connecting to queue '{_queueName}'...");
+                await Task.Delay(500, ct);
+                Console.WriteLine($"✅ Queue '{_queueName}' connected");
+            },
+            options.DefaultTimeout);
+
+        registrar.AddSignal(
             $"queue:{_queueName}:subscribe",
             async ct =>
             {
@@ -116,20 +114,6 @@ public class MessageQueueBundle : IIgnitionBundle
                 Console.WriteLine($"✅ Subscribed to queue '{_queueName}'");
             },
             options.DefaultTimeout);
-
-        // Configure dependency: subscribe depends on connect
-        services.AddIgnitionGraph((builder, sp) =>
-        {
-            var signals = sp.GetServices<IIgnitionSignal>().ToList();
-            var connectSig = signals.FirstOrDefault(s => s.Name == $"queue:{_queueName}:connect");
-            var subscribeSig = signals.FirstOrDefault(s => s.Name == $"queue:{_queueName}:subscribe");
-
-            if (connectSig is not null && subscribeSig is not null)
-            {
-                builder.AddSignals(new[] { connectSig, subscribeSig });
-                builder.DependsOn(subscribeSig, connectSig);
-            }
-        });
     }
 }
 

@@ -58,7 +58,7 @@ internal sealed class RabbitMqReadinessSignal : IIgnitionSignal
     }
 
     /// <inheritdoc/>
-    public string Name => "rabbitmq-readiness";
+    public string Name => _options.Name;
 
     /// <inheritdoc/>
     public TimeSpan? Timeout => _options.Timeout;

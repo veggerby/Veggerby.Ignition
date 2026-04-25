@@ -22,11 +22,17 @@ public class IgnitionTimeoutStrategyTests
     {
         // arrange
         var signal = new FakeSignal("test", _ => Task.CompletedTask, timeout: TimeSpan.FromSeconds(5));
-        var options = new IgnitionOptions { CancelIndividualOnTimeout = true };
+        var context = new IgnitionTimeoutContext
+        {
+            GlobalTimeout = TimeSpan.FromSeconds(30),
+            CancelIndividualOnTimeout = true,
+            ElapsedTime = TimeSpan.Zero,
+            PendingSignalCount = 1
+        };
         var strategy = DefaultIgnitionTimeoutStrategy.Instance;
 
         // act
-        var (timeout, cancelImmediately) = strategy.GetTimeout(signal, options);
+        var (timeout, cancelImmediately) = strategy.GetTimeout(signal, context);
 
         // assert
         timeout.Should().Be(TimeSpan.FromSeconds(5));
@@ -38,11 +44,17 @@ public class IgnitionTimeoutStrategyTests
     {
         // arrange
         var signal = new FakeSignal("test", _ => Task.CompletedTask); // no timeout
-        var options = new IgnitionOptions { CancelIndividualOnTimeout = false };
+        var context = new IgnitionTimeoutContext
+        {
+            GlobalTimeout = TimeSpan.FromSeconds(30),
+            CancelIndividualOnTimeout = false,
+            ElapsedTime = TimeSpan.Zero,
+            PendingSignalCount = 1
+        };
         var strategy = DefaultIgnitionTimeoutStrategy.Instance;
 
         // act
-        var (timeout, cancelImmediately) = strategy.GetTimeout(signal, options);
+        var (timeout, cancelImmediately) = strategy.GetTimeout(signal, context);
 
         // assert
         timeout.Should().BeNull();
@@ -300,7 +312,13 @@ public class IgnitionTimeoutStrategyTests
         var options = provider.GetRequiredService<IOptions<IgnitionOptions>>().Value;
         var (timeout, cancel) = options.TimeoutStrategy!.GetTimeout(
             new FakeSignal("test", _ => Task.CompletedTask),
-            options);
+            new IgnitionTimeoutContext
+            {
+                GlobalTimeout = options.GlobalTimeout,
+                CancelIndividualOnTimeout = options.CancelIndividualOnTimeout,
+                ElapsedTime = TimeSpan.Zero,
+                PendingSignalCount = 1
+            });
 
         // assert
         options.TimeoutStrategy.Should().NotBeNull();
@@ -351,7 +369,7 @@ public class IgnitionTimeoutStrategyTests
             _cancelImmediately = config.CancelImmediately;
         }
 
-        public (TimeSpan? signalTimeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionOptions options)
+        public (TimeSpan? signalTimeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionTimeoutContext context)
         {
             return (_timeout, _cancelImmediately);
         }
@@ -361,7 +379,7 @@ public class IgnitionTimeoutStrategyTests
 
     private sealed class NoTimeoutStrategy : IIgnitionTimeoutStrategy
     {
-        public (TimeSpan? signalTimeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionOptions options)
+        public (TimeSpan? signalTimeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionTimeoutContext context)
         {
             return (null, false);
         }
@@ -378,7 +396,7 @@ public class IgnitionTimeoutStrategyTests
             _cancelImmediately = cancelImmediately;
         }
 
-        public (TimeSpan? signalTimeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionOptions options)
+        public (TimeSpan? signalTimeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionTimeoutContext context)
         {
             return (_timeoutSelector(signal), _cancelImmediately);
         }

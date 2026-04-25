@@ -317,7 +317,7 @@ public class IgnitionBundleTests
 
         public string Name => _prefix;
 
-        public void ConfigureBundle(IServiceCollection services, Action<IgnitionBundleOptions>? configure = null)
+        public void ConfigureBundle(IIgnitionRegistrar registrar, Action<IgnitionBundleOptions>? configure = null)
         {
             var options = new IgnitionBundleOptions();
             configure?.Invoke(options);
@@ -325,7 +325,7 @@ public class IgnitionBundleTests
             for (int i = 0; i < _signalCount; i++)
             {
                 var signal = new TestBundleSignal($"{_prefix}-signal-{i}", options.DefaultTimeout);
-                services.AddIgnitionSignal(signal);
+                registrar.AddSignal(signal);
             }
         }
 
@@ -358,13 +358,13 @@ public class IgnitionBundleTests
 
         public string Name => _prefix;
 
-        public void ConfigureBundle(IServiceCollection services, Action<IgnitionBundleOptions>? configure = null)
+        public void ConfigureBundle(IIgnitionRegistrar registrar, Action<IgnitionBundleOptions>? configure = null)
         {
             for (int i = 0; i < 3; i++)
             {
                 var signalName = $"{_prefix}-{i}";
                 var name = signalName; // Explicit local capture for clarity
-                services.AddIgnitionFromTask(signalName, ct =>
+                registrar.AddSignal(signalName, ct =>
                 {
                     _executed.Add(name);
                     return Task.CompletedTask;

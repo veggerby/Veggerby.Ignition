@@ -860,7 +860,8 @@ public static class IgnitionExtensions
     /// <returns>The same service collection for chaining.</returns>
     /// <remarks>
     /// Bundles provide a convenient way to register grouped sets of signals with optional shared configuration.
-    /// The bundle's <see cref="IIgnitionBundle.ConfigureBundle"/> method is invoked immediately to register signals and configure dependencies.
+    /// The bundle's <see cref="IIgnitionBundle.ConfigureBundle"/> method is invoked immediately via an
+    /// <see cref="IIgnitionRegistrar"/> to register signals and configure dependencies.
     /// Per-bundle options (e.g., <see cref="IgnitionBundleOptions.DefaultTimeout"/>) are applied to signals registered by the bundle.
     /// </remarks>
     public static IServiceCollection AddIgnitionBundle(
@@ -870,7 +871,8 @@ public static class IgnitionExtensions
     {
         ArgumentNullException.ThrowIfNull(bundle, nameof(bundle));
 
-        bundle.ConfigureBundle(services, configure);
+        var registrar = new IgnitionRegistrar(services);
+        bundle.ConfigureBundle(registrar, configure);
 
         return services;
     }
@@ -891,7 +893,8 @@ public static class IgnitionExtensions
         Action<IgnitionBundleOptions>? configure = null) where TBundle : class, IIgnitionBundle, new()
     {
         var bundle = new TBundle();
-        bundle.ConfigureBundle(services, configure);
+        var registrar = new IgnitionRegistrar(services);
+        bundle.ConfigureBundle(registrar, configure);
 
         return services;
     }

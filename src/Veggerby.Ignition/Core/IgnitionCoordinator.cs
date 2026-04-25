@@ -1448,7 +1448,14 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
 
                 if (_options.TimeoutStrategy is not null)
                 {
-                    (effectiveTimeout, cancelOnTimeout) = _options.TimeoutStrategy.GetTimeout(h, _options);
+                    var timeoutContext = new IgnitionTimeoutContext
+                    {
+                        GlobalTimeout = _options.GlobalTimeout,
+                        CancelIndividualOnTimeout = _options.CancelIndividualOnTimeout,
+                        ElapsedTime = swGlobal.Elapsed,
+                        PendingSignalCount = _factories.Count
+                    };
+                    (effectiveTimeout, cancelOnTimeout) = _options.TimeoutStrategy.GetTimeout(h, timeoutContext);
                 }
                 else
                 {
