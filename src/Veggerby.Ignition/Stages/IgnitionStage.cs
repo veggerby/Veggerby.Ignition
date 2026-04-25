@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 
 namespace Veggerby.Ignition.Stages;
 
@@ -64,8 +65,12 @@ public sealed class IgnitionStage
 
     /// <summary>
     /// Gets the child stages for hierarchical stage structures.
-    /// Used when ExecutionMode is Staged to enable nested stage graphs.
     /// </summary>
+    /// <remarks>
+    /// This feature is reserved for future use and is not yet implemented in the coordinator.
+    /// Nested stage execution is not currently performed; child stages are parsed but have no effect on execution.
+    /// </remarks>
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public IReadOnlyList<IgnitionStage> ChildStages => _childStages;
 
     /// <summary>
@@ -83,10 +88,10 @@ public sealed class IgnitionStage
     /// </summary>
     /// <param name="childStage">The child stage to add.</param>
     /// <remarks>
-    /// Child stages are only executed when this stage's ExecutionMode is Staged.
-    /// They enable deep hierarchical structures where each stage can have its own sub-stages
-    /// with independent execution modes.
+    /// This feature is reserved for future use. Nested stage execution is not yet implemented.
+    /// Adding child stages has no effect on coordinator behavior.
     /// </remarks>
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public void AddChildStage(IgnitionStage childStage)
     {
         ArgumentNullException.ThrowIfNull(childStage, nameof(childStage));

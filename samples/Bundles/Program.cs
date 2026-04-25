@@ -75,21 +75,6 @@ public class MessageQueueBundle : IIgnitionBundle
 
     public string Name => $"MessageQueue:{_queueName}";
 
-    public void ConfigureBundle(IServiceCollection services, Action<IgnitionBundleOptions>? configure = null)
-    {
-        var options = new IgnitionBundleOptions();
-        configure?.Invoke(options);
-
-        services.AddIgnitionFromTask(
-            $"queue:{_queueName}:connect",
-            async ct =>
-            {
-                Console.WriteLine($"🔌 Connecting to queue '{_queueName}'...");
-                await Task.Delay(500, ct);
-                Console.WriteLine($"✅ Queue '{_queueName}' connected");
-            },
-            options.DefaultTimeout);
-
     public void ConfigureBundle(IIgnitionRegistrar registrar, Action<IgnitionBundleOptions>? configure = null)
     {
         var options = new IgnitionBundleOptions();
@@ -298,10 +283,11 @@ public class Program
             Console.WriteLine($"   Total Duration: {result.TotalDuration.TotalMilliseconds:F0}ms");
             Console.WriteLine($"   Timed Out: {(result.TimedOut ? "YES" : "NO")}");
 
-            var succeeded = result.Results.Count(r => r.Status == IgnitionSignalStatus.Succeeded);
-            var failed = result.Results.Count(r => r.Status == IgnitionSignalStatus.Failed);
-            var skipped = result.Results.Count(r => r.Status == IgnitionSignalStatus.Skipped);
-            var timedOut = result.Results.Count(r => r.Status == IgnitionSignalStatus.TimedOut);
+            var allResults = result.Results.ToList();
+            var succeeded = allResults.Count(r => r.Status == IgnitionSignalStatus.Succeeded);
+            var failed = allResults.Count(r => r.Status == IgnitionSignalStatus.Failed);
+            var skipped = allResults.Count(r => r.Status == IgnitionSignalStatus.Skipped);
+            var timedOut = allResults.Count(r => r.Status == IgnitionSignalStatus.TimedOut);
 
             Console.WriteLine($"   Success: {succeeded}/{result.Results.Count}");
             if (failed > 0) Console.WriteLine($"   Failed: {failed}");
@@ -309,7 +295,7 @@ public class Program
             if (timedOut > 0) Console.WriteLine($"   Timed Out: {timedOut}");
 
             Console.WriteLine("\n📋 Signal Execution Details:");
-            foreach (var signalResult in result.Results.OrderBy(r => r.Name))
+            foreach (var signalResult in allResults.OrderBy(r => r.Name))
             {
                 var icon = signalResult.Status switch
                 {
@@ -334,7 +320,7 @@ public class Program
                 Console.WriteLine();
             }
 
-            var overallSuccess = result.Results.All(r => r.Status == IgnitionSignalStatus.Succeeded);
+            var overallSuccess = allResults.All(r => r.Status == IgnitionSignalStatus.Succeeded);
             Console.WriteLine($"\n{(overallSuccess ? "✅" : "⚠️ ")} Overall Status: {(overallSuccess ? "SUCCESS" : "COMPLETED WITH ISSUES")}");
 
             if (overallSuccess)
