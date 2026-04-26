@@ -343,7 +343,7 @@ public class ValidatorTests
     private sealed class AlwaysPassValidator : IIgnitionValidator
     {
         public ValueTask<IReadOnlyList<string>?> ValidateAsync(
-            IReadOnlyList<IIgnitionSignal> signals, IgnitionOptions options, CancellationToken ct)
+            IReadOnlyList<IIgnitionSignalFactory> factories, IgnitionOptions options, CancellationToken ct)
         {
             return ValueTask.FromResult<IReadOnlyList<string>?>(null);
         }
@@ -352,7 +352,7 @@ public class ValidatorTests
     private sealed class AlwaysFailValidator(string error) : IIgnitionValidator
     {
         public ValueTask<IReadOnlyList<string>?> ValidateAsync(
-            IReadOnlyList<IIgnitionSignal> signals, IgnitionOptions options, CancellationToken ct)
+            IReadOnlyList<IIgnitionSignalFactory> factories, IgnitionOptions options, CancellationToken ct)
         {
             return ValueTask.FromResult<IReadOnlyList<string>?>([error]);
         }

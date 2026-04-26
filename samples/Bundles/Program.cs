@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -135,7 +136,7 @@ public class Program
             {
                 services.AddIgnition(options =>
                 {
-                    options.ExecutionMode = IgnitionExecutionMode.DependencyAware;
+                    options.ExecutionMode = IgnitionExecutionMode.Sequential;
                     options.Policy = IgnitionPolicy.BestEffort;
                     options.GlobalTimeout = TimeSpan.FromSeconds(30);
                 });
@@ -188,7 +189,7 @@ public class Program
             {
                 services.AddIgnition(options =>
                 {
-                    options.ExecutionMode = IgnitionExecutionMode.DependencyAware;
+                    options.ExecutionMode = IgnitionExecutionMode.Parallel;
                     options.Policy = IgnitionPolicy.BestEffort;
                     options.GlobalTimeout = TimeSpan.FromSeconds(30);
                 });

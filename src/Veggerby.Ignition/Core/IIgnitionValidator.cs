@@ -11,7 +11,7 @@ namespace Veggerby.Ignition;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Validators are invoked synchronously at the start of coordinator execution, before any signals are started.
+/// Validators are invoked at the start of coordinator execution, before any signals are started.
 /// If any validator produces errors, the coordinator throws a <see cref="IgnitionValidationException"/>
 /// and no signals are executed.
 /// </para>
@@ -25,6 +25,12 @@ namespace Veggerby.Ignition;
 /// </list>
 /// </para>
 /// <para>
+/// Validators receive <see cref="IIgnitionSignalFactory"/> descriptors rather than fully-constructed
+/// <see cref="IIgnitionSignal"/> instances. This avoids triggering side effects (e.g., connection attempts,
+/// resource allocation) that signal constructors may have, and ensures validation operates on the same
+/// factory descriptors that the coordinator will use during execution.
+/// </para>
+/// <para>
 /// Validators should be fast, deterministic, and stateless. Avoid performing I/O in a validator;
 /// use <see cref="IIgnitionSignal"/> for I/O-based readiness checks instead.
 /// </para>
@@ -34,7 +40,7 @@ public interface IIgnitionValidator
     /// <summary>
     /// Validates the ignition configuration before any signals execute.
     /// </summary>
-    /// <param name="signals">The complete list of registered signals.</param>
+    /// <param name="factories">The complete list of registered signal factories (descriptors), in registration order.</param>
     /// <param name="options">The resolved ignition options.</param>
     /// <param name="cancellationToken">Cancellation token for the validation operation.</param>
     /// <returns>
@@ -43,7 +49,7 @@ public interface IIgnitionValidator
     /// <see cref="IgnitionValidationException"/> before executing any signals.
     /// </returns>
     ValueTask<IReadOnlyList<string>?> ValidateAsync(
-        IReadOnlyList<IIgnitionSignal> signals,
+        IReadOnlyList<IIgnitionSignalFactory> factories,
         IgnitionOptions options,
         CancellationToken cancellationToken);
 }

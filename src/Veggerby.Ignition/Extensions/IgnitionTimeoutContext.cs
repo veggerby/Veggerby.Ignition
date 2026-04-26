@@ -25,7 +25,8 @@ public readonly struct IgnitionTimeoutContext
     /// </summary>
     /// <remarks>
     /// This is the value of <see cref="IgnitionOptions.GlobalTimeout"/> at execution time.
-    /// A value of <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> indicates no global deadline.
+    /// <see cref="IgnitionOptions"/> validates that this value is positive; a very large value
+    /// (e.g., <see cref="System.TimeSpan.MaxValue"/>) effectively means no deadline.
     /// </remarks>
     public TimeSpan GlobalTimeout { get; init; }
 

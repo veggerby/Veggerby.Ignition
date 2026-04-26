@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -9,8 +8,11 @@ namespace Veggerby.Ignition.Bundles;
 /// connection establishment, schema validation, and initial data warmup.
 /// </summary>
 /// <remarks>
-/// This bundle demonstrates a dependency-aware pattern where schema validation depends on connection,
-/// and data warmup depends on schema validation. Users provide factory delegates for each phase.
+/// This bundle registers three signals: connect, validate-schema (optional), and warmup (optional).
+/// To enforce the natural ordering (connect → validate-schema → warmup), configure the coordinator
+/// with <see cref="IgnitionExecutionMode.Sequential"/> so signals execute in registration order.
+/// In <see cref="IgnitionExecutionMode.Parallel"/> or <see cref="IgnitionExecutionMode.DependencyAware"/>
+/// modes without an explicit graph, the signals may run concurrently.
 /// </remarks>
 public sealed class DatabaseTrioBundle : IIgnitionBundle
 {

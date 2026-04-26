@@ -37,7 +37,10 @@ public interface IIgnitionBundle
     /// <remarks>
     /// This method is invoked once during DI container setup when the bundle is registered via
     /// <see cref="IgnitionExtensions.AddIgnitionBundle(Microsoft.Extensions.DependencyInjection.IServiceCollection, IIgnitionBundle, Action{IgnitionBundleOptions}?)"/>.
-    /// Implementations should register all signals and optionally configure a dependency graph if signals have prerequisites.
+    /// Implementations register all signals via the <paramref name="registrar"/>. To enforce ordering
+    /// among a bundle's signals, use <see cref="IgnitionExecutionMode.Sequential"/> on the coordinator
+    /// (signals execute in registration order) or register the bundle signals with explicit stage numbers
+    /// for staged execution.
     /// </remarks>
     void ConfigureBundle(IIgnitionRegistrar registrar, Action<IgnitionBundleOptions>? configure = null);
 }

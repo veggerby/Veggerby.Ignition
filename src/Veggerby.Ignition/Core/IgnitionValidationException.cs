@@ -23,8 +23,15 @@ public sealed class IgnitionValidationException : Exception
     /// Initializes a new instance with the provided validation error messages.
     /// </summary>
     /// <param name="errors">Non-empty list of validation error messages.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="errors"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="errors"/> is empty.</exception>
     public IgnitionValidationException(IReadOnlyList<string> errors)
-        : base($"Ignition pre-flight validation failed with {errors.Count} error(s): {string.Join("; ", errors)}")
+        : base(BuildMessage(errors))
+    {
+        ValidationErrors = errors;
+    }
+
+    private static string BuildMessage(IReadOnlyList<string> errors)
     {
         ArgumentNullException.ThrowIfNull(errors, nameof(errors));
 
@@ -33,6 +40,6 @@ public sealed class IgnitionValidationException : Exception
             throw new ArgumentException("At least one validation error is required.", nameof(errors));
         }
 
-        ValidationErrors = errors;
+        return $"Ignition pre-flight validation failed with {errors.Count} error(s): {string.Join("; ", errors)}";
     }
 }

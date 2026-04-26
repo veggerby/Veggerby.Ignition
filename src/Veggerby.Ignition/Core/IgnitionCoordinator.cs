@@ -80,12 +80,20 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
 
     /// <summary>
     /// Validates that no two registered factories share the same name, which would cause ambiguous diagnostics.
+    /// Also validates that all factory names are non-null and non-whitespace.
     /// </summary>
     private void ValidateFactoryNames()
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var factory in _factories)
         {
+            if (string.IsNullOrWhiteSpace(factory.Name))
+            {
+                throw new InvalidOperationException(
+                    $"A factory of type '{factory.GetType().Name}' produced a null or whitespace signal name. " +
+                    "All registered signals must have a non-empty name for accurate diagnostics and health reporting.");
+            }
+
             if (!seen.Add(factory.Name))
             {
                 throw new InvalidOperationException(
@@ -139,16 +147,10 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
             return;
         }
 
-        var allSignals = new List<IIgnitionSignal>(_factories.Count);
-        foreach (var factory in _factories)
-        {
-            allSignals.Add(factory.CreateSignal(_serviceProvider));
-        }
-
         var allErrors = new List<string>();
         foreach (var validator in _options.Validators)
         {
-            var errors = await validator.ValidateAsync(allSignals, _options, ct).ConfigureAwait(false);
+            var errors = await validator.ValidateAsync(_factories, _options, ct).ConfigureAwait(false);
             if (errors is not null)
             {
                 foreach (var error in errors)
@@ -285,7 +287,8 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         List<Task<IgnitionSignalResult>> signalTasks,
         List<IIgnitionSignal> handles,
         bool globalTimedOut,
-        Stopwatch swGlobal)
+        Stopwatch swGlobal,
+        CancellationToken ct)
     {
         // Build results snapshot. Unfinished tasks appear as placeholder results when a hard global cancellation occurred.
         List<IgnitionSignalResult> results;
@@ -390,7 +393,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                         GlobalTimeoutElapsed = globalTimedOut
                     };
 
-                if (!await PolicyShouldContinueAsync(policy, context, CancellationToken.None).ConfigureAwait(false))
+                if (!await PolicyShouldContinueAsync(policy, context, ct).ConfigureAwait(false))
                 {
                     shouldStopExecution = true;
                     break;
@@ -444,7 +447,8 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         foreach (var h in handles)
         {
             RaiseSignalStarted(h.Name);
-            var t = WaitOneAsync(h, globalCts.Token, swGlobal);
+            var pendingCount = handles.Count - list.Count;
+            var t = WaitOneAsync(h, globalCts.Token, swGlobal, pendingCount);
             list.Add(t);
             var completed = await Task.WhenAny(t, globalTimeoutTask);
             if (completed == globalTimeoutTask)
@@ -532,6 +536,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
             gate = new SemaphoreSlim(_options.MaxDegreeOfParallelism.Value);
         }
 
+        var totalHandles = handles.Count;
         foreach (var h in handles)
         {
             if (gate is not null)
@@ -544,7 +549,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                 RaiseSignalStarted(h.Name);
                 try
                 {
-                    var result = await WaitOneAsync(h, globalCts.Token, swGlobal);
+                    var result = await WaitOneAsync(h, globalCts.Token, swGlobal, totalHandles);
                     RaiseSignalCompleted(result);
                     return result;
                 }
@@ -738,12 +743,18 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
 
                     // Start the signal - gate released in task's finally block
                     gateAcquired = false; // Transfer ownership to task
+                    int pendingAtStart;
+                    lock (syncLock)
+                    {
+                        pendingAtStart = handles.Count - completed.Count;
+                    }
+
                     var task = Task.Run(async () =>
                     {
                         RaiseSignalStarted(signal.Name);
                         try
                         {
-                            var result = await WaitOneAsync(signal, globalCts.Token, swGlobal);
+                            var result = await WaitOneAsync(signal, globalCts.Token, swGlobal, pendingAtStart);
                             RaiseSignalCompleted(result);
 
                             // Capture data for policy check under lock, but evaluate policy outside lock to allow async.
@@ -946,7 +957,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
             };
             
             // Build result from the non-staged execution
-            return await BuildNonStagedResultAsync(signalTasks, signals, globalTimedOut, swGlobal);
+            return await BuildNonStagedResultAsync(signalTasks, signals, globalTimedOut, swGlobal, globalCts.Token);
         }
 
         // For true staged execution, execute each stage in sequence
@@ -1143,6 +1154,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         Stopwatch swGlobal)
     {
         var stageTasks = new List<Task<IgnitionSignalResult>>();
+        var totalInStage = signals.Count;
         foreach (var signal in signals)
         {
             var task = Task.Run(async () =>
@@ -1155,7 +1167,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                 RaiseSignalStarted(signal.Name);
                 try
                 {
-                    var result = await WaitOneAsync(signal, globalCts.Token, swGlobal);
+                    var result = await WaitOneAsync(signal, globalCts.Token, swGlobal, totalInStage);
                     RaiseSignalCompleted(result);
                     return result;
                 }
@@ -1461,7 +1473,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
         return pending;
     }
 
-    private async Task<IgnitionSignalResult> WaitOneAsync(IIgnitionSignal h, CancellationToken globalToken, Stopwatch swGlobal)
+    private async Task<IgnitionSignalResult> WaitOneAsync(IIgnitionSignal h, CancellationToken globalToken, Stopwatch swGlobal, int pendingCount = 0)
     {
         var startedAt = swGlobal.Elapsed;
         var sw = Stopwatch.StartNew();
@@ -1530,7 +1542,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                         GlobalTimeout = _options.GlobalTimeout,
                         CancelIndividualOnTimeout = _options.CancelIndividualOnTimeout,
                         ElapsedTime = swGlobal.Elapsed,
-                        PendingSignalCount = _factories.Count
+                        PendingSignalCount = pendingCount > 0 ? pendingCount : _factories.Count
                     };
                     (effectiveTimeout, cancelOnTimeout) = _options.TimeoutStrategy.GetTimeout(h, timeoutContext);
                 }
@@ -1564,14 +1576,15 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                             sw.Elapsed,
                             CancellationReason: CancellationReason.PerSignalTimeout,
                             StartedAt: startedAt,
-                            CompletedAt: completedAt);
+                            CompletedAt: completedAt,
+                            IsRequired: isRequired);
 
                         // Invoke OnAfterSignalAsync hook for timed out signal
                         if (_options.LifecycleHooks is not null)
                         {
                             try
                             {
-                                await _options.LifecycleHooks.OnAfterSignalAsync(timedOutResult, CancellationToken.None);
+                                await _options.LifecycleHooks.OnAfterSignalAsync(timedOutResult, globalToken);
                             }
                             catch (Exception ex)
                             {
@@ -1598,7 +1611,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
                 {
                     try
                     {
-                        await _options.LifecycleHooks.OnAfterSignalAsync(successResult, CancellationToken.None);
+                        await _options.LifecycleHooks.OnAfterSignalAsync(successResult, globalToken);
                     }
                     catch (Exception ex)
                     {
@@ -1753,7 +1766,7 @@ public sealed class IgnitionCoordinator : IIgnitionCoordinator
             foreach (var r in result.Results)
             {
                 // Only required signals can block startup; advisory (non-required) signals are informational only.
-                if (r.IsRequired && (r.Status == IgnitionSignalStatus.Failed || r.Status == IgnitionSignalStatus.Cancelled))
+                if (r.IsRequired && (r.Status == IgnitionSignalStatus.Failed || r.Status == IgnitionSignalStatus.Cancelled || r.Status == IgnitionSignalStatus.TimedOut))
                 {
                     hasFailed = true;
                     break;
