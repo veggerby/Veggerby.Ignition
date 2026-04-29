@@ -68,7 +68,7 @@ internal sealed class ElasticsearchReadinessSignal : IIgnitionSignal
     }
 
     /// <inheritdoc/>
-    public string Name => "elasticsearch-readiness";
+    public string Name => _options.Name;
 
     /// <inheritdoc/>
     public TimeSpan? Timeout => _options.Timeout;

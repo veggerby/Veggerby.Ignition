@@ -194,9 +194,9 @@ public class HttpReadinessSignalTests
         var httpClient = new HttpClient(handler);
         var options = new HttpReadinessOptions
         {
-            ValidateResponse = async (response) =>
+            ValidateResponse = async (content) =>
             {
-                var content = await response.Content.ReadAsStringAsync();
+                await Task.CompletedTask;
                 return content.Contains("healthy");
             }
         };
@@ -218,9 +218,9 @@ public class HttpReadinessSignalTests
         var httpClient = new HttpClient(handler);
         var options = new HttpReadinessOptions
         {
-            ValidateResponse = async (response) =>
+            ValidateResponse = async (content) =>
             {
-                var content = await response.Content.ReadAsStringAsync();
+                await Task.CompletedTask;
                 return content.Contains("healthy");
             }
         };

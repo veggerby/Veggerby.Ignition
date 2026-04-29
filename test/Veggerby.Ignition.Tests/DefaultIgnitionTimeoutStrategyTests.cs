@@ -4,6 +4,21 @@ namespace Veggerby.Ignition.Tests;
 
 public class DefaultIgnitionTimeoutStrategyTests
 {
+    private static IgnitionTimeoutContext DefaultContext(
+        bool cancelIndividualOnTimeout = false,
+        TimeSpan? globalTimeout = null,
+        TimeSpan? elapsed = null,
+        int pendingCount = 1)
+    {
+        return new IgnitionTimeoutContext
+        {
+            GlobalTimeout = globalTimeout ?? TimeSpan.FromSeconds(30),
+            CancelIndividualOnTimeout = cancelIndividualOnTimeout,
+            ElapsedTime = elapsed ?? TimeSpan.Zero,
+            PendingSignalCount = pendingCount
+        };
+    }
+
     [Fact]
     public void Instance_ReturnsSingletonInstance()
     {
@@ -20,21 +35,9 @@ public class DefaultIgnitionTimeoutStrategyTests
     {
         // arrange
         var strategy = DefaultIgnitionTimeoutStrategy.Instance;
-        var options = new IgnitionOptions();
 
         // act & assert
-        Assert.Throws<ArgumentNullException>(() => strategy.GetTimeout(null!, options));
-    }
-
-    [Fact]
-    public void GetTimeout_WithNullOptions_ThrowsArgumentNullException()
-    {
-        // arrange
-        var strategy = DefaultIgnitionTimeoutStrategy.Instance;
-        var signal = new FakeSignal("test", _ => Task.CompletedTask);
-
-        // act & assert
-        Assert.Throws<ArgumentNullException>(() => strategy.GetTimeout(signal, null!));
+        Assert.Throws<ArgumentNullException>(() => strategy.GetTimeout(null!, DefaultContext()));
     }
 
     [Fact]
@@ -44,10 +47,9 @@ public class DefaultIgnitionTimeoutStrategyTests
         var strategy = DefaultIgnitionTimeoutStrategy.Instance;
         var signalTimeout = TimeSpan.FromSeconds(5);
         var signal = new FakeSignal("test", _ => Task.CompletedTask, signalTimeout);
-        var options = new IgnitionOptions();
 
         // act
-        var (timeout, _) = strategy.GetTimeout(signal, options);
+        var (timeout, _) = strategy.GetTimeout(signal, DefaultContext());
 
         // assert
         timeout.Should().Be(signalTimeout);
@@ -59,28 +61,23 @@ public class DefaultIgnitionTimeoutStrategyTests
         // arrange
         var strategy = DefaultIgnitionTimeoutStrategy.Instance;
         var signal = new FakeSignal("test", _ => Task.CompletedTask);
-        var options = new IgnitionOptions();
 
         // act
-        var (timeout, _) = strategy.GetTimeout(signal, options);
+        var (timeout, _) = strategy.GetTimeout(signal, DefaultContext());
 
         // assert
         timeout.Should().BeNull();
     }
 
     [Fact]
-    public void GetTimeout_ReturnsCancelImmediatelyFromOptions()
+    public void GetTimeout_ReturnsCancelImmediatelyFromContext()
     {
         // arrange
         var strategy = DefaultIgnitionTimeoutStrategy.Instance;
         var signal = new FakeSignal("test", _ => Task.CompletedTask);
-        var options = new IgnitionOptions
-        {
-            CancelIndividualOnTimeout = true
-        };
 
         // act
-        var (_, cancelImmediately) = strategy.GetTimeout(signal, options);
+        var (_, cancelImmediately) = strategy.GetTimeout(signal, DefaultContext(cancelIndividualOnTimeout: true));
 
         // assert
         cancelImmediately.Should().BeTrue();
@@ -92,13 +89,9 @@ public class DefaultIgnitionTimeoutStrategyTests
         // arrange
         var strategy = DefaultIgnitionTimeoutStrategy.Instance;
         var signal = new FakeSignal("test", _ => Task.CompletedTask);
-        var options = new IgnitionOptions
-        {
-            CancelIndividualOnTimeout = false
-        };
 
         // act
-        var (_, cancelImmediately) = strategy.GetTimeout(signal, options);
+        var (_, cancelImmediately) = strategy.GetTimeout(signal, DefaultContext(cancelIndividualOnTimeout: false));
 
         // assert
         cancelImmediately.Should().BeFalse();
@@ -112,12 +105,12 @@ public class DefaultIgnitionTimeoutStrategyTests
         var signal1 = new FakeSignal("signal1", _ => Task.CompletedTask, TimeSpan.FromSeconds(3));
         var signal2 = new FakeSignal("signal2", _ => Task.CompletedTask, TimeSpan.FromSeconds(10));
         var signal3 = new FakeSignal("signal3", _ => Task.CompletedTask);
-        var options = new IgnitionOptions();
+        var context = DefaultContext();
 
         // act
-        var (timeout1, _) = strategy.GetTimeout(signal1, options);
-        var (timeout2, _) = strategy.GetTimeout(signal2, options);
-        var (timeout3, _) = strategy.GetTimeout(signal3, options);
+        var (timeout1, _) = strategy.GetTimeout(signal1, context);
+        var (timeout2, _) = strategy.GetTimeout(signal2, context);
+        var (timeout3, _) = strategy.GetTimeout(signal3, context);
 
         // assert
         timeout1.Should().Be(TimeSpan.FromSeconds(3));
@@ -132,15 +125,12 @@ public class DefaultIgnitionTimeoutStrategyTests
         var strategy = DefaultIgnitionTimeoutStrategy.Instance;
         var signalTimeout = TimeSpan.FromSeconds(7);
         var signal = new FakeSignal("test", _ => Task.CompletedTask, signalTimeout);
-        var options = new IgnitionOptions
-        {
-            CancelIndividualOnTimeout = true
-        };
+        var context = DefaultContext(cancelIndividualOnTimeout: true);
 
         // act
-        var result1 = strategy.GetTimeout(signal, options);
-        var result2 = strategy.GetTimeout(signal, options);
-        var result3 = strategy.GetTimeout(signal, options);
+        var result1 = strategy.GetTimeout(signal, context);
+        var result2 = strategy.GetTimeout(signal, context);
+        var result3 = strategy.GetTimeout(signal, context);
 
         // assert
         result1.Should().Be(result2);
@@ -153,10 +143,9 @@ public class DefaultIgnitionTimeoutStrategyTests
         // arrange
         var strategy = DefaultIgnitionTimeoutStrategy.Instance;
         var signal = new FakeSignal("test", _ => Task.CompletedTask, TimeSpan.Zero);
-        var options = new IgnitionOptions();
 
         // act
-        var (timeout, _) = strategy.GetTimeout(signal, options);
+        var (timeout, _) = strategy.GetTimeout(signal, DefaultContext());
 
         // assert
         timeout.Should().Be(TimeSpan.Zero);
@@ -169,12 +158,44 @@ public class DefaultIgnitionTimeoutStrategyTests
         var strategy = DefaultIgnitionTimeoutStrategy.Instance;
         var largeTimeout = TimeSpan.FromDays(365);
         var signal = new FakeSignal("test", _ => Task.CompletedTask, largeTimeout);
-        var options = new IgnitionOptions();
 
         // act
-        var (timeout, _) = strategy.GetTimeout(signal, options);
+        var (timeout, _) = strategy.GetTimeout(signal, DefaultContext());
 
         // assert
         timeout.Should().Be(largeTimeout);
     }
+
+    [Fact]
+    public void IgnitionTimeoutContext_RemainingGlobalBudget_ComputedCorrectly()
+    {
+        // arrange
+        var context = new IgnitionTimeoutContext
+        {
+            GlobalTimeout = TimeSpan.FromSeconds(30),
+            ElapsedTime = TimeSpan.FromSeconds(10),
+            CancelIndividualOnTimeout = false,
+            PendingSignalCount = 2
+        };
+
+        // act & assert
+        context.RemainingGlobalBudget.Should().Be(TimeSpan.FromSeconds(20));
+    }
+
+    [Fact]
+    public void IgnitionTimeoutContext_RemainingGlobalBudget_NegativeWhenExpired()
+    {
+        // arrange
+        var context = new IgnitionTimeoutContext
+        {
+            GlobalTimeout = TimeSpan.FromSeconds(10),
+            ElapsedTime = TimeSpan.FromSeconds(15),
+            CancelIndividualOnTimeout = false,
+            PendingSignalCount = 1
+        };
+
+        // act & assert
+        context.RemainingGlobalBudget.Should().BeLessThan(TimeSpan.Zero);
+    }
 }
+

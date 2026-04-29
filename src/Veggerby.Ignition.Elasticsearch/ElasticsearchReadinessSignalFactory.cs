@@ -31,7 +31,7 @@ public sealed class ElasticsearchReadinessSignalFactory : IIgnitionSignalFactory
     }
 
     /// <inheritdoc/>
-    public string Name => "elasticsearch-readiness";
+    public string Name => _options.Name;
 
     /// <inheritdoc/>
     public TimeSpan? Timeout => _options.Timeout;

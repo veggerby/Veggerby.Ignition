@@ -39,7 +39,7 @@ internal sealed class AzureTableReadinessSignal : IIgnitionSignal
     }
 
     /// <inheritdoc/>
-    public string Name => "azure-table-readiness";
+    public string Name => _options.Name;
 
     /// <inheritdoc/>
     public TimeSpan? Timeout => _options.Timeout;

@@ -40,7 +40,6 @@ public interface IIgnitionPolicy
     ///   <item>Total signal count (<see cref="IgnitionPolicyContext.TotalSignalCount"/>)</item>
     ///   <item>Elapsed time (<see cref="IgnitionPolicyContext.ElapsedTime"/>)</item>
     ///   <item>Global timeout status (<see cref="IgnitionPolicyContext.GlobalTimeoutElapsed"/>)</item>
-    ///   <item>Execution mode (<see cref="IgnitionPolicyContext.ExecutionMode"/>)</item>
     /// </list>
     /// </para>
     /// <para>

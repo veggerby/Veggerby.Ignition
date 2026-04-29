@@ -46,7 +46,7 @@ internal sealed class GrpcReadinessSignal : IIgnitionSignal, IDisposable
     }
 
     /// <inheritdoc/>
-    public string Name => "grpc-readiness";
+    public string Name => _options.Name;
 
     /// <inheritdoc/>
     public TimeSpan? Timeout => _options.Timeout;

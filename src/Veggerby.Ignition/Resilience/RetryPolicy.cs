@@ -25,7 +25,7 @@ public sealed class RetryPolicy
     public RetryPolicy(int maxRetries = 3, TimeSpan? initialDelay = null, ILogger? logger = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRetries, nameof(maxRetries));
-        
+
         _maxRetries = maxRetries;
         _initialDelay = initialDelay ?? TimeSpan.FromMilliseconds(100);
         _logger = logger;
@@ -46,7 +46,7 @@ public sealed class RetryPolicy
     /// Delay between retries follows exponential backoff: initialDelay, initialDelay*2, initialDelay*4, etc.
     /// If a timeout is specified, the total execution time (including retries and delays) will not exceed this value.
     /// </remarks>
-    public async Task ExecuteAsync(
+    public Task ExecuteAsync(
         Func<CancellationToken, Task> operation,
         string operationName,
         CancellationToken cancellationToken = default,
@@ -55,76 +55,23 @@ public sealed class RetryPolicy
         ArgumentNullException.ThrowIfNull(operation, nameof(operation));
         ArgumentException.ThrowIfNullOrWhiteSpace(operationName, nameof(operationName));
 
-        // Create a timeout cancellation token source if a timeout is configured
-        using var timeoutCts = timeout.HasValue
-            ? new CancellationTokenSource(timeout.Value)
-            : null;
-
-        // Combine the timeout with the incoming cancellation token
-        using var linkedCts = timeoutCts is not null
-            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token)
-            : null;
-
-        var effectiveToken = linkedCts?.Token ?? cancellationToken;
-
-        var attempt = 0;
-        var delay = _initialDelay;
-
-        try
-        {
-            while (true)
+        return ExecuteCoreAsync<bool>(
+            async ct =>
             {
-                attempt++;
-                try
-                {
-                    await operation(effectiveToken).ConfigureAwait(false);
-                    
-                    if (attempt > 1)
-                    {
-                        _logger?.LogInformation(
-                            "{OperationName} succeeded on attempt {Attempt}",
-                            operationName,
-                            attempt);
-                    }
-                    
-                    return;
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException && attempt < _maxRetries)
-                {
-                    _logger?.LogWarning(
-                        ex,
-                        "{OperationName} failed (attempt {Attempt}/{MaxRetries}), retrying in {DelayMs}ms",
-                        operationName,
-                        attempt,
-                        _maxRetries,
-                        delay.TotalMilliseconds);
-
-                    await Task.Delay(delay, effectiveToken).ConfigureAwait(false);
-                    delay = TimeSpan.FromMilliseconds(delay.TotalMilliseconds * 2); // Exponential backoff
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    _logger?.LogError(
-                        ex,
-                        "{OperationName} failed after {Attempts} attempts",
-                        operationName,
-                        attempt);
-                    throw;
-                }
-            }
-        }
-        catch (OperationCanceledException) when (timeoutCts?.Token.IsCancellationRequested == true)
-        {
-            _logger?.LogError("{OperationName} timed out after {Timeout}", operationName, timeout!.Value);
-            throw new TimeoutException($"{operationName} timed out after {timeout!.Value}");
-        }
+                await operation(ct).ConfigureAwait(false);
+                return false; // Placeholder return value; ignored by caller.
+            },
+            shouldRetry: null,
+            operationName,
+            cancellationToken,
+            timeout);
     }
 
     /// <summary>
     /// Executes an async operation with retry logic, exponential backoff, and custom retry condition.
     /// </summary>
     /// <param name="operation">The async operation to execute.</param>
-    /// <param name="shouldRetry">Predicate that determines if a retry should be attempted based on the current state.</param>
+    /// <param name="shouldRetry">Predicate that determines if a retry should be attempted based on the current attempt number.</param>
     /// <param name="operationName">Name of the operation for logging purposes.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <param name="timeout">Optional timeout for the entire operation including all retries.</param>
@@ -136,7 +83,7 @@ public sealed class RetryPolicy
     /// This is useful for scenarios where the retry condition depends on external state (e.g., connection status).
     /// If a timeout is specified, the total execution time (including retries and delays) will not exceed this value.
     /// </remarks>
-    public async Task ExecuteAsync(
+    public Task ExecuteAsync(
         Func<CancellationToken, Task> operation,
         Func<int, bool> shouldRetry,
         string operationName,
@@ -147,84 +94,16 @@ public sealed class RetryPolicy
         ArgumentNullException.ThrowIfNull(shouldRetry, nameof(shouldRetry));
         ArgumentException.ThrowIfNullOrWhiteSpace(operationName, nameof(operationName));
 
-        // Create a timeout cancellation token source if a timeout is configured
-        using var timeoutCts = timeout.HasValue
-            ? new CancellationTokenSource(timeout.Value)
-            : null;
-
-        // Combine the timeout with the incoming cancellation token
-        using var linkedCts = timeoutCts is not null
-            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token)
-            : null;
-
-        var effectiveToken = linkedCts?.Token ?? cancellationToken;
-
-        var attempt = 0;
-        var delay = _initialDelay;
-
-        try
-        {
-            while (true)
+        return ExecuteCoreAsync<bool>(
+            async ct =>
             {
-                attempt++;
-                
-                if (!shouldRetry(attempt))
-                {
-                    if (attempt > 1)
-                    {
-                        _logger?.LogWarning(
-                            "{OperationName} retry condition not met after {Attempts} attempts",
-                            operationName,
-                            attempt - 1);
-                    }
-                    
-                    await operation(effectiveToken).ConfigureAwait(false);
-                    return;
-                }
-
-                try
-                {
-                    await operation(effectiveToken).ConfigureAwait(false);
-                    
-                    if (attempt > 1)
-                    {
-                        _logger?.LogInformation(
-                            "{OperationName} succeeded on attempt {Attempt}",
-                            operationName,
-                            attempt);
-                    }
-                    
-                    return;
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException && attempt < _maxRetries)
-                {
-                    _logger?.LogDebug(
-                        ex,
-                        "{OperationName} failed (transient, attempt {Attempt}/{MaxRetries}), retrying in {DelayMs}ms",
-                        operationName,
-                        attempt,
-                        _maxRetries,
-                        delay.TotalMilliseconds);
-
-                    await Task.Delay(delay, effectiveToken).ConfigureAwait(false);
-                    delay = TimeSpan.FromMilliseconds(delay.TotalMilliseconds * 2); // Exponential backoff
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    _logger?.LogError(
-                        ex,
-                        "{OperationName} failed after {Attempts} attempts",
-                        operationName,
-                        attempt);
-                    throw;
-                }
-            }
-        }
-        catch (OperationCanceledException) when (timeoutCts?.Token.IsCancellationRequested == true)
-        {
-            _logger?.LogError("{OperationName} timed out after {Timeout}", operationName, timeout!.Value);
-            throw new TimeoutException($"{operationName} timed out after {timeout!.Value}");
-        }
+                await operation(ct).ConfigureAwait(false);
+                return false;
+            },
+            shouldRetry,
+            operationName,
+            cancellationToken,
+            timeout);
     }
 
     /// <summary>
@@ -243,7 +122,7 @@ public sealed class RetryPolicy
     /// Delay between retries follows exponential backoff: initialDelay, initialDelay*2, initialDelay*4, etc.
     /// If a timeout is specified, the total execution time (including retries and delays) will not exceed this value.
     /// </remarks>
-    public async Task<T> ExecuteAsync<T>(
+    public Task<T> ExecuteAsync<T>(
         Func<CancellationToken, Task<T>> operation,
         string operationName,
         CancellationToken cancellationToken = default,
@@ -252,12 +131,26 @@ public sealed class RetryPolicy
         ArgumentNullException.ThrowIfNull(operation, nameof(operation));
         ArgumentException.ThrowIfNullOrWhiteSpace(operationName, nameof(operationName));
 
-        // Create a timeout cancellation token source if a timeout is configured
+        return ExecuteCoreAsync(operation, shouldRetry: null, operationName, cancellationToken, timeout);
+    }
+
+    /// <summary>
+    /// Core retry loop shared by all public overloads.
+    /// Sets up the timeout CTS, links it with the caller's token, and drives the
+    /// attempt/backoff/logging loop. All public <c>ExecuteAsync</c> overloads delegate here.
+    /// </summary>
+    private async Task<T> ExecuteCoreAsync<T>(
+        Func<CancellationToken, Task<T>> operation,
+        Func<int, bool>? shouldRetry,
+        string operationName,
+        CancellationToken cancellationToken,
+        TimeSpan? timeout)
+    {
+        // Set up timeout and linked cancellation token.
         using var timeoutCts = timeout.HasValue
             ? new CancellationTokenSource(timeout.Value)
             : null;
 
-        // Combine the timeout with the incoming cancellation token
         using var linkedCts = timeoutCts is not null
             ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token)
             : null;
@@ -272,10 +165,26 @@ public sealed class RetryPolicy
             while (true)
             {
                 attempt++;
+
+                // If caller provided a shouldRetry predicate and it returns false, run the operation
+                // once more without retry wrapping (last-chance execution after exhausting the predicate).
+                if (shouldRetry is not null && !shouldRetry(attempt))
+                {
+                    if (attempt > 1)
+                    {
+                        _logger?.LogWarning(
+                            "{OperationName} retry condition not met after {Attempts} attempts",
+                            operationName,
+                            attempt - 1);
+                    }
+
+                    return await operation(effectiveToken).ConfigureAwait(false);
+                }
+
                 try
                 {
                     var result = await operation(effectiveToken).ConfigureAwait(false);
-                    
+
                     if (attempt > 1)
                     {
                         _logger?.LogInformation(
@@ -283,21 +192,21 @@ public sealed class RetryPolicy
                             operationName,
                             attempt);
                     }
-                    
+
                     return result;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException && attempt < _maxRetries)
                 {
-                    _logger?.LogDebug(
+                    _logger?.LogWarning(
                         ex,
-                        "{OperationName} failed (transient, attempt {Attempt}/{MaxRetries}), retrying in {DelayMs}ms",
+                        "{OperationName} failed (attempt {Attempt}/{MaxRetries}), retrying in {DelayMs}ms",
                         operationName,
                         attempt,
                         _maxRetries,
                         delay.TotalMilliseconds);
 
                     await Task.Delay(delay, effectiveToken).ConfigureAwait(false);
-                    delay = TimeSpan.FromMilliseconds(delay.TotalMilliseconds * 2); // Exponential backoff
+                    delay = TimeSpan.FromMilliseconds(delay.TotalMilliseconds * 2);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {

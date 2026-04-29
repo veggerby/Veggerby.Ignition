@@ -76,14 +76,4 @@ public sealed class IgnitionPolicyContext
     /// </para>
     /// </remarks>
     public required bool GlobalTimeoutElapsed { get; init; }
-
-    /// <summary>
-    /// Gets the execution mode used for this ignition run.
-    /// </summary>
-    /// <remarks>
-    /// Policies can adjust their behavior based on execution mode. For example, a policy might
-    /// be more lenient in parallel mode (where failures are expected to be aggregated) versus
-    /// sequential mode (where failures should stop execution immediately).
-    /// </remarks>
-    public required IgnitionExecutionMode ExecutionMode { get; init; }
 }

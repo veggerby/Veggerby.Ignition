@@ -271,6 +271,100 @@ public static class IgnitionExtensions
         => services.AddIgnitionSignals((IEnumerable<IIgnitionSignal>)signals);
 
     /// <summary>
+    /// Conditionally registers a named ignition signal from a task factory, only if <paramref name="condition"/> is <c>true</c>.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="condition">If <c>false</c>, the signal is not registered and this method is a no-op.</param>
+    /// <param name="name">Logical signal name used for diagnostics and result reporting.</param>
+    /// <param name="readyTaskFactory">Factory producing the readiness task when first awaited.</param>
+    /// <param name="timeout">Optional per-signal timeout limit applied by the coordinator.</param>
+    /// <returns>The same service collection for chaining.</returns>
+    /// <remarks>
+    /// Useful for environment-conditional registration, e.g., registering a Redis signal only when Redis is enabled:
+    /// <code>
+    /// services.AddIgnitionFromTaskIf(configuration.GetValue&lt;bool&gt;("Redis:Enabled"),
+    ///     "redis-readiness", ct => redis.PingAsync(ct));
+    /// </code>
+    /// </remarks>
+    public static IServiceCollection AddIgnitionFromTaskIf(
+        this IServiceCollection services,
+        bool condition,
+        string name,
+        Func<CancellationToken, Task> readyTaskFactory,
+        TimeSpan? timeout = null)
+    {
+        if (!condition)
+        {
+            return services;
+        }
+
+        return services.AddIgnitionFromTask(name, readyTaskFactory, timeout);
+    }
+
+    /// <summary>
+    /// Conditionally registers a named ignition signal from an already-created task, only if <paramref name="condition"/> is <c>true</c>.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="condition">If <c>false</c>, the signal is not registered and this method is a no-op.</param>
+    /// <param name="name">Logical signal name used for diagnostics and result reporting.</param>
+    /// <param name="readyTask">Task that completes when the underlying component is ready.</param>
+    /// <param name="timeout">Optional per-signal timeout limit applied by the coordinator.</param>
+    /// <returns>The same service collection for chaining.</returns>
+    public static IServiceCollection AddIgnitionFromTaskIf(
+        this IServiceCollection services,
+        bool condition,
+        string name,
+        Task readyTask,
+        TimeSpan? timeout = null)
+    {
+        if (!condition)
+        {
+            return services;
+        }
+
+        return services.AddIgnitionFromTask(name, readyTask, timeout);
+    }
+
+    /// <summary>
+    /// Conditionally registers a pre-built ignition signal instance, only if <paramref name="condition"/> is <c>true</c>.
+    /// </summary>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="condition">If <c>false</c>, the signal is not registered and this method is a no-op.</param>
+    /// <param name="signal">The signal instance to register when the condition is satisfied.</param>
+    /// <returns>The same service collection for chaining.</returns>
+    public static IServiceCollection AddIgnitionSignalIf(
+        this IServiceCollection services,
+        bool condition,
+        IIgnitionSignal signal)
+    {
+        if (!condition)
+        {
+            return services;
+        }
+
+        return services.AddIgnitionSignal(signal);
+    }
+
+    /// <summary>
+    /// Conditionally registers an ignition signal by type, only if <paramref name="condition"/> is <c>true</c>.
+    /// </summary>
+    /// <typeparam name="TSignal">Concrete signal type to register.</typeparam>
+    /// <param name="services">Target DI service collection.</param>
+    /// <param name="condition">If <c>false</c>, the signal type is not registered and this method is a no-op.</param>
+    /// <returns>The same service collection for chaining.</returns>
+    public static IServiceCollection AddIgnitionSignalIf<TSignal>(
+        this IServiceCollection services,
+        bool condition) where TSignal : class, IIgnitionSignal
+    {
+        if (!condition)
+        {
+            return services;
+        }
+
+        return services.AddIgnitionSignal<TSignal>();
+    }
+
+    /// <summary>
     /// Adapts an existing already-created readiness <see cref="Task"/> into an ignition signal.
     /// </summary>
     /// <param name="services">Target DI service collection.</param>
@@ -860,7 +954,8 @@ public static class IgnitionExtensions
     /// <returns>The same service collection for chaining.</returns>
     /// <remarks>
     /// Bundles provide a convenient way to register grouped sets of signals with optional shared configuration.
-    /// The bundle's <see cref="IIgnitionBundle.ConfigureBundle"/> method is invoked immediately to register signals and configure dependencies.
+    /// The bundle's <see cref="IIgnitionBundle.ConfigureBundle"/> method is invoked immediately via an
+    /// <see cref="IIgnitionRegistrar"/> to register signals and configure dependencies.
     /// Per-bundle options (e.g., <see cref="IgnitionBundleOptions.DefaultTimeout"/>) are applied to signals registered by the bundle.
     /// </remarks>
     public static IServiceCollection AddIgnitionBundle(
@@ -870,7 +965,8 @@ public static class IgnitionExtensions
     {
         ArgumentNullException.ThrowIfNull(bundle, nameof(bundle));
 
-        bundle.ConfigureBundle(services, configure);
+        var registrar = new IgnitionRegistrar(services);
+        bundle.ConfigureBundle(registrar, configure);
 
         return services;
     }
@@ -891,7 +987,8 @@ public static class IgnitionExtensions
         Action<IgnitionBundleOptions>? configure = null) where TBundle : class, IIgnitionBundle, new()
     {
         var bundle = new TBundle();
-        bundle.ConfigureBundle(services, configure);
+        var registrar = new IgnitionRegistrar(services);
+        bundle.ConfigureBundle(registrar, configure);
 
         return services;
     }

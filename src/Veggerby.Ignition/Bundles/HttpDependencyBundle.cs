@@ -2,8 +2,6 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 
-using Microsoft.Extensions.DependencyInjection;
-
 namespace Veggerby.Ignition.Bundles;
 
 /// <summary>
@@ -56,7 +54,7 @@ public sealed class HttpDependencyBundle : IIgnitionBundle
     public string Name => "HttpDependency";
 
     /// <inheritdoc/>
-    public void ConfigureBundle(IServiceCollection services, Action<IgnitionBundleOptions>? configure = null)
+    public void ConfigureBundle(IIgnitionRegistrar registrar, Action<IgnitionBundleOptions>? configure = null)
     {
         var options = new IgnitionBundleOptions { DefaultTimeout = _defaultTimeout };
         configure?.Invoke(options);
@@ -64,7 +62,7 @@ public sealed class HttpDependencyBundle : IIgnitionBundle
         foreach (var endpoint in _endpoints)
         {
             var signal = new HttpEndpointSignal(endpoint, options.DefaultTimeout);
-            services.AddIgnitionSignal(signal);
+            registrar.AddSignal(signal);
         }
     }
 

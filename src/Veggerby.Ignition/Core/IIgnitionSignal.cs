@@ -28,6 +28,26 @@ public interface IIgnitionSignal
     TimeSpan? Timeout { get; }
 
     /// <summary>
+    /// Gets whether this signal is critical for startup success.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// When <c>true</c> (the default), a failure or timeout of this signal contributes to the overall startup
+    /// failure outcome and is treated as a blocking dependency.
+    /// </para>
+    /// <para>
+    /// When <c>false</c>, the signal is advisory: its outcome is recorded in diagnostics and the health check,
+    /// but a failure or timeout does not block startup from being declared successful. This is useful for
+    /// optional features like warm caches, background enrichment services, or telemetry collectors.
+    /// </para>
+    /// <para>
+    /// Existing implementations that do not override this property automatically inherit <c>true</c>
+    /// (fully required), preserving backward compatibility.
+    /// </para>
+    /// </remarks>
+    bool IsRequired => true;
+
+    /// <summary>
     /// Await the readiness of this signal. Should complete successfully when ready or throw to indicate failure.
     /// The provided <paramref name="cancellationToken"/> is cooperative and should be honored if supported.
     /// </summary>

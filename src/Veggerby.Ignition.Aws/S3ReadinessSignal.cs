@@ -40,7 +40,7 @@ internal sealed class S3ReadinessSignal : IIgnitionSignal
     }
 
     /// <inheritdoc/>
-    public string Name => "s3-readiness";
+    public string Name => _options.Name;
 
     /// <inheritdoc/>
     public TimeSpan? Timeout => _options.Timeout;

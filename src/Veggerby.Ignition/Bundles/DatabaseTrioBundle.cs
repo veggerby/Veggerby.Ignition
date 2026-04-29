@@ -1,8 +1,5 @@
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Veggerby.Ignition.Bundles;
 
@@ -11,8 +8,11 @@ namespace Veggerby.Ignition.Bundles;
 /// connection establishment, schema validation, and initial data warmup.
 /// </summary>
 /// <remarks>
-/// This bundle demonstrates a dependency-aware pattern where schema validation depends on connection,
-/// and data warmup depends on schema validation. Users provide factory delegates for each phase.
+/// This bundle registers three signals: connect, validate-schema (optional), and warmup (optional).
+/// To enforce the natural ordering (connect → validate-schema → warmup), configure the coordinator
+/// with <see cref="IgnitionExecutionMode.Sequential"/> so signals execute in registration order.
+/// In <see cref="IgnitionExecutionMode.Parallel"/> or <see cref="IgnitionExecutionMode.DependencyAware"/>
+/// modes without an explicit graph, the signals may run concurrently.
 /// </remarks>
 public sealed class DatabaseTrioBundle : IIgnitionBundle
 {
@@ -51,59 +51,26 @@ public sealed class DatabaseTrioBundle : IIgnitionBundle
     public string Name => $"DatabaseTrio:{_databaseName}";
 
     /// <inheritdoc/>
-    public void ConfigureBundle(IServiceCollection services, Action<IgnitionBundleOptions>? configure = null)
+    public void ConfigureBundle(IIgnitionRegistrar registrar, Action<IgnitionBundleOptions>? configure = null)
     {
         var options = new IgnitionBundleOptions { DefaultTimeout = _defaultTimeout };
         configure?.Invoke(options);
 
         var connectSignal = new DatabasePhaseSignal($"{_databaseName}:connect", _connectFactory, options.DefaultTimeout);
-        services.AddIgnitionSignal(connectSignal);
+        registrar.AddSignal(connectSignal);
 
         DatabasePhaseSignal? validateSignal = null;
         if (_validateSchemaFactory is not null)
         {
             validateSignal = new DatabasePhaseSignal($"{_databaseName}:validate-schema", _validateSchemaFactory, options.DefaultTimeout);
-            services.AddIgnitionSignal(validateSignal);
+            registrar.AddSignal(validateSignal);
         }
 
         DatabasePhaseSignal? warmupSignal = null;
         if (_warmupFactory is not null)
         {
             warmupSignal = new DatabasePhaseSignal($"{_databaseName}:warmup", _warmupFactory, options.DefaultTimeout);
-            services.AddIgnitionSignal(warmupSignal);
-        }
-
-        // Register dependency graph if any dependencies exist
-        if (validateSignal is not null || warmupSignal is not null)
-        {
-            services.AddIgnitionGraph((builder, sp) =>
-            {
-                // Only add signals from this bundle to avoid unnecessary dependencies with other bundles
-                var bundleSignals = new List<IIgnitionSignal> { connectSignal };
-                if (validateSignal is not null)
-                {
-                    bundleSignals.Add(validateSignal);
-                }
-                if (warmupSignal is not null)
-                {
-                    bundleSignals.Add(warmupSignal);
-                }
-
-                builder.AddSignals(bundleSignals);
-
-                // Schema validation depends on connection
-                if (validateSignal is not null)
-                {
-                    builder.DependsOn(validateSignal, connectSignal);
-                }
-
-                // Warmup depends on schema validation if present, otherwise on connection
-                if (warmupSignal is not null)
-                {
-                    var dependency = validateSignal ?? connectSignal;
-                    builder.DependsOn(warmupSignal, dependency);
-                }
-            });
+            registrar.AddSignal(warmupSignal);
         }
     }
 

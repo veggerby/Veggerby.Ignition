@@ -10,9 +10,12 @@ namespace Veggerby.Ignition;
 /// </summary>
 /// <remarks>
 /// Bundles provide a convenient way to group related signals with optional per-bundle configuration overrides
-/// (timeouts, policies, dependencies). Each bundle registers its signals and optionally a dependency graph
-/// when <see cref="ConfigureBundle(IServiceCollection, Action{IgnitionBundleOptions}?)"/> is invoked.
+/// (timeouts, policies, dependencies). Each bundle registers its signals via an <see cref="IIgnitionRegistrar"/>
+/// when <see cref="ConfigureBundle(IIgnitionRegistrar, Action{IgnitionBundleOptions}?)"/> is invoked.
 /// 
+/// Using <see cref="IIgnitionRegistrar"/> (rather than the raw <c>IServiceCollection</c>) prevents bundles
+/// from registering arbitrary unrelated services and keeps bundle logic focused on signal registration.
+///
 /// Implementation guidelines:
 /// - Keep bundle logic lightweight and focused on registration; avoid heavy initialization in the bundle itself.
 /// - Use <see cref="IgnitionBundleOptions"/> to provide per-bundle timeout and policy overrides.
@@ -27,14 +30,17 @@ public interface IIgnitionBundle
     string Name { get; }
 
     /// <summary>
-    /// Configure the bundle by registering its signals and optional dependency graph.
+    /// Configure the bundle by registering its signals via the provided <see cref="IIgnitionRegistrar"/>.
     /// </summary>
-    /// <param name="services">Target DI service collection.</param>
+    /// <param name="registrar">Narrowly-scoped registrar that only exposes ignition-signal registration methods.</param>
     /// <param name="configure">Optional configuration delegate for per-bundle options.</param>
     /// <remarks>
     /// This method is invoked once during DI container setup when the bundle is registered via
-    /// <see cref="IgnitionExtensions.AddIgnitionBundle(IServiceCollection, IIgnitionBundle, Action{IgnitionBundleOptions}?)"/>.
-    /// Implementations should register all signals and optionally configure a dependency graph if signals have prerequisites.
+    /// <see cref="IgnitionExtensions.AddIgnitionBundle(Microsoft.Extensions.DependencyInjection.IServiceCollection, IIgnitionBundle, Action{IgnitionBundleOptions}?)"/>.
+    /// Implementations register all signals via the <paramref name="registrar"/>. To enforce ordering
+    /// among a bundle's signals, use <see cref="IgnitionExecutionMode.Sequential"/> on the coordinator
+    /// (signals execute in registration order) or register the bundle signals with explicit stage numbers
+    /// for staged execution.
     /// </remarks>
-    void ConfigureBundle(IServiceCollection services, Action<IgnitionBundleOptions>? configure = null);
+    void ConfigureBundle(IIgnitionRegistrar registrar, Action<IgnitionBundleOptions>? configure = null);
 }

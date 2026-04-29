@@ -24,13 +24,13 @@ public class RedisStarterBundle : IIgnitionBundle
 
     public string Name => "RedisStarter";
 
-    public void ConfigureBundle(IServiceCollection services, Action<IgnitionBundleOptions>? configure = null)
+    public void ConfigureBundle(IIgnitionRegistrar registrar, Action<IgnitionBundleOptions>? configure = null)
     {
         var options = new IgnitionBundleOptions();
         configure?.Invoke(options);
 
         // Register three signals for Redis initialization
-        services.AddIgnitionFromTask(
+        registrar.AddSignal(
             "redis:connect",
             async ct =>
             {
@@ -40,7 +40,7 @@ public class RedisStarterBundle : IIgnitionBundle
             },
             options.DefaultTimeout);
 
-        services.AddIgnitionFromTask(
+        registrar.AddSignal(
             "redis:health-check",
             async ct =>
             {
@@ -50,7 +50,7 @@ public class RedisStarterBundle : IIgnitionBundle
             },
             options.DefaultTimeout);
 
-        services.AddIgnitionFromTask(
+        registrar.AddSignal(
             "redis:warmup-cache",
             async ct =>
             {
@@ -59,22 +59,6 @@ public class RedisStarterBundle : IIgnitionBundle
                 Console.WriteLine("✅ Redis cache warmed successfully");
             },
             options.DefaultTimeout);
-
-        // Configure dependency graph: connect → health → warmup
-        services.AddIgnitionGraph((builder, sp) =>
-        {
-            var signals = sp.GetServices<IIgnitionSignal>().ToList();
-            var connectSig = signals.FirstOrDefault(s => s.Name == "redis:connect");
-            var healthSig = signals.FirstOrDefault(s => s.Name == "redis:health-check");
-            var warmupSig = signals.FirstOrDefault(s => s.Name == "redis:warmup-cache");
-
-            if (connectSig is not null && healthSig is not null && warmupSig is not null)
-            {
-                builder.AddSignals(new[] { connectSig, healthSig, warmupSig });
-                builder.DependsOn(healthSig, connectSig);
-                builder.DependsOn(warmupSig, healthSig);
-            }
-        });
     }
 }
 
@@ -92,12 +76,12 @@ public class MessageQueueBundle : IIgnitionBundle
 
     public string Name => $"MessageQueue:{_queueName}";
 
-    public void ConfigureBundle(IServiceCollection services, Action<IgnitionBundleOptions>? configure = null)
+    public void ConfigureBundle(IIgnitionRegistrar registrar, Action<IgnitionBundleOptions>? configure = null)
     {
         var options = new IgnitionBundleOptions();
         configure?.Invoke(options);
 
-        services.AddIgnitionFromTask(
+        registrar.AddSignal(
             $"queue:{_queueName}:connect",
             async ct =>
             {
@@ -107,7 +91,7 @@ public class MessageQueueBundle : IIgnitionBundle
             },
             options.DefaultTimeout);
 
-        services.AddIgnitionFromTask(
+        registrar.AddSignal(
             $"queue:{_queueName}:subscribe",
             async ct =>
             {
@@ -116,20 +100,6 @@ public class MessageQueueBundle : IIgnitionBundle
                 Console.WriteLine($"✅ Subscribed to queue '{_queueName}'");
             },
             options.DefaultTimeout);
-
-        // Configure dependency: subscribe depends on connect
-        services.AddIgnitionGraph((builder, sp) =>
-        {
-            var signals = sp.GetServices<IIgnitionSignal>().ToList();
-            var connectSig = signals.FirstOrDefault(s => s.Name == $"queue:{_queueName}:connect");
-            var subscribeSig = signals.FirstOrDefault(s => s.Name == $"queue:{_queueName}:subscribe");
-
-            if (connectSig is not null && subscribeSig is not null)
-            {
-                builder.AddSignals(new[] { connectSig, subscribeSig });
-                builder.DependsOn(subscribeSig, connectSig);
-            }
-        });
     }
 }
 
@@ -166,7 +136,7 @@ public class Program
             {
                 services.AddIgnition(options =>
                 {
-                    options.ExecutionMode = IgnitionExecutionMode.DependencyAware;
+                    options.ExecutionMode = IgnitionExecutionMode.Sequential;
                     options.Policy = IgnitionPolicy.BestEffort;
                     options.GlobalTimeout = TimeSpan.FromSeconds(30);
                 });
@@ -219,7 +189,7 @@ public class Program
             {
                 services.AddIgnition(options =>
                 {
-                    options.ExecutionMode = IgnitionExecutionMode.DependencyAware;
+                    options.ExecutionMode = IgnitionExecutionMode.Parallel;
                     options.Policy = IgnitionPolicy.BestEffort;
                     options.GlobalTimeout = TimeSpan.FromSeconds(30);
                 });
@@ -314,10 +284,11 @@ public class Program
             Console.WriteLine($"   Total Duration: {result.TotalDuration.TotalMilliseconds:F0}ms");
             Console.WriteLine($"   Timed Out: {(result.TimedOut ? "YES" : "NO")}");
 
-            var succeeded = result.Results.Count(r => r.Status == IgnitionSignalStatus.Succeeded);
-            var failed = result.Results.Count(r => r.Status == IgnitionSignalStatus.Failed);
-            var skipped = result.Results.Count(r => r.Status == IgnitionSignalStatus.Skipped);
-            var timedOut = result.Results.Count(r => r.Status == IgnitionSignalStatus.TimedOut);
+            var allResults = result.Results.ToList();
+            var succeeded = allResults.Count(r => r.Status == IgnitionSignalStatus.Succeeded);
+            var failed = allResults.Count(r => r.Status == IgnitionSignalStatus.Failed);
+            var skipped = allResults.Count(r => r.Status == IgnitionSignalStatus.Skipped);
+            var timedOut = allResults.Count(r => r.Status == IgnitionSignalStatus.TimedOut);
 
             Console.WriteLine($"   Success: {succeeded}/{result.Results.Count}");
             if (failed > 0) Console.WriteLine($"   Failed: {failed}");
@@ -325,7 +296,7 @@ public class Program
             if (timedOut > 0) Console.WriteLine($"   Timed Out: {timedOut}");
 
             Console.WriteLine("\n📋 Signal Execution Details:");
-            foreach (var signalResult in result.Results.OrderBy(r => r.Name))
+            foreach (var signalResult in allResults.OrderBy(r => r.Name))
             {
                 var icon = signalResult.Status switch
                 {
@@ -350,7 +321,7 @@ public class Program
                 Console.WriteLine();
             }
 
-            var overallSuccess = result.Results.All(r => r.Status == IgnitionSignalStatus.Succeeded);
+            var overallSuccess = allResults.All(r => r.Status == IgnitionSignalStatus.Succeeded);
             Console.WriteLine($"\n{(overallSuccess ? "✅" : "⚠️ ")} Overall Status: {(overallSuccess ? "SUCCESS" : "COMPLETED WITH ISSUES")}");
 
             if (overallSuccess)

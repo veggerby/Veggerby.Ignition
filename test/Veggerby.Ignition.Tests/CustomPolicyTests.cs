@@ -114,7 +114,6 @@ public class CustomPolicyTests
         var lastContext = policy.LastContext!;
         lastContext.TotalSignalCount.Should().Be(3);
         lastContext.CompletedSignals.Should().HaveCount(3);
-        lastContext.ExecutionMode.Should().Be(IgnitionExecutionMode.Sequential);
         lastContext.ElapsedTime.Should().BeGreaterThan(TimeSpan.Zero);
         lastContext.GlobalTimeoutElapsed.Should().BeFalse();
     }

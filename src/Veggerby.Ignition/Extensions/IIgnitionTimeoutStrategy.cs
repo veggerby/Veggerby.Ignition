@@ -28,7 +28,7 @@ public interface IIgnitionTimeoutStrategy
     /// Determines the timeout and cancellation behavior for a specific ignition signal.
     /// </summary>
     /// <param name="signal">The ignition signal being evaluated.</param>
-    /// <param name="options">The current ignition options providing global configuration context.</param>
+    /// <param name="context">A focused context providing the relevant global configuration and runtime state.</param>
     /// <returns>
     /// A tuple containing:
     /// <list type="bullet">
@@ -48,5 +48,5 @@ public interface IIgnitionTimeoutStrategy
     /// <c>false</c> allows the task to continue running while classifying the result as timed out.
     /// </para>
     /// </remarks>
-    (TimeSpan? signalTimeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionOptions options);
+    (TimeSpan? signalTimeout, bool cancelImmediately) GetTimeout(IIgnitionSignal signal, IgnitionTimeoutContext context);
 }

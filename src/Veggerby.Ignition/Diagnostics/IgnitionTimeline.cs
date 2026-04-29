@@ -145,6 +145,26 @@ public sealed class IgnitionTimeline
     [JsonPropertyName("summary")]
     public IgnitionTimelineSummary? Summary { get; init; }
 
+    // Cached serialization option instances to avoid recreating them on every call.
+    private static readonly JsonSerializerOptions WriteOptionsIndented = new()
+    {
+        WriteIndented = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
+    private static readonly JsonSerializerOptions WriteOptionsCompact = new()
+    {
+        WriteIndented = false,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
+    private static readonly JsonSerializerOptions ReadOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
     /// <summary>
     /// Exports the timeline to a JSON string.
     /// </summary>
@@ -152,13 +172,7 @@ public sealed class IgnitionTimeline
     /// <returns>A JSON string representation of the timeline.</returns>
     public string ToJson(bool indented = true)
     {
-        var options = new JsonSerializerOptions
-        {
-            WriteIndented = indented,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        };
-        return JsonSerializer.Serialize(this, options);
+        return JsonSerializer.Serialize(this, indented ? WriteOptionsIndented : WriteOptionsCompact);
     }
 
     /// <summary>
@@ -168,11 +182,7 @@ public sealed class IgnitionTimeline
     /// <returns>The deserialized timeline, or null if deserialization fails.</returns>
     public static IgnitionTimeline? FromJson(string json)
     {
-        var options = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        };
-        return JsonSerializer.Deserialize<IgnitionTimeline>(json, options);
+        return JsonSerializer.Deserialize<IgnitionTimeline>(json, ReadOptions);
     }
 }
 

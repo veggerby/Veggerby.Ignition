@@ -38,7 +38,7 @@ internal sealed class AzureQueueReadinessSignal : IIgnitionSignal
     }
 
     /// <inheritdoc/>
-    public string Name => "azure-queue-readiness";
+    public string Name => _options.Name;
 
     /// <inheritdoc/>
     public TimeSpan? Timeout => _options.Timeout;

@@ -9,6 +9,13 @@ namespace Veggerby.Ignition.MySql;
 public sealed class MySqlReadinessOptions
 {
     /// <summary>
+    /// Signal name used for diagnostics, health reporting, and timeline visualization.
+    /// Must be unique across all registered signals; allows multiple instances of the same
+    /// provider to be registered with distinguishable names (e.g., "redis-primary", "redis-replica").
+    /// </summary>
+    public string Name { get; set; } = "mysql-readiness";
+
+    /// <summary>
     /// Optional per-signal timeout. If <c>null</c>, the global timeout configured via <see cref="IgnitionOptions"/> applies.
     /// Default is 30 seconds.
     /// </summary>

@@ -27,7 +27,7 @@ public sealed class MongoDbReadinessSignalFactory : IIgnitionSignalFactory
     }
 
     /// <inheritdoc/>
-    public string Name => "mongodb-readiness";
+    public string Name => _options.Name;
 
     /// <inheritdoc/>
     public TimeSpan? Timeout => _options.Timeout;
