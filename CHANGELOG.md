@@ -8,15 +8,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
-- None.
+- **Core: `IIgnitionRegistrar`** — narrowly-scoped registration API for bundle implementations. Bundles now receive `IIgnitionRegistrar` instead of `IServiceCollection`, preventing them from registering unrelated services and keeping bundle logic focused on signal registration. Supports fluent `AddSignal(...)` and `AddSignalFactory(...)` overloads mirroring the existing `IgnitionExtensions` helpers.
+- **Core: `IgnitionTimeoutContext`** — focused read-only context struct passed to `IIgnitionTimeoutStrategy.GetTimeout`, replacing the raw `IgnitionOptions` parameter. Exposes `GlobalTimeout`, `CancelIndividualOnTimeout`, `ElapsedTime`, `RemainingGlobalBudget`, and `PendingSignalCount`, enabling adaptive strategies to distribute remaining time proportionally across outstanding signals.
+- **Core: `IIgnitionSignalFilter`** — new extensibility interface consulted before each signal executes. Filters return `false` to skip a signal (recorded as `Skipped`); evaluated in registration order; first `false` stops further filter evaluation for that signal. Common uses: environment-conditional skipping, pre-execution logging/metrics, compliance gating.
+- **Core: `IIgnitionValidator`** — new pre-flight validation interface invoked before any signals execute. Validators receive `IIgnitionSignalFactory` descriptors (not constructed signals) to avoid side-effects; errors cause `IgnitionValidationException` to be thrown before execution starts. Common uses: required config checks, duplicate-name detection, environment assertions.
+- **Core: `IAsyncIgnitionPolicy`** — extends `IIgnitionPolicy` with an async `ShouldContinueAsync` method. The coordinator prefers the async overload when the policy also implements this interface; policies should still provide a correct synchronous fallback. Enables policies that consult remote circuit breakers or async metrics sinks.
+- **Core: `IgnitionValidationException`** — new exception type thrown when one or more `IIgnitionValidator` instances report errors. Carries the full list of error messages for structured diagnostic reporting.
+- **All integration packages: configurable signal `Name`** — every integration package's `*ReadinessOptions` class now exposes a writable `Name` property (defaulting to the existing static name). This allows multiple instances of the same provider to be registered with distinguishable names (e.g., `"redis-primary"`, `"redis-replica"`).
 
 ### Changed
 
-- None.
+- **Breaking: `IIgnitionBundle.ConfigureBundle`** — parameter changed from `IServiceCollection services` to `IIgnitionRegistrar registrar`. Existing bundle implementations must be updated to use `registrar.AddSignal(...)` instead of `services.AddIgnitionFromTask(...)` / `services.AddIgnition*(...)`.
+- **Breaking: `IIgnitionTimeoutStrategy.GetTimeout`** — second parameter changed from `IgnitionOptions options` to `IgnitionTimeoutContext context`. Update custom strategy implementations to read values from the new context struct instead of `IgnitionOptions` directly.
+- **`DatabaseTrioBundle` and `HttpDependencyBundle`** — updated to use the new `IIgnitionRegistrar` API; dependency-graph wiring inside bundle removed in favour of `Sequential` execution mode for ordered phase execution.
+- **`RetryPolicy`** — significantly simplified; complex internal state removed while preserving all supported call sites, reducing allocations in the retry hot path.
+- **OpenTelemetry** — updated from 1.14.0 to 1.15.3 (`OpenTelemetry` and `OpenTelemetry.Exporter.Console`).
 
 ### Fixed
 
-- None.
+- **Advisory signals timed-out no longer report `IsRequired = true`** — the `timedOutResult` in the coordinator was not propagating the `isRequired` flag, causing advisory (non-required) signals that timed out to be incorrectly classified as required. Required signals with `TimedOut` status now also correctly block startup in `TransitionToFinalState`.
+- **`OnAfterSignalAsync` and parallel `PolicyShouldContinueAsync`** — both now receive the `globalCts.Token` instead of `CancellationToken.None`, so post-signal hooks and policy decisions respect the global cancellation context.
+- **`IgnitionValidationException`** — null `errors` list now throws `ArgumentNullException` (not `NullReferenceException`) due to moved null-check before `base()` message construction.
+- **`ValidateFactoryNames`** — now rejects null or whitespace factory names with a clear `ArgumentException` that includes the factory type name, improving diagnostics for misconfigured factories.
+- **`IIgnitionValidator.ValidateAsync` receives factory descriptors** — changed from `IReadOnlyList<IIgnitionSignal>` to `IReadOnlyList<IIgnitionSignalFactory>`, eliminating duplicate signal construction and avoiding constructor side-effects before execution.
 
 ## [0.6.0] - 2026-02-02
 
